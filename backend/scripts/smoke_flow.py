@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Smoke flow end-to-end:
-1) Get slots (SERVICE_ID, PROFESSIONAL_ID, DAYS_AHEAD)
-2) Create reservation
-3) Reschedule to next slot
-4) Cancel reservation
-5) Run sync (both) for that day
-6) Show conflicts for that day
+Flujo de humo (end-to-end):
+1) Obtener huecos (SERVICE_ID, PROFESSIONAL_ID, DAYS_AHEAD)
+2) Crear reserva
+3) Reprogramar a siguiente hueco
+4) Cancelar reserva
+5) Sincronizar (both) para ese día
+6) Mostrar conflictos para ese día
 
-Env vars:
+Variables de entorno:
   BASE=http://127.0.0.1:8776
   API_KEY=dev-key
   SERVICE_ID=corte
@@ -61,7 +61,7 @@ def main() -> None:
     arr = slots.get("slots") or []
     out["slots"] = len(arr)
     if len(arr) < 2:
-        print(json.dumps({"ok": False, "error": "need at least 2 slots", **out}))
+        print(json.dumps({"ok": False, "error": "se requieren al menos 2 huecos", **out}))
         return
     first, second = arr[0], arr[1]
     created = _post(

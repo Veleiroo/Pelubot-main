@@ -9,9 +9,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI
+import logging
 from fastapi.middleware.cors import CORSMiddleware
 
-# Use API router from the structured package (it re-exports legacy routes)
+# Usa el router de la API del paquete estructurado (reexporta rutas heredadas)
 from app.api.routes import router
 
 from app.db import create_db_and_tables
@@ -23,6 +24,8 @@ from app.services.logic import sync_from_gcal_range
 from app.core.logging_config import setup_logging
 from app.core.middleware import RequestIDMiddleware
 from app.core.errors import install_exception_handlers
+from app.core.metrics import install_metrics
+from app.core.rate_limit import RateLimitMiddleware
 
 
 @asynccontextmanager
@@ -58,6 +61,13 @@ def create_app() -> FastAPI:
     else:
         allow_origins = ["*"]
 
+    # Aviso si CORS está abierto en lo que parece un entorno de producción
+    try:
+        if allow_origins == ["*"] and os.getenv("ENV", "dev").lower() in ("prod", "production"):
+            logging.getLogger("pelubot.main").warning("CORS abierto (*) en ENV=prod. Define ORIGINS en .env")
+    except Exception:
+        pass
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allow_origins,
@@ -67,7 +77,15 @@ def create_app() -> FastAPI:
     )
 
     app.add_middleware(RequestIDMiddleware)
+    # Rate limiting básico (memoria local por proceso)
+    try:
+        limit_admin = int(os.getenv("RATE_LIMIT_ADMIN_PER_MIN", "30"))
+        limit_ops = int(os.getenv("RATE_LIMIT_OPS_PER_MIN", "60"))
+    except Exception:
+        limit_admin, limit_ops = 30, 60
+    app.add_middleware(RateLimitMiddleware, window=60, limit_admin=limit_admin, limit_ops=limit_ops)
     install_exception_handlers(app)
+    install_metrics(app)
     app.include_router(router)
     return app
 

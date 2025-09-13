@@ -7,6 +7,7 @@ from typing import List, Optional
 from datetime import datetime, date, timezone
 from sqlmodel import SQLModel, Field as SQLField
 from sqlalchemy.types import DateTime
+from sqlalchemy import Index, UniqueConstraint, CheckConstraint, event
 from app.utils.date import validate_target_dt, TZ
 
 class Service(BaseModel):
@@ -104,13 +105,26 @@ class ReservationIn(BaseModel):
         return v
 
 class ReservationDB(SQLModel, table=True):
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        Index('ix_res_prof_start_end', 'professional_id', 'start', 'end'),
+        UniqueConstraint('google_calendar_id', 'google_event_id', name='uq_gcal_event_per_calendar'),
+        CheckConstraint('end > start', name='ck_end_after_start'),
+        {"extend_existing": True},
+    )
     id: str = SQLField(primary_key=True)
-    service_id: str = SQLField()
-    professional_id: str = SQLField()
-    start: datetime = SQLField(sa_type=DateTime(timezone=True))
+    service_id: str = SQLField(index=True)
+    professional_id: str = SQLField(index=True)
+    start: datetime = SQLField(sa_type=DateTime(timezone=True), index=True)
     end: datetime = SQLField(sa_type=DateTime(timezone=True))
-    google_event_id: Optional[str] = SQLField(default=None, nullable=True)
-    google_calendar_id: Optional[str] = SQLField(default=None, nullable=True)
+    google_event_id: Optional[str] = SQLField(default=None, nullable=True, index=True)
+    google_calendar_id: Optional[str] = SQLField(default=None, nullable=True, index=True)
     created_at: datetime = SQLField(default_factory=lambda: datetime.now(timezone.utc), sa_type=DateTime(timezone=True), nullable=False)
     updated_at: datetime = SQLField(default_factory=lambda: datetime.now(timezone.utc), sa_type=DateTime(timezone=True), nullable=False)
+
+# Auto-actualiza updated_at en updates
+@event.listens_for(ReservationDB, 'before_update', propagate=True)
+def _set_updated_at(mapper, connection, target):  # type: ignore[override]
+    try:
+        target.updated_at = datetime.now(timezone.utc)
+    except Exception:
+        pass

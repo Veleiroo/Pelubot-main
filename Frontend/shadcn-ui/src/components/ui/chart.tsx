@@ -3,7 +3,7 @@ import * as RechartsPrimitive from 'recharts';
 
 import { cn } from '@/lib/utils';
 
-// Format: { THEME_NAME: CSS_SELECTOR }
+// Formato: { NOMBRE_TEMA: SELECTOR_CSS }
 const THEMES = { light: '', dark: '.dark' } as const;
 
 export type ChartConfig = {
@@ -23,7 +23,7 @@ function useChart() {
   const context = React.useContext(ChartContext);
 
   if (!context) {
-    throw new Error('useChart must be used within a <ChartContainer />');
+    throw new Error('useChart debe usarse dentro de <ChartContainer />');
   }
 
   return context;
@@ -258,7 +258,7 @@ const ChartLegendContent = React.forwardRef<
 });
 ChartLegendContent.displayName = 'ChartLegend';
 
-// Helper to extract item config from a payload.
+// Ayudante para extraer la configuración de un elemento desde un payload.
 function getPayloadConfigFromPayload(config: ChartConfig, payload: unknown, key: string) {
   if (typeof payload !== 'object' || payload === null) {
     return undefined;

@@ -1,19 +1,19 @@
 """
-One-off CLI to sync Google Calendar events into the local DB over a date range.
+CLI puntual para sincronizar eventos de Google Calendar con la BD local en un rango de fechas.
 
-Usage examples:
-  # default: today..today+6 (7 days)
+Ejemplos de uso:
+  # por defecto: hoy..hoy+6 (7 días)
   python -m backend.scripts.sync_cli
 
-  # custom range
+  # rango personalizado
   START=2025-09-06 END=2025-09-13 python -m backend.scripts.sync_cli
 
-  # days ahead (overrides END)
+  # días hacia delante (sustituye END)
   DAYS=14 python -m backend.scripts.sync_cli
 
-Environment:
+Variables de entorno:
   - USE_GCAL_BUSY, GCAL_CALENDAR_ID, GOOGLE_OAUTH_JSON, GOOGLE_SERVICE_ACCOUNT_JSON
-  - TZ (default Europe/Madrid)
+  - TZ (por defecto Europe/Madrid)
 """
 from __future__ import annotations
 import os
@@ -61,7 +61,7 @@ def main() -> None:
     mode = (os.getenv("MODE") or "import").lower()  # import | push | both
     with Session(engine) as s:
         before = s.exec(select(ReservationDB)).all()
-        print(f"Reservations before: {len(before)}")
+        print(f"Reservas antes: {len(before)}")
 
         results: dict[str, dict] = {}
         if mode in ("import", "both"):
@@ -87,11 +87,11 @@ def main() -> None:
         after = s.exec(select(ReservationDB)).all()
 
     print({
-        "range": (start.isoformat(), end.isoformat()),
-        "by_professional": by_professional,
-        "mode": mode,
-        "results": results,
-        "reservations_after": len(after),
+        "rango": (start.isoformat(), end.isoformat()),
+        "por_profesional": by_professional,
+        "modo": mode,
+        "resultados": results,
+        "reservas_despues": len(after),
     })
 
 

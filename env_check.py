@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Simple environment validator for Pelubot.
+"""Validador simple de variables de entorno para Pelubot.
 
-Checks presence of required variables and reports missing ones.
-It does not reveal secret values.
+Comprueba la presencia de variables necesarias y reporta las faltantes.
+No muestra valores de secretos.
 """
 import os
 import sys
@@ -26,7 +26,7 @@ def main() -> int:
         missing.append("GOOGLE_OAUTH_JSON or GOOGLE_SERVICE_ACCOUNT_JSON")
 
     if missing:
-        print("Missing variables:")
+        print("Faltan variables:")
         for name in missing:
             print(f"- {name}")
         return 1
@@ -35,9 +35,9 @@ def main() -> int:
     if db_url.startswith("sqlite:///"):
         db_path = db_url.replace("sqlite:///", "")
         if not Path(db_path).exists():
-            print(f"Warning: SQLite database not found at {db_path}")
+            print(f"Aviso: no se encontró la base SQLite en {db_path}")
 
-    print("Environment looks good.")
+    print("Entorno correcto.")
     return 0
 
 if __name__ == "__main__":

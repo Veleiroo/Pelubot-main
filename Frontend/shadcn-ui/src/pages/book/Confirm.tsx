@@ -103,10 +103,17 @@ const BookConfirm = () => {
 
   const formatDateTime = (isoString: string) => `${fmtDateLong(isoString)}, ${fmtTime(isoString)}h`;
 
+  // Pasos para el indicador de progreso en Confirm
+  const steps = [
+    { key: 'service', label: 'Servicio', done: !!serviceId },
+    { key: 'date', label: 'Fecha y hora', done: !!slotStart },
+    { key: 'confirm', label: 'Confirmar', active: true },
+  ];
+
   if (!serviceId || !slotStart) {
     return (
       <>
-          <BookingSteps />
+          <BookingSteps steps={steps} />
           <BookingSection title="Confirmar reserva" subtitle="Revisa los detalles antes de confirmar">
             <div className="text-center py-12">
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r from-amber-500/20 to-amber-400/20 border border-amber-500/30 mb-6">
@@ -131,7 +138,7 @@ const BookConfirm = () => {
 
   return (
     <>
-        <BookingSteps />
+        <BookingSteps steps={steps} />
         <BookingSection title="Confirmar reserva" subtitle="Revisa los detalles y confirma tu cita">
       <Card className="rounded-2xl border border-[var(--border)] bg-[var(--card)] backdrop-blur shadow-lg shadow-black/20">
         <CardHeader className="pb-2">
@@ -203,7 +210,7 @@ const BookConfirm = () => {
         <Button
           onClick={onConfirm}
           disabled={loading || !!ok}
-          className="h-11 px-6 bg-accent text-[var(--accent-contrast)] hover:bg-emerald-400 disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150"
+          className="h-11 px-6 bg-accent text-accent-foreground hover:bg-emerald-400 disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150"
         >
           {loading ? 'Creando reserva…' : 'Confirmar reserva'}
         </Button>
@@ -211,6 +218,6 @@ const BookConfirm = () => {
       </BookingSection>
     </>
   );
-};
+}
 
 export default BookConfirm;

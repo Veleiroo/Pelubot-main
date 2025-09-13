@@ -8,8 +8,8 @@
 
 ## Etiquetas
 - `TODO:` pendiente por implementar.
-- `NOTE:` aclaración relevante.
-- `WARNING:` comportamiento no obvio.
+- `NOTA:` aclaración relevante.
+- `AVISO:` comportamiento no obvio.
 
 ## Ejemplos
 **Antes**
@@ -21,4 +21,3 @@
 ```python
 # Engine de prueba: una sola conexión en memoria
 ```
-

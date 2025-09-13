@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-Dev demo helper:
-- Optionally clears Google Calendars via admin endpoint
-- Creates a demo reservation and checks conflicts
+Ayudante de demo para desarrollo:
+- Opcionalmente limpia Google Calendar vía endpoint admin
+- Crea una reserva de demo y comprueba conflictos
 
-Env vars:
-  BASE        default http://127.0.0.1:8776
-  API_KEY     default dev-key
-  SERVICE_ID  default corte
-  PROFESSIONAL_ID default ana
-  DAYS_AHEAD  default 10
-  CLEAR_ALL   default true (if true, clear all events; if false, only pelubot events)
+Variables de entorno:
+  BASE                por defecto http://127.0.0.1:8776
+  API_KEY             por defecto dev-key
+  SERVICE_ID          por defecto corte
+  PROFESSIONAL_ID     por defecto ana
+  DAYS_AHEAD          por defecto 10
+  CLEAR_ALL           por defecto true (si es true, borra todo; si es false, solo eventos de Pelubot)
 
-Usage:
-  python backend/scripts/dev_demo.py            # clear+demo
-  python backend/scripts/dev_demo.py --no-clear # only demo
-  python backend/scripts/dev_demo.py --clear-only # only clear
+Uso:
+  python backend/scripts/dev_demo.py              # limpiar+demo
+  python backend/scripts/dev_demo.py --no-clear   # solo demo
+  python backend/scripts/dev_demo.py --clear-only # solo limpiar
 """
 from __future__ import annotations
 import json
@@ -69,7 +69,7 @@ def demo_flow():
     slots = _post("/slots", {"service_id": SERVICE_ID, "date_str": d.isoformat(), "professional_id": PROFESSIONAL_ID})
     arr = slots.get("slots") or []
     if not arr:
-        return {"ok": False, "error": "No slots available"}
+        return {"ok": False, "error": "No hay huecos disponibles"}
     first = arr[0]
     created = _post(
         "/reservations",

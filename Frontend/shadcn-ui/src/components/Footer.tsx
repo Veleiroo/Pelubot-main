@@ -23,7 +23,7 @@ export default function Footer() {
     <footer className="bg-[#0a0a0a] border-t border-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid md:grid-cols-4 gap-8">
-          {/* Brand */}
+          {/* Marca */}
           <div className="md:col-span-2">
             <div className="flex items-center mb-4">
               <Scissors className="text-brand mr-3" size={32} />
@@ -36,7 +36,7 @@ export default function Footer() {
               somos tu destino para lucir siempre impecable.
             </p>
             
-            {/* Social Media */}
+            {/* Redes sociales */}
             <div className="flex space-x-4">
               <button
                 onClick={() => handleSocialClick('instagram')}
@@ -59,7 +59,7 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Quick Links */}
+          {/* Enlaces rápidos */}
           <div>
             <h4 className="text-white font-semibold mb-4">Enlaces Rápidos</h4>
             <ul className="space-y-3">
@@ -106,7 +106,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact Info */}
+          {/* Información de contacto */}
           <div>
             <h4 className="text-white font-semibold mb-4">Contacto</h4>
             <ul className="space-y-3">
@@ -135,7 +135,7 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar */}
+        {/* Barra inferior */}
         <div className="border-t border-gray-800 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm mb-4 md:mb-0">
@@ -153,7 +153,7 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* Floating WhatsApp Button */}
+      {/* Botón flotante de WhatsApp */}
       <div className="fixed bottom-6 right-6 z-40">
         <button
           onClick={() => window.open('https://wa.me/1234567890?text=Hola, me gustaría reservar una cita en Deinis Barber Club', '_blank')}

@@ -77,7 +77,7 @@ export default function GallerySection() {
           </p>
         </div>
 
-        {/* Gallery Grid */}
+        {/* Rejilla de galería */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {galleryImages.map((image, index) => (
             <div
@@ -91,7 +91,7 @@ export default function GallerySection() {
                 className="w-full h-80 object-cover transition-transform duration-500 group-hover:scale-110"
               />
               
-              {/* Overlay */}
+              {/* Capa superpuesta */}
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                 <div className="text-center">
                   <div className="text-brand text-sm font-semibold mb-2">
@@ -103,7 +103,7 @@ export default function GallerySection() {
                 </div>
               </div>
 
-              {/* Category Badge */}
+              {/* Insignia de categoría */}
               <div className="absolute top-4 left-4 bg-brand text-black px-3 py-1 rounded-full text-sm font-semibold">
                 {image.category}
               </div>
@@ -111,7 +111,7 @@ export default function GallerySection() {
           ))}
         </div>
 
-        {/* Lightbox */}
+        {/* Visor (lightbox) */}
         {selectedImage !== null && (
           <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
             <div className="relative max-w-4xl max-h-full">
@@ -121,7 +121,7 @@ export default function GallerySection() {
                 className="max-w-full max-h-full object-contain"
               />
               
-              {/* Close Button */}
+              {/* Botón cerrar */}
               <button
                 onClick={closeLightbox}
                 className="absolute top-4 right-4 text-white hover:text-brand transition-colors"
@@ -129,7 +129,7 @@ export default function GallerySection() {
                 <X size={32} />
               </button>
 
-              {/* Navigation Buttons */}
+              {/* Botones de navegación */}
               <button
                 onClick={prevImage}
                 className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white hover:text-brand transition-colors"
@@ -143,7 +143,7 @@ export default function GallerySection() {
                 <ChevronRight size={48} />
               </button>
 
-              {/* Image Info */}
+              {/* Información de la imagen */}
               <div className="absolute bottom-4 left-4 text-white">
                 <div className="text-brand text-sm font-semibold">
                   {galleryImages[selectedImage].category}
@@ -153,7 +153,7 @@ export default function GallerySection() {
                 </div>
               </div>
 
-              {/* Image Counter */}
+              {/* Contador de imágenes */}
               <div className="absolute bottom-4 right-4 text-white bg-black/50 px-3 py-1 rounded-full">
                 {selectedImage + 1} / {galleryImages.length}
               </div>
@@ -161,7 +161,7 @@ export default function GallerySection() {
           </div>
         )}
 
-        {/* Call to Action */}
+        {/* Llamada a la acción */}
         <div className="text-center mt-12">
           <p className="text-gray-400 mb-6">¿Te gusta lo que ves?</p>
           <button

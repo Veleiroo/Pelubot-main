@@ -5,7 +5,7 @@ export default function AboutSection() {
     <section id="sobre-nosotros" className="py-20 bg-[#1a1a1a]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Image */}
+          {/* Imagen */}
           <div className="relative">
             <div className="relative overflow-hidden rounded-lg">
               <img
@@ -20,7 +20,7 @@ export default function AboutSection() {
             </div>
           </div>
 
-          {/* Content */}
+          {/* Contenido */}
           <div className="space-y-8">
             <div>
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
@@ -36,7 +36,7 @@ export default function AboutSection() {
               </p>
             </div>
 
-            {/* Stats */}
+            {/* Métricas */}
             <div className="grid grid-cols-2 gap-6">
               <div className="text-center p-6 bg-black/50 rounded-lg border border-gray-800">
                 <Users className="text-brand mx-auto mb-3" size={32} />

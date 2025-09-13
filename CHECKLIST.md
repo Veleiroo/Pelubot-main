@@ -1,4 +1,4 @@
-# Ready for Production Checklist
+# Lista de comprobación para producción
 
 ## Base de datos
 - [ ] `DATABASE_URL` configurada para cada entorno.
@@ -8,7 +8,7 @@
 ## API
 - [ ] Autenticación por API key u OAuth.
 - [ ] Validación de entrada y tests.
-- [ ] Health/ready endpoints.
+- [ ] Endpoints de salud/listo (`/health`, `/ready`).
 
 ## Seguridad
 - [ ] Variables de entorno gestionadas como secretos.
@@ -31,4 +31,3 @@
 ## Infraestructura
 - [ ] Contenedores con recursos definidos.
 - [ ] Monitorización y auto-restart.
-

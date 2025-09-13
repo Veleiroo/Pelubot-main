@@ -4,11 +4,9 @@
 **/.pytest_cache/
 **/.mypy_cache/
 
-# Entornos virtuales
+# Entornos virtuales (pero NO .env)
 .venv/
 venv/
-.env/
-.env.*
 
 # Node/yarn/pnpm
 **/node_modules/
@@ -23,9 +21,7 @@ e2e/artifacts/
 backend/server.log
 backend/server2.log
 
-# Archivos locales sensibles
-*.sqlite3
-*.db
+# Archivos locales sensibles a excluir explícitamente (no claves de .env)
 backend/oauth_tokens.json
 backend/autorizacion.json
 uploads/
@@ -39,4 +35,3 @@ uvicorn*.pid
 **/__pycache__/**
 *.pyc
 *.pyo
-

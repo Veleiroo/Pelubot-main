@@ -30,7 +30,7 @@ export default function ContactSection() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-12">
-          {/* Contact Info */}
+          {/* Información de contacto */}
           <div className="space-y-8">
             <div className="bg-[#1a1a1a] border border-gray-800 rounded-lg p-8">
               <h3 className="text-2xl font-bold text-white mb-6">Información de Contacto</h3>
@@ -89,7 +89,7 @@ export default function ContactSection() {
               </div>
             </div>
 
-            {/* Hours */}
+            {/* Horarios */}
             <div className="bg-[#1a1a1a] border border-gray-800 rounded-lg p-8">
               <div className="flex items-center mb-6">
                 <Clock className="text-brand mr-3" size={24} />
@@ -119,12 +119,12 @@ export default function ContactSection() {
             </div>
           </div>
 
-          {/* Map/Image */}
+          {/* Mapa/Imagen */}
           <div className="space-y-6">
             <div className="bg-[#1a1a1a] border border-gray-800 rounded-lg p-8 h-full">
               <h3 className="text-2xl font-bold text-white mb-6">Nuestro Local</h3>
               
-              {/* Placeholder for map - you can replace with actual map */}
+              {/* Marcador de posición para el mapa: sustituir por mapa real si se desea */}
               <div className="bg-gray-800 rounded-lg h-64 flex items-center justify-center mb-6">
                 <div className="text-center">
                   <MapPin className="text-brand mx-auto mb-2" size={48} />

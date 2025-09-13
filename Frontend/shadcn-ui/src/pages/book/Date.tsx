@@ -6,8 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
-import { BookingSection } from '@/components/book/BookingSection';
-import { BookingSteps } from '@/components/BookingSteps';
 import { Card, CardContent } from '@/components/ui/card';
 import { addDays, addMonths, endOfMonth, endOfWeek, format, isAfter, isBefore, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -45,7 +43,12 @@ const BookDate = () => {
   const [loading, setLoading] = useState(false);
   const [pros, setPros] = useState<{ id: string; name: string; services?: string[] }[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
-  const [useGcal] = useState<boolean>(false);
+  // Usa variable de entorno para activar Google Calendar por defecto (1/true = activo)
+  const [useGcal] = useState<boolean>(() => {
+    const v = (import.meta as unknown as { env: { VITE_USE_GCAL?: string | boolean } }).env
+      ?.VITE_USE_GCAL;
+    return v === '1' || v === 'true' || v === true;
+  });
   const [slotsLoading, setSlotsLoading] = useState(false);
   const daysAbort = useRef<AbortController | null>(null);
   const slotsAbort = useRef<AbortController | null>(null);
@@ -164,8 +167,12 @@ const BookDate = () => {
   const canContinue = !!slotStart; // requiere elegir un hueco
 
   const onNext = () => {
-    if (!selectedValid || slots.length === 0) return;
-    navigate('/book/confirm');
+    if (!selectedValid || slots.length === 0 || !slotStart) return;
+    const params = new URLSearchParams();
+    if (serviceId) params.set('service', serviceId);
+    params.set('start', slotStart);
+    if (professionalId) params.set('pro', professionalId);
+    navigate(`/book/confirm?${params.toString()}`);
   };
 
   // Al seleccionar una fecha válida se solicitan los huecos.
@@ -338,8 +345,8 @@ const BookDate = () => {
                     ? 'text-muted-foreground/60 cursor-not-allowed'
                     : enabled
                       ? (selectedDay
-                          ? 'bg-accent text-[var(--accent-contrast)]'
-                          : 'bg-[var(--accent-weak)] text-emerald-400 hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]')
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-accent/10 text-emerald-400 hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent')
                       : 'text-muted-foreground/60 cursor-not-allowed',
                 ].filter(Boolean).join(' ');
 
@@ -408,26 +415,28 @@ const BookDate = () => {
 
           {!slotsLoading && selectedValid && (
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-              {slots.map((iso) => (
-                <Button
-                  key={iso}
-                  variant="secondary"
-                  className="h-9 rounded-md border border-[var(--border)] bg-white/0 hover:bg-white/5 transition-colors duration-150"
-                  onClick={() => {
-                    setSlot(iso);
-                    if (selectedValid) setDate(toYmd(selected as Date));
-
-                    // Navega a Confirm con parámetros robustos
-                    const params = new URLSearchParams();
-                    if (serviceId) params.set('service', serviceId);
-                    params.set('start', iso);
-                    if (professionalId) params.set('pro', professionalId);
-                    navigate(`/book/confirm?${params.toString()}`);
-                  }}
-                >
-                  {iso.slice(11, 16)}
-                </Button>
-              ))}
+              {slots.map((iso) => {
+                const selectedSlot = slotStart === iso;
+                const base = 'h-9 rounded-md border border-[var(--border)] transition-colors duration-150 px-3 text-sm flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
+                const cls = selectedSlot
+                  ? `${base} bg-accent text-accent-foreground`
+                  : `${base} bg-white/0 hover:bg-white/5 text-foreground`;
+                return (
+                  <button
+                    key={iso}
+                    type="button"
+                    aria-pressed={selectedSlot}
+                    data-selected={selectedSlot}
+                    className={cls}
+                    onClick={() => {
+                      setSlot(iso);
+                      // No llamamos a setDate aquí para no limpiar slotStart.
+                    }}
+                  >
+                    {iso.slice(11, 16)}
+                  </button>
+                );
+              })}
               {slots.length === 0 && (
                 <div className="col-span-full text-center py-6">
                   <div className="text-neutral-400 mb-1">No hay horarios disponibles</div>
@@ -436,19 +445,15 @@ const BookDate = () => {
               )}
             </div>
           )}
-
-          {/* CTA centrada */}
-          <div className="mt-4 flex justify-center">
-            <Button
-              disabled={!canContinue || slots.length === 0}
-              onClick={onNext}
-              className="h-11 px-6 bg-accent text-[var(--accent-contrast)] hover:bg-emerald-400 disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150"
-            >
-              Continuar
-            </Button>
-          </div>
         </CardContent>
       </Card>
+
+      {/* Botón continuar */}
+      <div className="mt-4">
+        <Button onClick={onNext} disabled={!canContinue} className="w-full">
+          Continuar
+        </Button>
+      </div>
     </BookingLayout>
   );
 };

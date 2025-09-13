@@ -23,7 +23,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         except Exception:
             latency_ms = (time.perf_counter() - start) * 1000
             logger.exception(
-                "Unhandled error",
+                "Error no controlado",
                 extra={
                     "method": request.method,
                     "path": str(request.url.path),

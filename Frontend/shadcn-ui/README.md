@@ -1,8 +1,8 @@
-# Shadcn-UI Template Usage Instructions
+# Guía de uso de la plantilla shadcn-ui
 
-## technology stack
+## Stack tecnológico
 
-This project is built with:
+Este proyecto está construido con:
 
 - Vite
 - TypeScript
@@ -10,32 +10,32 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-All shadcn/ui components have been downloaded under `@/components/ui`.
+Todos los componentes de shadcn/ui están predescargados en `@/components/ui`.
 
-## File Structure
+## Estructura de archivos
 
-- `index.html` - HTML entry point
-- `vite.config.ts` - Vite configuration file
-- `tailwind.config.js` - Tailwind CSS configuration file
-- `package.json` - NPM dependencies and scripts
-- `src/app.tsx` - Root component of the project
-- `src/main.tsx` - Project entry point
-- `src/index.css` - Existing CSS configuration
-- `src/pages/Index.tsx` - Home page logic
+- `index.html` — entrada HTML
+- `vite.config.ts` — configuración de Vite
+- `tailwind.config.js` — configuración de Tailwind CSS
+- `package.json` — dependencias y scripts
+- `src/App.tsx` — componente raíz del proyecto
+- `src/main.tsx` — punto de entrada
+- `src/index.css` — estilos globales
+- `src/pages/Index.tsx` — página de inicio
 
-## Components
+## Componentes
 
-- All shadcn/ui components are pre-downloaded and available at `@/components/ui`
+- Los componentes shadcn/ui están disponibles en `@/components/ui`.
 
-## Styling
+## Estilos
 
-- Add global styles to `src/index.css` or create new CSS files as needed
-- Use Tailwind classes for styling components
+- Añade estilos globales en `src/index.css` o crea nuevos ficheros CSS si lo prefieres
+- Usa clases de Tailwind para estilizar componentes
 
-## Development
+## Desarrollo
 
-- Import components from `@/components/ui` in your React components
-- Customize the UI by modifying the Tailwind configuration
+- Importa componentes desde `@/components/ui` en tus componentes React
+- Personaliza la UI modificando la configuración de Tailwind
 - Configura la base URL del backend creando un `.env` en `Frontend/shadcn-ui/` con:
 
 ```
@@ -59,31 +59,32 @@ VITE_ENABLE_CALENDAR=true
 
 Si el calendario falla en tu entorno, seguirá estando el selector nativo como respaldo.
 
-## Note
+## Notas
 
-- The `@/` path alias points to the `src/` directory
-- In your typescript code, don't re-export types that you're already importing
+- El alias de ruta `@/` apunta a `src/`
+- En TypeScript, evita reexportar tipos que ya estás importando
 
-# Commands
+## Comandos
 
-**Install Dependencies**
+Instalar dependencias
 
 ```shell
 pnpm i
 ```
 
-**Add Dependencies**
+Añadir dependencias
 
 ```shell
-pnpm add some_new_dependency
+pnpm add nombre_paquete
+```
 
-**Start Dev**
+Arrancar modo desarrollo
 
 ```shell
 pnpm run dev
 ```
 
-**To build**
+Compilar (build)
 
 ```shell
 pnpm run build

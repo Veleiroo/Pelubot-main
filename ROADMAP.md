@@ -1,4 +1,4 @@
-# Roadmap / Backlog
+# Hoja de ruta / Backlog
 
 Este documento recoge mejoras y próximos pasos para el proyecto.
 
@@ -29,4 +29,3 @@ Este documento recoge mejoras y próximos pasos para el proyecto.
 - Estado de carga y accesibilidad en los componentes de reserva.
 - Pruebas E2E básicas (Playwright) para el flujo de reserva.
 - Limpieza de assets y estructura (si procede) y scripts de build/previews.
-

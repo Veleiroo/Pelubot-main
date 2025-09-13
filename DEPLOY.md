@@ -44,7 +44,7 @@ pnpm build
 - Conflictos: `POST /admin/conflicts`
 - Limpiar calendarios: `POST /admin/clear_calendars`
 
-Makefile wrappers:
+Atajos de Makefile:
 - `make sync-import START=YYYY-MM-DD DAYS=7`
 - `make sync-push START=YYYY-MM-DD DAYS=7`
 - `make conflicts START=YYYY-MM-DD END=YYYY-MM-DD`

@@ -22,12 +22,12 @@ def install_exception_handlers(app: FastAPI):
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
         details = exc.errors()
-        # Ensure JSON-serializable (pydantic v2 may include Exception objects in ctx)
+        # Aseguramos que sea serializable a JSON (pydantic v2 puede incluir Exception en ctx)
         safe = jsonable_encoder(details)
         logger.info("Validation error: %s", safe)
         return JSONResponse(status_code=422, content={"detail": safe})
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
-        logger.exception("Unhandled exception")
+        logger.exception("Excepción no controlada")
         return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})

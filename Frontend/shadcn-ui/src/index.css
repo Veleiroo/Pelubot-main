@@ -3,14 +3,14 @@
 @tailwind utilities;
 
 @layer base {
-  /* Brand tokens (neutral dark + emerald accent) */
+  /* Tokens de marca (oscuro neutro + acento esmeralda) */
   :root {
     --bg: #0b1014;
     --card: rgba(16, 23, 30, 0.7);
-    /* Border in HSL syntax so Tailwind hsl(var(--border)) stays valid */
+    /* Borde en sintaxis HSL para que hsl(var(--border)) funcione en Tailwind */
     --border: 0 0% 100% / 0.06;
     --muted: rgba(255, 255, 255, 0.55);
-    /* Accent helpers for direct var() usage */
+    /* Ayudas de acento para uso directo con var() */
     --accent-weak: rgba(16, 185, 129, 0.12);
     --accent-hover: rgba(16, 185, 129, 0.2);
     --accent-contrast: #052e2a;
@@ -35,7 +35,7 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    /* Accent brand = emerald */
+    /* Acento de marca = esmeralda */
     --accent: 160 84% 39%;
     --accent-foreground: 160 100% 10%;
 
@@ -84,7 +84,7 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    /* Accent brand = emerald */
+    /* Acento de marca = esmeralda */
     --accent: 160 84% 39%;
     --accent-foreground: 160 100% 10%;
 
@@ -111,7 +111,7 @@
   }
 
   body {
-    /* Override to neutral dark background */
+    /* Fondo forzado a oscuro neutro */
     background: var(--bg);
     @apply text-foreground;
   }
@@ -125,7 +125,7 @@
   pointer-events: none;
 }
 
-/* Weekdays */
+/* Días de la semana */
 .pelu-cal .rdp-head_cell {
   color: #a3a3a3; /* neutral-400 */
   font-weight: 600;

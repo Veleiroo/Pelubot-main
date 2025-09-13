@@ -9,6 +9,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Body
 from sqlmodel import Session, select
+from sqlalchemy import delete as sa_delete, text as _sql_text
 
 from app.data import SERVICES, PROS, SERVICE_BY_ID, PRO_BY_ID
 from app.models import (
@@ -32,6 +33,7 @@ from app.services.logic import (
 )
 from app.db import get_session, engine
 from app.utils.date import validate_target_dt, TZ, now_tz, MAX_AHEAD_DAYS
+from app.core.metrics import RESERVATIONS_CREATED, RESERVATIONS_RESCHEDULED, RESERVATIONS_CANCELLED
 from datetime import timezone as _utc_tz
 
 logger = logging.getLogger("pelubot.api")
@@ -144,7 +146,7 @@ def list_reservations(session: Session = Depends(get_session)):
 @router.post("/cancel_reservation", response_model=ActionResult, dependencies=[Depends(require_api_key)])
 def cancel_reservation_post(payload: dict | None = Body(None), session: Session = Depends(get_session), _=Depends(require_api_key)):
     if payload is None:
-        # Let FastAPI style error shape via HTTPException
+        # Preferimos el manejo estándar de FastAPI con HTTPException
         raise HTTPException(status_code=422, detail="Payload requerido")
     try:
         payload = CancelReservationIn(**payload)
@@ -162,6 +164,10 @@ def cancel_reservation_post(payload: dict | None = Body(None), session: Session 
     ok = cancel_reservation(session, payload.reservation_id)
     if ok:
         logger.info("Reservation cancelled: id=%s", payload.reservation_id)
+        try:
+            RESERVATIONS_CANCELLED.inc()
+        except Exception:
+            pass
         return ActionResult(ok=True, message=f"Reserva {payload.reservation_id} cancelada.")
     raise HTTPException(status_code=500, detail="No se pudo cancelar la reserva")
 
@@ -179,11 +185,24 @@ def cancel_reservation_delete(reservation_id: str, session: Session = Depends(ge
     ok = cancel_reservation(session, reservation_id)
     if ok:
         logger.info("Reservation cancelled: id=%s", reservation_id)
+        try:
+            RESERVATIONS_CANCELLED.inc()
+        except Exception:
+            pass
         return ActionResult(ok=True, message=f"Reserva {reservation_id} cancelada.")
     raise HTTPException(status_code=500, detail="No se pudo cancelar la reserva")
 
 @router.post("/reschedule", response_model=RescheduleOut, dependencies=[Depends(require_api_key)])
 def reschedule_post(payload: dict | None = Body(None), session: Session = Depends(get_session), _=Depends(require_api_key)):
+    # Serializa escrituras en SQLite para evitar condiciones de carrera
+    try:
+        if str(engine.url).startswith("sqlite"):
+            try:
+                session.exec(_sql_text("BEGIN IMMEDIATE"))
+            except Exception:
+                pass
+    except Exception:
+        pass
     if payload is None:
         raise HTTPException(status_code=422, detail="Payload requerido")
     try:
@@ -328,33 +347,49 @@ def create_reservation(payload: dict | None = Body(None), session: Session = Dep
     res_id = str(uuid.uuid4())
     cal_id = get_calendar_for_professional(payload.professional_id)
     gcal_id = None
-    
-    # Intentar crear en Google Calendar, pero no fallar si no está configurado
+
+    # Sección crítica: bloquear escritura en SQLite y revalidar solape antes de insertar
+    try:
+        if str(engine.url).startswith("sqlite"):
+            try:
+                session.exec(_sql_text("BEGIN IMMEDIATE"))
+            except Exception:
+                pass
+        q = select(ReservationDB).where(
+            ReservationDB.professional_id == payload.professional_id,
+            ReservationDB.start < end,
+            ReservationDB.end > start,
+        )
+        if session.exec(q).first():
+            session.rollback()
+            raise HTTPException(status_code=409, detail="El profesional ya tiene esa hora ocupada.")
+        row = ReservationDB(id=res_id, service_id=payload.service_id, professional_id=payload.professional_id, start=start, end=end, google_event_id=None, google_calendar_id=cal_id)
+        session.add(row)
+        session.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"No se pudo guardar la reserva: {e}")
+
+    # Crear evento en Google Calendar después (best-effort)
     try:
         gcal_event = create_gcal_reservation(Reservation(id=res_id, service_id=payload.service_id, professional_id=payload.professional_id, start=start, end=end), calendar_id=cal_id)
         gcal_id = gcal_event.get("id")
-        logger.info("Google Calendar event created: %s", gcal_id)
+        r_upd = session.get(ReservationDB, res_id)
+        if r_upd:
+            r_upd.google_event_id = gcal_id
+            r_upd.google_calendar_id = cal_id
+            session.add(r_upd); session.commit()
+        logger.info("Evento Google Calendar creado: %s", gcal_id)
     except Exception as e:
-        logger.warning("Google Calendar not available, creating reservation without sync: %s", e)
-        # Continuar sin Google Calendar para desarrollo
-    
-    try:
-        row = ReservationDB(id=res_id, service_id=payload.service_id, professional_id=payload.professional_id, start=start, end=end, google_event_id=gcal_id, google_calendar_id=cal_id)
-        session.add(row); session.commit()
-    except Exception as e:
-        try:
-            if gcal_id:
-                delete_gcal_reservation(gcal_id, cal_id)
-        except Exception:
-            pass
-        raise HTTPException(status_code=500, detail=f"No se pudo guardar la reserva: {e}")
-    
+        logger.warning("Google Calendar no disponible; reserva sin sincronización: %s", e)
+
     message = f"Reserva creada exitosamente. ID: {res_id}"
     if gcal_id:
         message += f", Evento Google Calendar: {gcal_id}"
     else:
         message += " (sin sincronización con Google Calendar)"
-    
     logger.info("Reservation created: id=%s gcal_event=%s calendar=%s start=%s end=%s", res_id, gcal_id, cal_id, start.isoformat(), end.isoformat())
     return ActionResult(ok=True, message=message)
 
@@ -422,7 +457,7 @@ class AdminClearCalendarsIn(BaseModel):
     dry_run: bool | None = True
     confirm: str | None = None
 
-from app.integrations.google_calendar import build_calendar, clear_calendar
+from app.integrations.google_calendar import build_calendar, clear_calendar, list_events_allpages, delete_event
 
 @router.post("/admin/clear_calendars")
 def admin_clear_calendars(body: AdminClearCalendarsIn | None = None, _=Depends(require_api_key)):
@@ -452,3 +487,183 @@ def admin_clear_calendars(body: AdminClearCalendarsIn | None = None, _=Depends(r
         results[cal] = res
         total_deleted += res.get("deleted", 0); total_listed += res.get("total_listed", 0); total_skipped += res.get("skipped", 0)
     return {"ok": True, "dry_run": bool(body.dry_run), "only_pelubot": bool(body.only_pelubot), "calendars": cals, "range": (body.start, body.end), "totals": {"listed": total_listed, "deleted": total_deleted, "skipped": total_skipped}, "results": results}
+
+# --- Wipe de reservas en BD (peligroso) ---
+class AdminWipeReservationsIn(BaseModel):
+    confirm: str | None = None
+
+# --- Limpieza de eventos huérfanos en Google Calendar ---
+class AdminCleanupOrphansIn(BaseModel):
+    by_professional: bool | None = True
+    calendar_id: str | None = None
+    calendar_ids: list[str] | None = None
+    start: str | None = None
+    end: str | None = None
+    dry_run: bool | None = True
+    confirm: str | None = None
+
+@router.post("/admin/cleanup_orphans")
+def admin_cleanup_orphans(body: AdminCleanupOrphansIn | None = None, session: Session = Depends(get_session), _=Depends(require_api_key)):
+    """Borra eventos en GCal con private.reservation_id cuyo ID no existe en la BD local.
+    Requiere confirm='DELETE' si dry_run es False.
+    """
+    from app.data import PRO_CALENDAR
+    body = body or AdminCleanupOrphansIn()
+    if not (body.dry_run or (body.confirm and body.confirm.upper() == "DELETE")):
+        return {"ok": False, "error": "Confirmación requerida: confirm='DELETE' o dry_run=true"}
+    cals: list[str] = []
+    if body.calendar_ids:
+        cals.extend([c for c in body.calendar_ids if c])
+    if body.calendar_id:
+        cals.append(body.calendar_id)
+    if body.by_professional or not cals:
+        cals.extend([v for v in PRO_CALENDAR.values() if v])
+    cals = sorted(set(cals))
+    if not cals:
+        return {"ok": False, "error": "No hay calendarios destino"}
+    tmin = f"{body.start}T00:00:00" if body.start else None
+    tmax = f"{body.end}T23:59:59" if body.end else None
+    try:
+        svc = build_calendar()
+    except Exception as e:
+        return {"ok": False, "error": f"gcal client: {e}"}
+    results: dict[str, dict] = {}
+    totals = {"listed": 0, "orphans_found": 0, "deleted": 0, "skipped": 0}
+    for cal in cals:
+        items = []
+        try:
+            items = list_events_allpages(svc, cal, time_min=tmin, time_max=tmax)
+        except Exception:
+            items = []
+        listed = len(items)
+        orphans = deleted = skipped = 0
+        for it in items:
+            ev_id = it.get("id")
+            if not ev_id:
+                continue
+            priv = (it.get("extendedProperties") or {}).get("private") or {}
+            rid = priv.get("reservation_id")
+            if not rid:
+                continue
+            r = session.get(ReservationDB, rid)
+            if r is None:
+                orphans += 1
+                if not body.dry_run:
+                    try:
+                        delete_event(svc, cal, ev_id)
+                        deleted += 1
+                    except Exception:
+                        skipped += 1
+        results[cal] = {"listed": listed, "orphans_found": orphans, "deleted": deleted, "skipped": skipped}
+        totals["listed"] += listed; totals["orphans_found"] += orphans; totals["deleted"] += deleted; totals["skipped"] += skipped
+    return {"ok": True, "dry_run": bool(body.dry_run), "calendars": cals, "range": (body.start, body.end), "totals": totals, "results": results}
+
+@router.post("/admin/wipe_reservations")
+def admin_wipe_reservations(body: AdminWipeReservationsIn | None = None, session: Session = Depends(get_session), _=Depends(require_api_key)):
+    body = body or AdminWipeReservationsIn()
+    if not (body.confirm and body.confirm.upper() == "DELETE"):
+        return {"ok": False, "error": "Confirmación requerida: confirm='DELETE'"}
+    try:
+        session.exec(sa_delete(ReservationDB))
+        session.commit()
+        return {"ok": True, "message": "Todas las reservas eliminadas"}
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"No se pudo limpiar la BD: {e}")
+
+# --- Info y optimización de base de datos ---
+@router.get("/admin/db_info")
+def admin_db_info(session: Session = Depends(get_session), _=Depends(require_api_key)):
+    db_url_env = os.getenv("DATABASE_URL")
+    is_sqlite = str(engine.url).startswith("sqlite")
+    sqlite_path = None
+    file_exists = file_size = None
+    if is_sqlite:
+        # Obtiene la ruta de forma robusta a través de engine.url.database
+        try:
+            raw = getattr(engine.url, "database", None)
+            if raw:
+                sqlite_path = os.path.abspath(raw)
+        except Exception:
+            sqlite_path = None
+        if sqlite_path and os.path.exists(sqlite_path):
+            try:
+                file_exists = True
+                file_size = os.path.getsize(sqlite_path)
+            except Exception:
+                pass
+    count = session.exec(select(ReservationDB)).all()
+    total = len(count)
+    first = min((r.start for r in count), default=None)
+    last = max((r.start for r in count), default=None)
+    pragma = {}
+    if is_sqlite:
+        try:
+            with engine.connect() as conn:
+                res = conn.exec_driver_sql("PRAGMA journal_mode;").scalar()
+                pragma["journal_mode"] = res
+                res2 = conn.exec_driver_sql("PRAGMA synchronous;").scalar()
+                pragma["synchronous"] = res2
+                fk = conn.exec_driver_sql("PRAGMA foreign_keys;").scalar()
+                pragma["foreign_keys"] = fk
+        except Exception:
+            pass
+    return {
+        "ok": True,
+        "engine_url": str(engine.url),
+        "env_DATABASE_URL": db_url_env,
+        "is_sqlite": is_sqlite,
+        "sqlite_path": sqlite_path,
+        "file_exists": file_exists,
+        "file_size": file_size,
+        "reservations": {"total": total, "first": first.isoformat() if first else None, "last": last.isoformat() if last else None},
+        "pragma": pragma,
+    }
+
+class AdminDbOptimizeIn(BaseModel):
+    vacuum: bool | None = True
+    analyze: bool | None = True
+    optimize: bool | None = True
+
+@router.post("/admin/db_optimize")
+def admin_db_optimize(body: AdminDbOptimizeIn | None = None, _=Depends(require_api_key)):
+    body = body or AdminDbOptimizeIn()
+    is_sqlite = str(engine.url).startswith("sqlite")
+    actions = {"vacuum": False, "analyze": False, "optimize": False}
+    if not is_sqlite:
+        return {"ok": False, "error": "Solo soportado en SQLite"}
+    try:
+        with engine.connect() as conn:
+            if body.vacuum:
+                conn.exec_driver_sql("VACUUM")
+                actions["vacuum"] = True
+            if body.analyze:
+                conn.exec_driver_sql("ANALYZE")
+                actions["analyze"] = True
+            if body.optimize:
+                try:
+                    conn.exec_driver_sql("PRAGMA optimize;")
+                    actions["optimize"] = True
+                except Exception:
+                    pass
+        return {"ok": True, "actions": actions}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "actions": actions}
+
+# Checkpoint WAL (SQLite)
+class AdminDbCheckpointOut(BaseModel):
+    ok: bool
+    result: list | None = None
+    error: str | None = None
+
+@router.post("/admin/db_checkpoint", response_model=AdminDbCheckpointOut)
+def admin_db_checkpoint(_=Depends(require_api_key)):
+    is_sqlite = str(engine.url).startswith("sqlite")
+    if not is_sqlite:
+        return AdminDbCheckpointOut(ok=False, error="Solo soportado en SQLite")
+    try:
+        with engine.connect() as conn:
+            res = conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+        return AdminDbCheckpointOut(ok=True, result=list(res) if res else [])
+    except Exception as e:
+        return AdminDbCheckpointOut(ok=False, error=str(e))

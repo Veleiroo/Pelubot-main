@@ -19,6 +19,9 @@ except Exception:
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
+# Caché sencilla del cliente de Calendar en proceso
+_CACHED_SVC: dict[str, Any] = {"svc": None}
+
 def iso_datetime(dt_or_str, tz: str = "Europe/Madrid") -> str:
     """
     Devuelve ISO 8601 con zona horaria real (RFC3339).
@@ -151,13 +154,24 @@ def build_calendar() -> Any:
     """
     if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("PELUBOT_FAKE_GCAL") == "1":
         return FakeCalendarService()
+    # Usa el cliente en caché si existe
+    try:
+        cached = _CACHED_SVC.get("svc")
+        if cached is not None:
+            return cached
+    except Exception:
+        pass
     try:
         sa = _load_sa_creds()
         if sa:
-            return build("calendar", "v3", credentials=sa)
+            svc = build("calendar", "v3", credentials=sa)
+            _CACHED_SVC["svc"] = svc
+            return svc
         oa = _load_user_creds()
         if oa:
-            return build("calendar", "v3", credentials=oa)
+            svc = build("calendar", "v3", credentials=oa)
+            _CACHED_SVC["svc"] = svc
+            return svc
     except Exception as e:
         if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("PELUBOT_FAKE_GCAL") == "1":
             return FakeCalendarService()

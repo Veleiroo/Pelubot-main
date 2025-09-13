@@ -18,7 +18,7 @@ export default function HeroSection() {
 
     return (
         <section id="inicio" className="relative min-h-screen flex items-center justify-center overflow-hidden">
-            {/* Background Image */}
+            {/* Imagen de fondo */}
             <div
                 className="absolute inset-0 bg-cover bg-center bg-no-repeat"
                 style={{
@@ -28,7 +28,7 @@ export default function HeroSection() {
                 <div className="absolute inset-0 bg-black/70"></div>
             </div>
 
-            {/* Content */}
+            {/* Contenido */}
             <div className="relative z-10 text-center px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
                 <div className="flex items-center justify-center mb-6">
                     <Scissors className="text-brand mr-3" size={48} />
@@ -68,7 +68,7 @@ export default function HeroSection() {
                     </Button>
                 </div>
 
-                {/* Floating Elements */}
+                {/* Elementos flotantes */}
                 <div className="absolute top-20 left-10 animate-pulse">
                     <div className="w-2 h-2 bg-brand rounded-full"></div>
                 </div>
@@ -77,7 +77,7 @@ export default function HeroSection() {
                 </div>
             </div>
 
-            {/* Scroll Indicator */}
+            {/* Indicador de scroll */}
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
                 <div className="w-6 h-10 border-2 border-brand rounded-full flex justify-center">
                     <div className="w-1 h-3 bg-brand rounded-full mt-2 animate-pulse"></div>
