@@ -1,0 +1,42 @@
+# Archivos y carpetas a excluir del ZIP cuando no hay repo git
+# Caches Python/pytest
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+
+# Entornos virtuales
+.venv/
+venv/
+.env/
+.env.*
+
+# Node/yarn/pnpm
+**/node_modules/
+**/.parcel-cache/
+**/.next/
+**/dist/
+**/build/
+
+# Artifacts/tests E2E
+.e2e-cache/
+e2e/artifacts/
+backend/server.log
+backend/server2.log
+
+# Archivos locales sensibles
+*.sqlite3
+*.db
+backend/oauth_tokens.json
+backend/autorizacion.json
+uploads/
+
+# Control de versiones
+.git/
+.gitignore
+
+# Otros
+uvicorn*.pid
+**/__pycache__/**
+*.pyc
+*.pyo
+
