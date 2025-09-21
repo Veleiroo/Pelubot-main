@@ -29,11 +29,13 @@ DAYS_AHEAD = int(os.getenv("DAYS_AHEAD", "10"))
 
 
 def _get(path: str):
+    """Realiza GET y devuelve el cuerpo como JSON."""
     with request.urlopen(BASE + path) as r:
         return json.loads(r.read().decode())
 
 
 def _post(path: str, payload: dict | None = None, headers: dict | None = None):
+    """Envía POST JSON y devuelve la respuesta decodificada."""
     data = None if payload is None else json.dumps(payload).encode()
     req = request.Request(BASE + path, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
@@ -45,6 +47,7 @@ def _post(path: str, payload: dict | None = None, headers: dict | None = None):
 
 
 def next_workday(days: int) -> date:
+    """Calcula un día laborable evitando domingos."""
     d = date.today() + timedelta(days=days)
     while d.weekday() == 6:
         d += timedelta(days=1)
@@ -52,6 +55,7 @@ def next_workday(days: int) -> date:
 
 
 def main() -> None:
+    """Ejecuta el flujo completo de smoke: slots, reserva, reschedule y limpieza."""
     out = {"health": _get("/health"), "ready": _get("/ready")}
     d = next_workday(DAYS_AHEAD)
     slots = _post(

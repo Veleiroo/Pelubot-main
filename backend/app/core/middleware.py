@@ -1,3 +1,5 @@
+"""Middlewares propios para enriquecer logs y contexto de cada petición."""
+
 import time
 import uuid
 import logging

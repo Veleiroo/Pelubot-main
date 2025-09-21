@@ -5,6 +5,15 @@ Este repo soporta dos modos con Docker Compose:
 1) Modo dev (Vite) – hot reload en :8080
 2) Modo prod (nginx) – build estático en :8080
 
+## Mantenimiento BD
+
+- Semanal: `make db-maintenance` (backup → checkpoint WAL → integrity_check → optimize)
+- Backup manual antes de tareas grandes: `make db-backup`
+- Forzar checkpoint WAL si crece mucho: `make db-checkpoint`
+- Verificar integridad: `make db-integrity`
+
+DB_PATH y BACKUPS_DIR se pueden ajustar en el Makefile o por entorno.
+
 ## Diagnóstico rápido
 
 - `docker compose ps`

@@ -13,7 +13,7 @@ import logging
 from fastapi.middleware.cors import CORSMiddleware
 
 # Usa el router de la API del paquete estructurado (reexporta rutas heredadas)
-from app.api.routes import router
+from app.api.routes import router, API_KEY
 
 from app.db import create_db_and_tables
 from sqlmodel import Session
@@ -30,6 +30,7 @@ from app.core.rate_limit import RateLimitMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Configura logging/BD al iniciar la app y ejecuta sincronización opcional."""
     setup_logging()
     create_db_and_tables()
 
@@ -44,10 +45,14 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
+    if not API_KEY or API_KEY == "changeme":
+        logging.getLogger("pelubot.main").warning("API_KEY no configurada o usando valor por defecto; define una clave segura en .env")
+
     yield
 
 
 def create_app() -> FastAPI:
+    """Construye la instancia principal de FastAPI con middlewares y rutas."""
     app = FastAPI(
         title="PeluBot MVP",
         version="0.6.0",

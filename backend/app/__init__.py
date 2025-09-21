@@ -1,2 +1,1 @@
-"""Application package for PeluBot backend."""
-
+"""Paquete principal del backend de PeluBot."""

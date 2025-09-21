@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import List, Dict
 from datetime import time
+"""Catálogo estático de servicios, profesionales y configuración horaria."""
+
 from app.models import Service, Professional
 
 # Servicios disponibles
@@ -37,5 +39,5 @@ PRO_CALENDAR: Dict[str, str] = {
     "luis": "988f3f3dcfed070004cceb7e67f0556677ae60a7b98637e965046467585d5edd@group.calendar.google.com",
 }
 
-# Uso de busy de GCAL por profesional
-PRO_USE_GCAL_BUSY: Dict[str, bool] = {"ana": True, "luis": False}
+# Uso de busy de GCAL por profesional (se desactiva por defecto)
+PRO_USE_GCAL_BUSY: Dict[str, bool] = {"ana": False, "luis": False}

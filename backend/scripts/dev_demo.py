@@ -32,11 +32,13 @@ CLEAR_ALL = (os.getenv("CLEAR_ALL", "true").lower() in ("1","true","yes","y","si
 
 
 def _get(path: str):
+    """Realiza una petición GET y devuelve el JSON resultante."""
     with request.urlopen(BASE + path) as r:
         return json.loads(r.read().decode())
 
 
 def _post(path: str, payload: dict | None = None, headers: dict | None = None):
+    """Envía una petición POST con JSON opcional y cabeceras extra."""
     data = None if payload is None else json.dumps(payload).encode()
     req = request.Request(BASE + path, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
@@ -48,6 +50,7 @@ def _post(path: str, payload: dict | None = None, headers: dict | None = None):
 
 
 def next_workday(days: int) -> date:
+    """Calcula el siguiente día laboral evitando domingos."""
     d = date.today() + timedelta(days=days)
     while d.weekday() == 6:
         d += timedelta(days=1)
@@ -55,6 +58,7 @@ def next_workday(days: int) -> date:
 
 
 def clear_calendars():
+    """Invoca el endpoint admin para limpiar calendarios según configuración."""
     body = {
         "dry_run": False,
         "confirm": "DELETE",
@@ -65,6 +69,7 @@ def clear_calendars():
 
 
 def demo_flow():
+    """Ejecuta el flujo de demo: busca slot, crea reserva y detecta conflictos."""
     d = next_workday(DAYS_AHEAD)
     slots = _post("/slots", {"service_id": SERVICE_ID, "date_str": d.isoformat(), "professional_id": PROFESSIONAL_ID})
     arr = slots.get("slots") or []
@@ -85,6 +90,7 @@ def demo_flow():
 
 
 def main():
+    """Punto de entrada CLI para limpiar calendarios y crear una reserva demo."""
     import sys
     do_clear = True
     clear_only = False

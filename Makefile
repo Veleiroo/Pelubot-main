@@ -1,4 +1,4 @@
-.PHONY: help dev-start dev-stop dev-ready dev-clear logs test smoke sync-import sync-push conflicts db-backup oauth prod front-dev front-build docker-up docker-down docker-logs docker-start docker-rebuild-backend docker-rebuild-frontend e2e e2e-headed dev-db-wipe docker-db-wipe gcal-clear-range gcal-clear-all wipe-reservations db-info db-optimize release-zip
+.PHONY: help dev-start dev-stop dev-ready dev-clear logs test smoke sync-import sync-push conflicts db-backup oauth prod front-dev front-build docker-up docker-down docker-logs docker-start docker-rebuild-backend docker-rebuild-frontend e2e e2e-headed dev-db-wipe docker-db-wipe gcal-clear-range gcal-clear-all wipe-reservations db-info db-optimize release-zip db-checkpoint db-integrity db-maintenance
 
 .ONESHELL:
 SHELL := /bin/sh
@@ -12,6 +12,8 @@ API_KEY ?= dev-key
 FAKE ?= 0
 # Ruta unificada por defecto
 DB_PATH ?= backend/data/pelubot.db
+# Directorio para backups locales
+BACKUPS_DIR ?= backups
 GOOGLE_OAUTH_JSON ?= oauth_tokens.json
 # Auto-detect Docker Compose (v2 plugin preferred, fallback to v1)
 # You can still override: make DOCKER=docker-compose docker-up
@@ -34,7 +36,10 @@ help:
 	@echo "  make conflicts   # detect conflicts (vars: START, END, DAYS)"
 	@echo "  make db-info     # print DB info (/admin/db_info)"
 	@echo "  make db-optimize # run VACUUM/ANALYZE (/admin/db_optimize)"
-	@echo "  make db-backup   # copy DB (from DB_PATH) with timestamp"
+	@echo "  make db-backup   # copy DB with timestamp to $(BACKUPS_DIR)/"
+	@echo "  make db-checkpoint # PRAGMA wal_checkpoint(TRUNCATE)"
+	@echo "  make db-integrity # PRAGMA integrity_check"
+	@echo "  make db-maintenance # backup -> checkpoint -> integrity -> optimize"
 	@echo "  make oauth       # run OAuth flow to capture token"
 	@echo "  make prod        # run uvicorn with 2 workers on $(BASE)"
 	@echo "  make front-dev   # run Vite dev server"
@@ -56,7 +61,6 @@ help:
 	@echo "  make gcal-clear-all # clear all Google Calendar events"
 	@echo "  make gcal-clean-orphans # delete orphan GCal events (dry-run by default)"
 	@echo "  make wipe-reservations # remove all reservations in DB"
-	@echo "  make db-checkpoint # PRAGMA wal_checkpoint(TRUNCATE) on SQLite"
 	@echo "  make release-zip # crea pelubot-release.zip limpio (con .env.example)"
 
 dev-start:
@@ -166,10 +170,40 @@ conflicts:
 db-backup:
 	@ts=$$(date +%Y%m%d-%H%M%S); \
 	if [ -f "$(DB_PATH)" ]; then \
-	  base=$$(basename "$(DB_PATH)" .db); cp "$(DB_PATH)" "backend/data/$${base}.$${ts}.db"; echo "Backup created: backend/data/$${base}.$${ts}.db"; \
+	  mkdir -p "$(BACKUPS_DIR)"; \
+	  cp "$(DB_PATH)" "$(BACKUPS_DIR)/pelubot-$${ts}.db"; \
+	  echo "Backup created: $(BACKUPS_DIR)/pelubot-$${ts}.db"; \
 	else \
 	  echo "DB not found at $(DB_PATH). Set DB_PATH or create DB (make dev-start)."; exit 1; \
 	fi
+
+# Ejecuta WAL checkpoint (TRUNCATE) en SQLite (vía CLI si está disponible; fallback a endpoint)
+db-checkpoint:
+	@if command -v sqlite3 >/dev/null 2>&1; then \
+	  sqlite3 "$(DB_PATH)" "PRAGMA wal_checkpoint(TRUNCATE);"; \
+	else \
+	  echo "sqlite3 no encontrado; usando endpoint /admin/db_checkpoint"; \
+	  BASE=$(BASE) API_KEY=$(API_KEY) python - <<- 'PY' \
+	import os,json; from urllib import request; BASE=os.environ['BASE']; API_KEY=os.environ['API_KEY']; \
+	req=request.Request(BASE+'/admin/db_checkpoint', data=b'{}', method='POST'); req.add_header('Content-Type','application/json'); req.add_header('X-API-Key',API_KEY); \
+	print(request.urlopen(req, timeout=12).read().decode()); PY; \
+	fi
+
+# Integridad de BD vía PRAGMA integrity_check
+db-integrity:
+	@if command -v sqlite3 >/dev/null 2>&1; then \
+	  sqlite3 "$(DB_PATH)" "PRAGMA integrity_check;"; \
+	else \
+	  echo "sqlite3 no encontrado; usando endpoint /admin/db_integrity"; \
+	  BASE=$(BASE) API_KEY=$(API_KEY) python - <<- 'PY' \
+	import os; from urllib import request; BASE=os.environ['BASE']; API_KEY=os.environ['API_KEY']; \
+	req=request.Request(BASE+'/admin/db_integrity'); req.add_header('X-API-Key',API_KEY); \
+	print(request.urlopen(req, timeout=12).read().decode()); PY; \
+	fi
+
+# Mantenimiento completo: backup -> checkpoint -> integrity -> optimize
+db-maintenance: db-backup db-checkpoint db-integrity db-optimize
+	@echo "Mantenimiento completo OK"
 
 # Migra la BD antigua dev-pelubot-sync.db -> pelubot.db si no existe
 migrate-db:
@@ -389,17 +423,3 @@ release-zip:
 	@zip -r pelubot-release.zip . -x@release.exclude
 	@echo "Hecho: pelubot-release.zip"
 
-# Ejecuta WAL checkpoint (TRUNCATE) en SQLite
-db-checkpoint:
-	@echo "Checkpoint WAL (TRUNCATE) vía /admin/db_checkpoint"
-	BASE=$(BASE) API_KEY=$(API_KEY) python - <<- 'PY'
-	import os,json
-	from urllib import request
-	BASE=os.environ.get('BASE','http://127.0.0.1:8776')
-	API_KEY=os.environ.get('API_KEY','dev-key')
-	req=request.Request(BASE+'/admin/db_checkpoint', data=b'{}', method='POST')
-	req.add_header('Content-Type','application/json')
-	req.add_header('X-API-Key',API_KEY)
-	with request.urlopen(req, timeout=12) as r: print(r.read().decode())
-	PY
-	@echo "Aviso: el ZIP puede incluir .env (claves). Compártelo con cuidado."

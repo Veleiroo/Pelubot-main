@@ -1,3 +1,5 @@
+"""Herramientas de fechas con zona horaria consistente para PeluBot."""
+
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -5,16 +7,14 @@ TZ = ZoneInfo("Europe/Madrid")
 
 MAX_AHEAD_DAYS = 183  # ~6 meses
 
+
 def now_tz() -> datetime:
+    """Devuelve la fecha/hora actual en la zona configurada."""
     return datetime.now(TZ)
 
+
 def validate_target_dt(dt: datetime) -> None:
-    """
-    Reglas:
-    - Debe ser consciente de zona (tz-aware). Si viene naive, se asume Europe/Madrid.
-    - No puede ser pasado.
-    - No puede estar más allá de ~6 meses.
-    """
+    """Verifica que la fecha esté en el futuro y dentro del rango permitido."""
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=TZ)
     _now = now_tz()

@@ -1,4 +1,5 @@
-# tests/test_smoke.py
+"""Pruebas básicas de humo para validar el entorno de test."""
+
 import asyncio
 import pytest
 

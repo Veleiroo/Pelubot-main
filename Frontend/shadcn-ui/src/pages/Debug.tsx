@@ -7,16 +7,9 @@ import { api } from '@/lib/api';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
-const mask = (s?: string) => {
-  if (!s) return 'none';
-  if (s.length <= 8) return s[0] + '***' + s[s.length - 1];
-  return s.slice(0, 4) + '...' + s.slice(-4);
-};
-
 const Debug = () => {
   const BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8776';
   const navigate = useNavigate();
-  const KEY = import.meta.env.VITE_API_KEY as string | undefined;
   const [health, setHealth] = useState<unknown>(null);
   const [ready, setReady] = useState<unknown>(null);
   const [services, setServices] = useState<unknown[]>([]);
@@ -66,7 +59,7 @@ const Debug = () => {
         <CardHeader><CardTitle>Configuración de Debug</CardTitle></CardHeader>
         <CardContent className="text-sm text-neutral-300 space-y-1">
           <div>BASE: {BASE}</div>
-          <div>VITE_API_KEY: {mask(KEY)}</div>
+          <div>Autenticación: gestionada desde servidor (reservas públicas {import.meta.env.VITE_PUBLIC_RESERVATIONS ?? 'desactivadas'})</div>
         </CardContent>
       </Card>
 

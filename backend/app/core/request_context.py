@@ -1,3 +1,5 @@
+"""Contexto compartido para propagar el identificador de petición."""
+
 import logging
 import contextvars
 
@@ -8,11 +10,9 @@ request_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 
 
 class RequestContextFilter(logging.Filter):
-    """
-    Inserta request_id en todos los logs (o '-' si no hay).
-    """
+    """Inserta `request_id` en todos los logs (o '-' si no hay)."""
+
     def filter(self, record: logging.LogRecord) -> bool:
         rid = request_id_var.get()
         record.request_id = rid if rid else "-"
         return True
-

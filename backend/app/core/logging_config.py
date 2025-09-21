@@ -1,3 +1,5 @@
+"""Configuración centralizada de logging para PeluBot."""
+
 import logging
 import logging.config
 

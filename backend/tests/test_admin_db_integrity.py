@@ -1,4 +1,5 @@
-# tests/test_admin_db_integrity.py
+"""Prueba del endpoint `/admin/db_integrity`."""
+
 import os
 
 API_KEY = "test-api-key"
@@ -11,4 +12,3 @@ def test_db_integrity_endpoint(app_client):
     assert isinstance(body.get("ok"), bool)
     # En SQLite in-memory debería responder ok o unknown, pero validamos estructura básica
     assert "detail" in body
-

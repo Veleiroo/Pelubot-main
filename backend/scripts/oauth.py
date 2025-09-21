@@ -11,6 +11,7 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
 def main():
+    """Lanza el flujo OAuth y guarda el token según la configuración."""
     here = Path(__file__).resolve().parent.parent  # scripts/ -> backend/
     client_secrets = here / "autorizacion.json"
     if not client_secrets.exists():

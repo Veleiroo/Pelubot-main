@@ -1,2 +1,1 @@
-"""Core utilities: logging, middleware, request context, errors."""
-
+"""Componentes núcleo: logging, middleware, contexto de petición y errores."""

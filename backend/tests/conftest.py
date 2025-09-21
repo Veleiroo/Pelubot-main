@@ -1,4 +1,5 @@
-# tests/conftest.py
+"""Fixtures compartidas para los tests del backend."""
+
 import importlib
 from pathlib import Path
 import sys

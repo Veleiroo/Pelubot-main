@@ -1,2 +1,1 @@
-"""Utility functions (date/time, etc.)."""
-
+"""Utilidades comunes (fechas, etc.)."""

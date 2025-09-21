@@ -1,2 +1,1 @@
-"""Domain services (business logic)."""
-
+"""Servicios de dominio (lógica de negocio)."""

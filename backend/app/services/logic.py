@@ -1,11 +1,11 @@
 from __future__ import annotations
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from datetime import datetime, date, time, timedelta
 import os
 from sqlmodel import Session, select
 from app.models import Service, RescheduleIn, Reservation, ReservationDB
 from app.data import SERVICE_BY_ID, PROS, PRO_BY_ID, WEEKLY_SCHEDULE, PRO_CALENDAR, PRO_USE_GCAL_BUSY
-from app.integrations.google_calendar import build_calendar, freebusy, freebusy_multi, create_event, patch_event, delete_event, iso_datetime, list_events_range
+from app.integrations.google_calendar import build_calendar, freebusy_multi, create_event, patch_event, delete_event, iso_datetime, list_events_range
 from zoneinfo import ZoneInfo
 from datetime import timezone as _utc_tz
 
@@ -13,7 +13,7 @@ from datetime import timezone as _utc_tz
 # Lógica de negocio con persistencia
 # ---------------------------------------------
 
-USE_GCAL_BUSY = os.getenv("USE_GCAL_BUSY", "true").lower() in ("1", "true", "yes", "y", "si", "sí")
+USE_GCAL_BUSY = os.getenv("USE_GCAL_BUSY", "false").lower() in ("1", "true", "yes", "y", "si", "sí")
 DEFAULT_CALENDAR_ID = os.getenv("GCAL_CALENDAR_ID", os.getenv("GCAL_TEST_CALENDAR_ID", "pelubot.test@gmail.com"))
 
 TZ = os.getenv("TZ", "Europe/Madrid")
@@ -28,30 +28,6 @@ def get_calendar_for_professional(pro_id: str) -> str:
     """Calendar destino para el profesional; fallback al calendar general."""
     return PRO_CALENDAR.get(pro_id) or DEFAULT_CALENDAR_ID
 
-def parse_date(s: str) -> Optional[date]:
-    s = (s or "").strip()
-    if not s:
-        return None
-    try:
-        if len(s) == 10 and s[4] == "-" and s[7] == "-":
-            return datetime.strptime(s, "%Y-%m-%d").date()
-    except Exception:
-        pass
-    try:
-        if len(s) in (4, 5) and "/" in s:
-            d = datetime.strptime(s, "%d/%m").date()
-            return d.replace(year=datetime.now().year)
-    except Exception:
-        pass
-    return None
-
-def parse_time(s: str) -> Optional[time]:
-    s = (s or "").strip()
-    try:
-        return datetime.strptime(s, "%H:%M").time()
-    except Exception:
-        return None
-
 def _reservations_for_prof_on_date(session: Session, pro_id: str, on_date: date) -> List[ReservationDB]:
     """Reservas del profesional que solapan el día."""
     day_start = datetime.combine(on_date, time(0, 0))
@@ -60,9 +36,11 @@ def _reservations_for_prof_on_date(session: Session, pro_id: str, on_date: date)
     return list(session.exec(stmt))
 
 def find_reservation(session: Session, reservation_id: str) -> Optional[ReservationDB]:
+    """Obtiene la reserva desde BD si existe."""
     return session.get(ReservationDB, reservation_id)
 
 def cancel_reservation(session: Session, reservation_id: str) -> bool:
+    """Elimina la reserva y confirma si existía."""
     r = session.get(ReservationDB, reservation_id)
     if not r:
         return False
@@ -70,8 +48,16 @@ def cancel_reservation(session: Session, reservation_id: str) -> bool:
     session.commit()
     return True
 
-def find_available_slots(session: Session, service_id: str, on_date: date, professional_id: Optional[str] = None, step_min: int = 15, use_gcal_busy_override: Optional[bool] = None) -> List[datetime]:
-    """Calcula huecos disponibles considerando agenda, reservas locales y opcionalmente busy de GCal."""
+def find_available_slots(
+    session: Session,
+    service_id: str,
+    on_date: date,
+    professional_id: Optional[str] = None,
+    step_min: int = 15,
+    use_gcal_busy_override: Optional[bool] = None,
+    precomputed_busy: Optional[Dict[str, List[Tuple[datetime, datetime]]]] = None,
+) -> List[datetime]:
+    """Calcula huecos disponibles combinando agenda local y, si aplica, eventos de GCal."""
     service: Service = SERVICE_BY_ID[service_id]
     day_ranges = WEEKLY_SCHEDULE.get(on_date.weekday(), [])
     if not day_ranges:
@@ -92,7 +78,10 @@ def find_available_slots(session: Session, service_id: str, on_date: date, profe
         return PRO_USE_GCAL_BUSY.get(pid, USE_GCAL_BUSY)
 
     gcal_busy_map: dict[str, List[Tuple[datetime, datetime]]] = {}
-    pros_needing_gcal = [pid for pid in pro_ids if pro_uses_gcal(pid)]
+    if precomputed_busy:
+        gcal_busy_map.update(precomputed_busy)
+
+    pros_needing_gcal = [pid for pid in pro_ids if pro_uses_gcal(pid) and pid not in gcal_busy_map]
     if pros_needing_gcal:
         svc = None
         try:
@@ -146,6 +135,69 @@ def find_available_slots(session: Session, service_id: str, on_date: date, profe
             break
     return free
 
+def collect_gcal_busy_for_range(
+    pro_ids: List[str],
+    start_date: date,
+    end_date: date,
+    use_gcal_override: Optional[bool] = None,
+    tz: str = TZ,
+) -> Dict[str, Dict[date, List[Tuple[datetime, datetime]]]]:
+    """Consulta Google Calendar una sola vez para un rango de días y agrupa por fecha.
+
+    Retorna un mapa profesional -> (fecha -> intervalos ocupados en hora local naive).
+    Cuando no hay integración o ocurre un error, devuelve diccionario vacío.
+    """
+
+    def pro_uses_gcal(pid: str) -> bool:
+        if use_gcal_override is not None:
+            return bool(use_gcal_override)
+        return PRO_USE_GCAL_BUSY.get(pid, USE_GCAL_BUSY)
+
+    pros_needing_gcal = [pid for pid in pro_ids if pro_uses_gcal(pid)]
+    if not pros_needing_gcal:
+        return {}
+
+    try:
+        svc = build_calendar()
+    except Exception:
+        return {}
+
+    cal_map: Dict[str, str] = {pid: get_calendar_for_professional(pid) for pid in pros_needing_gcal}
+    cal_ids = [cid for cid in {v for v in cal_map.values() if v}]
+    if not cal_ids:
+        return {}
+
+    start_dt = datetime.combine(start_date, time(0, 0))
+    end_dt = datetime.combine(end_date, time(23, 59, 59))
+
+    try:
+        busy_raw = freebusy_multi(svc, cal_ids, iso_datetime(start_dt, tz), iso_datetime(end_dt, tz))
+    except Exception:
+        busy_raw = {}
+
+    out: Dict[str, Dict[date, List[Tuple[datetime, datetime]]]] = {}
+    for pid, cid in cal_map.items():
+        entries = busy_raw.get(cid, [])
+        if not entries:
+            continue
+        by_day: Dict[date, List[Tuple[datetime, datetime]]] = {}
+        for b in entries:
+            try:
+                bs = _to_naive_local(datetime.fromisoformat((b.get("start") or "").replace("Z", "+00:00")))
+                be = _to_naive_local(datetime.fromisoformat((b.get("end") or "").replace("Z", "+00:00")))
+            except Exception:
+                continue
+            if be <= bs:
+                continue
+            current = bs.date()
+            last = be.date()
+            while current <= last:
+                by_day.setdefault(current, []).append((bs, be))
+                current = current + timedelta(days=1)
+        if by_day:
+            out[pid] = by_day
+    return out
+
 def _fits_in_schedule(start_dt: datetime, duration_min: int) -> bool:
     day_ranges = WEEKLY_SCHEDULE.get(start_dt.weekday(), [])
     if not day_ranges:
@@ -160,11 +212,12 @@ def _fits_in_schedule(start_dt: datetime, duration_min: int) -> bool:
 
 def apply_reschedule(session: Session, payload: RescheduleIn) -> Tuple[bool, str, Optional[ReservationDB]]:
     """Reprograma una reserva, validando agenda/solapes. Soporta new_start o (new_date,new_time)."""
-    r = find_reservation(session, payload.reservation_id)
+    r = session.get(ReservationDB, payload.reservation_id)
     if not r:
         return False, "La reserva no existe.", None
     service = SERVICE_BY_ID[r.service_id]
 
+    # Determinar nuevo inicio
     new_start_dt: Optional[datetime] = None
     if getattr(payload, "new_start", None):
         try:
@@ -190,44 +243,78 @@ def apply_reschedule(session: Session, payload: RescheduleIn) -> Tuple[bool, str
             new_time = r.start.time()
         new_start_dt = datetime.combine(new_date, new_time)
 
+    # Profesional destino (por defecto, el mismo)
     new_pro = payload.professional_id or r.professional_id
     if new_pro not in PRO_BY_ID:
         return False, "professional_id no existe.", None
 
-    # Usamos naive local únicamente para comparaciones internas; en BD guardamos TZ-aware
+    # Comparaciones en hora local naive
+    def _to_naive_local(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            try:
+                return dt.astimezone(ZoneInfo(TZ)).replace(tzinfo=None)  # type: ignore[arg-type]
+            except Exception:
+                return dt
+        return dt.astimezone(ZoneInfo(TZ)).replace(tzinfo=None)
+
     start_dt = _to_naive_local(new_start_dt)
     end_dt = start_dt + timedelta(minutes=service.duration_min)
 
-    if not _fits_in_schedule(start_dt, service.duration_min):
+    # Verifica ajuste al horario laboral
+    day_ranges = WEEKLY_SCHEDULE.get(start_dt.weekday(), [])
+    ok_in_sched = False
+    for start_t, end_t in day_ranges:
+        r_start = datetime.combine(start_dt.date(), start_t)
+        r_end = datetime.combine(start_dt.date(), end_t)
+        if start_dt >= r_start and end_dt <= r_end:
+            ok_in_sched = True
+            break
+    if not ok_in_sched:
         return False, "La nueva hora no encaja en el horario.", None
 
-    for x in _reservations_for_prof_on_date(session, new_pro, start_dt.date()):
+    # Validación rápida local en el día
+    rows_same_day = session.exec(
+        select(ReservationDB).where(
+            ReservationDB.professional_id == new_pro,
+            ReservationDB.start < datetime.combine(start_dt.date(), time(23, 59, 59)),
+            ReservationDB.end > datetime.combine(start_dt.date(), time(0, 0)),
+        )
+    ).all()
+    for x in rows_same_day:
         if x.id == r.id:
             continue
         if not (end_dt <= x.start or start_dt >= x.end):
             return False, f"El profesional {PRO_BY_ID[new_pro].name} ya tiene esa hora ocupada.", None
 
-    r.professional_id = new_pro
-    # Persistimos como TZ-aware (coherente con columnas timezone=True)
+    # Validación estricta por intervalo [start,end) en BD (con TZ)
     try:
         tz = ZoneInfo(TZ)
     except Exception:
         tz = None
-    r.start = start_dt.replace(tzinfo=tz) if tz else start_dt
-    r.end = end_dt.replace(tzinfo=tz) if tz else end_dt
+    start_aw = start_dt.replace(tzinfo=tz) if tz else start_dt
+    end_aw = end_dt.replace(tzinfo=tz) if tz else end_dt
+
+    q = select(ReservationDB).where(
+        ReservationDB.professional_id == new_pro,
+        ReservationDB.id != r.id,
+        ReservationDB.start < end_aw,
+        ReservationDB.end > start_aw,
+    )
+    if session.exec(q).first():
+        return False, f"El profesional {PRO_BY_ID[new_pro].name} ya tiene esa hora ocupada.", None
+
+    # Persistencia
+    r.professional_id = new_pro
+    r.start = start_aw
+    r.end = end_aw
     r.updated_at = datetime.now(_utc_tz.utc)
     session.add(r)
     session.commit()
     session.refresh(r)
     return True, "Reserva reprogramada.", r
 
-def find_gcal_busy_slots(calendar_id: str, on_date: date, tz: str = "Europe/Madrid") -> List[dict]:
-    service = build_calendar()
-    start_iso = iso_datetime(datetime.combine(on_date, time(0, 0)), tz)
-    end_iso = iso_datetime(datetime.combine(on_date, time(23, 59)), tz)
-    return freebusy(service, calendar_id, start_iso, end_iso, tz)
-
 def create_gcal_reservation(reservation: Reservation, calendar_id: str = None, tz: str = "Europe/Madrid") -> dict:
+    """Crea el evento correspondiente en Google Calendar."""
     service = build_calendar()
     if not calendar_id:
         calendar_id = get_calendar_for_professional(reservation.professional_id)
@@ -242,20 +329,24 @@ def create_gcal_reservation(reservation: Reservation, calendar_id: str = None, t
     )
 
 def patch_gcal_reservation(event_id: str, new_start: datetime, new_end: datetime, calendar_id: str, tz: str = "Europe/Madrid") -> dict:
+    """Actualiza fechas del evento en Google Calendar."""
     service = build_calendar()
     return patch_event(service, calendar_id, event_id, new_start, new_end, tz)
 
 def delete_gcal_reservation(event_id: str, calendar_id: str) -> None:
+    """Elimina el evento asociado en Google Calendar."""
     service = build_calendar()
     delete_event(service, calendar_id, event_id)
 
 def _parse_gcal_dt(s: str) -> datetime:
+    """Normaliza fechas ISO de Google Calendar a `datetime` aware."""
     try:
         return datetime.fromisoformat(s.replace("Z", "+00:00"))
     except Exception:
         return datetime.fromisoformat(s + "T00:00:00+00:00")
 
 def _detect_service_from_summary(summary: str, default_sid: str) -> str:
+    """Heurística para inferir el servicio a partir del resumen de GCal."""
     s = (summary or "").lower()
     if "tinte" in s:
         return "tinte"
@@ -289,6 +380,7 @@ def sync_from_gcal_range(session: Session, start_date: date, end_date: date, def
                 items = list_events_range(svc, cal_id, start_iso, end_iso, tz)
             except Exception:
                 items = []
+            # NOTA: usamos un identificador sintético cuando el evento no tiene metadata privada.
             for it in items:
                 start_v = (it.get("start") or {}).get("dateTime") or (it.get("start") or {}).get("date")
                 end_v = (it.get("end") or {}).get("dateTime") or (it.get("end") or {}).get("date")
@@ -303,6 +395,7 @@ def sync_from_gcal_range(session: Session, start_date: date, end_date: date, def
                     continue
                 r = session.get(ReservationDB, rid)
                 if r is None:
+                    # NOTA: se crea la reserva local para reflejar eventos creados directamente en GCal.
                     r = ReservationDB(id=rid, service_id=srv_id, professional_id=str(pro), start=start_dt, end=end_dt, google_event_id=it.get("id"), google_calendar_id=cal_id)
                     session.add(r); total_ins += 1
                 else:
@@ -356,11 +449,13 @@ def reconcile_db_to_gcal_range(session: Session, start_date: date, end_date: dat
                         delete_event(svc, r.google_calendar_id, r.google_event_id)
                     except Exception:
                         pass
+                    # NOTA: se recrea el evento en el calendario correcto para mantener la asignación por profesional.
                     ev = create_event(svc, target_cal, r.start, r.end, summary=f"Reserva: {r.service_id} - {r.professional_id}", private_props={"reservation_id": r.id, "professional_id": r.professional_id, "service_id": r.service_id}, tz=tz)
                     r.google_event_id = ev.get("id"); r.google_calendar_id = target_cal
                     session.add(r); created += 1
                     continue
                 if not r.google_event_id or r.google_event_id not in gmap:
+                    # NOTA: si falta evento en GCal, lo recreamos para restablecer la sincronización.
                     ev = create_event(svc, target_cal, r.start, r.end, summary=f"Reserva: {r.service_id} - {r.professional_id}", private_props={"reservation_id": r.id, "professional_id": r.professional_id, "service_id": r.service_id}, tz=tz)
                     r.google_event_id = ev.get("id"); r.google_calendar_id = target_cal
                     session.add(r); created += 1

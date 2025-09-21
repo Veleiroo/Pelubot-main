@@ -1,3 +1,5 @@
+"""Middleware sencillo de rate limiting in-memory."""
+
 from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
@@ -30,6 +32,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.store: Dict[str, _Bucket] = {}
 
     def _key(self, request: Request) -> str:
+        """Compone la clave de bucket combinando API key (o IP) y ruta."""
         key = request.headers.get("X-API-Key") or ""
         if not key:
             try:
@@ -43,6 +46,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return f"{key}|{path}"
 
     def _limit_for(self, request: Request) -> int | None:
+        """Determina el límite aplicable según ruta y método."""
         path = request.url.path
         method = request.method.upper()
         if path.startswith("/admin") and method != "GET":
@@ -57,6 +61,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return None
 
     async def dispatch(self, request: Request, call_next):
+        """Aplica el rate limit antes de delegar la petición."""
         limit = self._limit_for(request)
         if not limit:
             return await call_next(request)
@@ -74,4 +79,3 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return JSONResponse(status_code=429, content={"detail": "Demasiadas peticiones. Inténtalo de nuevo en un momento."})
         bucket.ts.append(now)
         return await call_next(request)
-

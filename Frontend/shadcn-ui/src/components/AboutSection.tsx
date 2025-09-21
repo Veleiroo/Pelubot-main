@@ -9,7 +9,7 @@ export default function AboutSection() {
           <div className="relative">
             <div className="relative overflow-hidden rounded-lg">
               <img
-                src="/assets/barber-working.jpg"
+                src="/assets/gallery-1.jpg"
                 alt="Deinis trabajando"
                 className="w-full h-[600px] object-cover transition-transform duration-500 hover:scale-105"
               />

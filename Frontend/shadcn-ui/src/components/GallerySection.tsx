@@ -8,36 +8,35 @@ export default function GallerySection() {
 
   const galleryImages = [
     {
-      src: "/assets/barber-working.jpg",
-      alt: "Deinis trabajando con precisión",
-      category: "Trabajo Profesional"
+      src: "/assets/gallery-1.jpg",
+      alt: "Trabajo de precisión en la silla",
+      category: "Trabajo Profesional",
     },
     {
-      src: "/assets/client-service.jpg",
-      alt: "Atención personalizada al cliente",
-      category: "Experiencia Cliente"
+      src: "/assets/gallery-2.jpg",
+      alt: "Detalle del servicio al cliente",
+      category: "Experiencia Cliente",
     },
     {
-      src: "/assets/barber-tools.jpg",
+      src: "/assets/hero.jpg",
       alt: "Herramientas profesionales de barbería",
-      category: "Equipamiento"
-    },
-    // Imágenes adicionales de ejemplo (placeholder)
-    {
-      src: "/assets/barber-working.jpg",
-      alt: "Corte de precisión",
-      category: "Cortes"
+      category: "Equipamiento",
     },
     {
-      src: "/assets/client-service.jpg",
-      alt: "Resultado final",
-      category: "Antes y Después"
+      src: "/assets/gallery-1.jpg",
+      alt: "Corte personalizado",
+      category: "Cortes",
     },
     {
-      src: "/assets/barber-tools.jpg",
+      src: "/assets/gallery-2.jpg",
+      alt: "Antes y después",
+      category: "Resultados",
+    },
+    {
+      src: "/assets/hero.jpg",
       alt: "Ambiente del local",
-      category: "Instalaciones"
-    }
+      category: "Instalaciones",
+    },
   ];
 
   const openLightbox = (index: number) => {

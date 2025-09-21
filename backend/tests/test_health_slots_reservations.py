@@ -1,3 +1,5 @@
+"""Pruebas de salud y flujo básico de reservas."""
+
 from datetime import date, timedelta
 import os
 
@@ -54,3 +56,40 @@ def test_create_list_cancel_reservation_flow(app_client):
     r3 = app_client.delete(f"/reservations/{res_id}", headers={"X-API-Key": API_KEY})
     assert r3.status_code == 200
     assert r3.json()["ok"] is True
+
+
+def test_bulk_reservations_fill_schedule(app_client):
+    """Crea varias reservas consecutivas y verifica que el calendario se llena sin solapes."""
+    target = date.today() + timedelta(days=21)
+    while target.weekday() == 6:
+        target += timedelta(days=1)
+
+    # Obtener todos los huecos iniciales para Ana
+    resp = app_client.post("/slots", json={"service_id": "corte", "date_str": target.isoformat(), "professional_id": "ana"})
+    assert resp.status_code == 200
+    slots = resp.json()["slots"]
+    assert len(slots) >= 6  # corte son 30 min, jornada típica dará varios huecos
+
+    created_ids = []
+    for start in slots:
+        payload = {"service_id": "corte", "professional_id": "ana", "start": start}
+        r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
+        if r.status_code == 400:
+            # En caso de carreras, el hueco ya no está disponible (esperado cuando el turno se llena)
+            assert "no está disponible" in r.json()["detail"].lower()
+            break
+        assert r.status_code == 200, r.text
+        res_id = r.json()["message"].split("ID: ")[1].split(",")[0]
+        created_ids.append(res_id)
+
+    # Intentar crear una reserva adicional debe fallar porque no quedan huecos
+    if created_ids:
+        last_slot = slots[min(len(created_ids), len(slots)) - 1]
+        payload = {"service_id": "corte", "professional_id": "ana", "start": last_slot}
+        r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
+        assert r.status_code == 400
+        assert "no está disponible" in r.json()["detail"].lower()
+
+    # Limpieza: cancelar las reservas creadas
+    for res_id in created_ids:
+        app_client.delete(f"/reservations/{res_id}", headers={"X-API-Key": API_KEY})

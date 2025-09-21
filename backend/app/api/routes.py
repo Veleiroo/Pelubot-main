@@ -3,6 +3,7 @@ Rutas y endpoints de la API (estructura nueva).
 """
 from __future__ import annotations
 from datetime import datetime, time, timedelta
+from typing import Dict, List, Tuple, Optional
 import os
 import uuid
 import logging
@@ -30,6 +31,7 @@ from app.services.logic import (
     sync_from_gcal_range,
     reconcile_db_to_gcal_range,
     detect_conflicts_range,
+    collect_gcal_busy_for_range,
 )
 from app.db import get_session, engine
 from app.utils.date import validate_target_dt, TZ, now_tz, MAX_AHEAD_DAYS
@@ -39,11 +41,13 @@ from datetime import timezone as _utc_tz
 logger = logging.getLogger("pelubot.api")
 
 API_KEY = os.getenv("API_KEY", "changeme")
+PUBLIC_RESERVATIONS_ENABLED = os.getenv("PUBLIC_RESERVATIONS_ENABLED", "false").lower() in ("1","true","yes","y","si","sí")
 # En tests, forzamos autenticación aunque ALLOW_LOCAL_NO_AUTH esté activado en .env
 _allow_local = os.getenv("ALLOW_LOCAL_NO_AUTH", "false").lower() in ("1","true","yes","y","si","sí")
 ALLOW_LOCAL_NO_AUTH = False if os.getenv("PYTEST_CURRENT_TEST") else _allow_local
 
 def require_api_key(request: Request):
+    """Pequeño guard: permite tráfico local en dev si así se configura."""
     client_host = getattr(request.client, "host", None)
     if ALLOW_LOCAL_NO_AUTH and client_host in ("127.0.0.1", "localhost"):
         return
@@ -65,10 +69,12 @@ GCAL_CALENDAR_ID = os.getenv("GCAL_CALENDAR_ID", os.getenv("GCAL_TEST_CALENDAR_I
 
 @router.get("/health")
 def health():
+    """Confirma que el servicio responde."""
     return {"ok": True}
 
 @router.get("/ready", tags=["monitor"])
 def readiness():
+    """Verifica conectividad básica con la base de datos y Google Calendar."""
     status = {"db": "ok", "gcal": "ok"}
     try:
         with engine.connect() as conn:
@@ -86,6 +92,7 @@ def readiness():
 
 @router.get("/")
 def home():
+    """Lista rutas de prueba para exploración manual."""
     return {
         "status": "ok",
         "try": [
@@ -99,14 +106,17 @@ def home():
 
 @router.get("/services")
 def list_services():
+    """Devuelve el catálogo estático de servicios."""
     return SERVICES
 
 @router.get("/professionals")
 def list_professionals():
+    """Devuelve el catálogo estático de profesionales."""
     return PROS
 
 @router.get("/reservations")
 def list_reservations(session: Session = Depends(get_session)):
+    """Lista reservas ordenadas por inicio, normalizando TZ si faltan."""
     rows = session.exec(select(ReservationDB).order_by(ReservationDB.start)).all()
     logger.info("List reservations: %s rows", len(rows))
     out = []
@@ -115,7 +125,7 @@ def list_reservations(session: Session = Depends(get_session)):
         updated = getattr(r, "updated_at", None)
         start = r.start
         end = r.end
-        # Asegurar TZ en fechas si vinieran naive por datos antiguos
+        # Normalizamos TZ por compatibilidad con datos antiguos/externos.
         if start is not None and getattr(start, "tzinfo", None) is None:
             try:
                 start = start.replace(tzinfo=TZ)
@@ -143,8 +153,14 @@ def list_reservations(session: Session = Depends(get_session)):
         })
     return out
 
-@router.post("/cancel_reservation", response_model=ActionResult, dependencies=[Depends(require_api_key)])
-def cancel_reservation_post(payload: dict | None = Body(None), session: Session = Depends(get_session), _=Depends(require_api_key)):
+@router.post("/cancel_reservation", response_model=ActionResult)
+def cancel_reservation_post(
+    request: Request,
+    payload: dict | None = Body(None),
+    session: Session = Depends(get_session),
+):
+    require_api_key(request)
+    """Cancela una reserva existente a partir del identificador recibido en el cuerpo."""
     if payload is None:
         # Preferimos el manejo estándar de FastAPI con HTTPException
         raise HTTPException(status_code=422, detail="Payload requerido")
@@ -172,7 +188,13 @@ def cancel_reservation_post(payload: dict | None = Body(None), session: Session 
     raise HTTPException(status_code=500, detail="No se pudo cancelar la reserva")
 
 @router.delete("/reservations/{reservation_id}", response_model=ActionResult)
-def cancel_reservation_delete(reservation_id: str, session: Session = Depends(get_session), _=Depends(require_api_key)):
+def cancel_reservation_delete(
+    reservation_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    require_api_key(request)
+    """Cancela una reserva existente a partir del identificador en la URL."""
     logger.info("Cancel reservation requested: id=%s", reservation_id)
     r = find_reservation(session, reservation_id)
     if not r:
@@ -192,8 +214,14 @@ def cancel_reservation_delete(reservation_id: str, session: Session = Depends(ge
         return ActionResult(ok=True, message=f"Reserva {reservation_id} cancelada.")
     raise HTTPException(status_code=500, detail="No se pudo cancelar la reserva")
 
-@router.post("/reschedule", response_model=RescheduleOut, dependencies=[Depends(require_api_key)])
-def reschedule_post(payload: dict | None = Body(None), session: Session = Depends(get_session), _=Depends(require_api_key)):
+@router.post("/reschedule", response_model=RescheduleOut)
+def reschedule_post(
+    request: Request,
+    payload: dict | None = Body(None),
+    session: Session = Depends(get_session),
+):
+    require_api_key(request)
+    """Reprograma una reserva validando horario, solapes y sincronización con Google Calendar."""
     # Serializa escrituras en SQLite para evitar condiciones de carrera
     try:
         if str(engine.url).startswith("sqlite"):
@@ -243,9 +271,11 @@ def reschedule_post(payload: dict | None = Body(None), session: Session = Depend
             new_cal = get_calendar_for_professional(r.professional_id)
             if old_cal and old_cal != new_cal:
                 delete_gcal_reservation(r.google_event_id, old_cal)
+                # Cambio de profesional implica mover el evento entre calendarios.
                 gnew = create_gcal_reservation(Reservation(id=r.id, service_id=r.service_id, professional_id=r.professional_id, start=r.start, end=r.end, google_event_id=r.google_event_id, google_calendar_id=new_cal), calendar_id=new_cal)
                 r.google_event_id = gnew.get("id"); r.google_calendar_id = new_cal
             else:
+                # Mismo calendario: podríamos reutilizar evento con un patch.
                 patch_gcal_reservation(r.google_event_id, r.start, r.end, old_cal or new_cal)
                 r.google_calendar_id = old_cal or new_cal
             session.add(r); session.commit(); session.refresh(r)
@@ -256,14 +286,20 @@ def reschedule_post(payload: dict | None = Body(None), session: Session = Depend
     logger.info("Reservation rescheduled: id=%s start=%s end=%s pro=%s", r.id, r.start.isoformat(), r.end.isoformat(), r.professional_id)
     return RescheduleOut(ok=True, message=message_out, reservation_id=r.id, start=r.start.isoformat(), end=r.end.isoformat())
 
-@router.post("/reservations/reschedule", response_model=RescheduleOut, dependencies=[Depends(require_api_key)])
-def reschedule_post_alias(payload: dict | None = Body(None), session: Session = Depends(get_session), _=Depends(require_api_key)):
+@router.post("/reservations/reschedule", response_model=RescheduleOut)
+def reschedule_post_alias(
+    request: Request,
+    payload: dict | None = Body(None),
+    session: Session = Depends(get_session),
+):
+    """Alias legada del endpoint de reprogramación."""
     if payload is None:
         raise HTTPException(status_code=422, detail="Payload requerido")
-    return reschedule_post(payload, session, _)
+    return reschedule_post(request, payload, session)
 
 @router.post("/slots", response_model=SlotsOut)
 def get_slots(q: SlotsQuery, session: Session = Depends(get_session)):
+    """Calcula los huecos disponibles para un servicio en una fecha concreta."""
     logger.info("Slots query: service=%s date=%s pro=%s", q.service_id, q.date_str, q.professional_id)
     try:
         d = datetime.strptime(q.date_str, "%Y-%m-%d").date()
@@ -290,6 +326,7 @@ def get_slots(q: SlotsQuery, session: Session = Depends(get_session)):
 
 @router.post("/slots/days", response_model=DaysAvailabilityOut)
 def get_days_availability(body: DaysAvailabilityIn, session: Session = Depends(get_session)):
+    """Enumera los días del rango que aún tienen huecos disponibles."""
     if body.service_id not in SERVICE_BY_ID:
         raise HTTPException(status_code=404, detail="service_id no existe")
     if body.professional_id and body.professional_id not in PRO_BY_ID:
@@ -300,11 +337,41 @@ def get_days_availability(body: DaysAvailabilityIn, session: Session = Depends(g
     if (body.end - body.start).days > 62:
         raise HTTPException(status_code=400, detail="Rango demasiado grande (máx. 62 días)")
     today = now_tz().date()
+
+    pro_ids_for_service = (
+        [body.professional_id]
+        if body.professional_id
+        else [p.id for p in PROS if body.service_id in (p.services or [])]
+    )
+    gcal_busy_range = collect_gcal_busy_for_range(
+        pro_ids_for_service,
+        body.start,
+        body.end,
+        use_gcal_override=body.use_gcal,
+    )
+
     available_days: list[str] = []
     d = body.start
     while d <= body.end:
         if d >= today and d <= today + timedelta(days=MAX_AHEAD_DAYS):
-            slots = find_available_slots(session, body.service_id, d, body.professional_id, use_gcal_busy_override=body.use_gcal)
+            precomputed_busy: Optional[Dict[str, List[Tuple[datetime, datetime]]]] = None
+            if gcal_busy_range:
+                busy_map: Dict[str, List[Tuple[datetime, datetime]]] = {}
+                for pid in pro_ids_for_service:
+                    intervals = gcal_busy_range.get(pid, {}).get(d, [])
+                    if intervals:
+                        busy_map[pid] = intervals
+                if busy_map:
+                    precomputed_busy = busy_map
+
+            slots = find_available_slots(
+                session,
+                body.service_id,
+                d,
+                body.professional_id,
+                use_gcal_busy_override=body.use_gcal,
+                precomputed_busy=precomputed_busy,
+            )
             if d == today:
                 now_local = now_tz().replace(tzinfo=None)
                 slots = [dt for dt in slots if dt >= now_local]
@@ -318,8 +385,15 @@ def _naive(dt: datetime) -> datetime:
         return dt.replace(tzinfo=None)
     return dt
 
-@router.post("/reservations", response_model=ActionResult, dependencies=[Depends(require_api_key)])
-def create_reservation(payload: dict | None = Body(None), session: Session = Depends(get_session), _=Depends(require_api_key)):
+@router.post("/reservations", response_model=ActionResult)
+def create_reservation(
+    request: Request,
+    payload: dict | None = Body(None),
+    session: Session = Depends(get_session),
+):
+    if not PUBLIC_RESERVATIONS_ENABLED:
+        require_api_key(request)
+    """Crea una reserva nueva y sincroniza con Google Calendar cuando sea posible."""
     if payload is None:
         raise HTTPException(status_code=422, detail="Payload requerido")
     try:
@@ -331,6 +405,13 @@ def create_reservation(payload: dict | None = Body(None), session: Session = Dep
         raise HTTPException(status_code=404, detail="service_id no existe")
     if payload.professional_id not in PRO_BY_ID:
         raise HTTPException(status_code=404, detail="professional_id no existe")
+    # Compatibilidad: el profesional debe ofrecer el servicio solicitado
+    try:
+        pro = PRO_BY_ID[payload.professional_id]
+        if payload.service_id not in (pro.services or []):
+            raise HTTPException(status_code=400, detail="El profesional no ofrece ese servicio")
+    except Exception:
+        pass
     start = payload.start
     if start.tzinfo is None:
         start = start.replace(tzinfo=TZ)
@@ -340,6 +421,7 @@ def create_reservation(payload: dict | None = Body(None), session: Session = Dep
         raise HTTPException(status_code=400, detail=str(e))
     service = SERVICE_BY_ID[payload.service_id]
     end = start + timedelta(minutes=service.duration_min)
+    # Recalcular disponibilidad garantiza que el slot sigue libre tras la validación inicial.
     avail = find_available_slots(session, payload.service_id, start.date(), payload.professional_id)
     avail_naive = [_naive(dt) for dt in avail]
     if _naive(start) not in avail_naive:
@@ -348,7 +430,7 @@ def create_reservation(payload: dict | None = Body(None), session: Session = Dep
     cal_id = get_calendar_for_professional(payload.professional_id)
     gcal_id = None
 
-    # Sección crítica: bloquear escritura en SQLite y revalidar solape antes de insertar
+    # NOTA: bloqueamos la tabla para evitar condiciones de carrera en SQLite.
     try:
         if str(engine.url).startswith("sqlite"):
             try:
@@ -362,7 +444,7 @@ def create_reservation(payload: dict | None = Body(None), session: Session = Dep
         )
         if session.exec(q).first():
             session.rollback()
-            raise HTTPException(status_code=409, detail="El profesional ya tiene esa hora ocupada.")
+            raise HTTPException(status_code=400, detail="El profesional ya tiene esa hora ocupada.")
         row = ReservationDB(id=res_id, service_id=payload.service_id, professional_id=payload.professional_id, start=start, end=end, google_event_id=None, google_calendar_id=cal_id)
         session.add(row)
         session.commit()
@@ -372,7 +454,7 @@ def create_reservation(payload: dict | None = Body(None), session: Session = Dep
         session.rollback()
         raise HTTPException(status_code=500, detail=f"No se pudo guardar la reserva: {e}")
 
-    # Crear evento en Google Calendar después (best-effort)
+    # NOTA: se sincroniza después del commit para no deshacer la reserva si Google falla.
     try:
         gcal_event = create_gcal_reservation(Reservation(id=res_id, service_id=payload.service_id, professional_id=payload.professional_id, start=start, end=end), calendar_id=cal_id)
         gcal_id = gcal_event.get("id")
@@ -408,6 +490,7 @@ class AdminSyncIn(BaseModel):
 
 @router.post("/admin/sync")
 def admin_sync(body: AdminSyncIn | None = None, session: Session = Depends(get_session), _=Depends(require_api_key)):
+    """Sincroniza la BD con Google Calendar: importa, exporta o ambos según `mode`."""
     from datetime import date, timedelta
     body = body or AdminSyncIn()
     mode = (body.mode or "import").lower()
@@ -420,10 +503,42 @@ def admin_sync(body: AdminSyncIn | None = None, session: Session = Depends(get_s
     by_prof = True if body.by_professional is None else bool(body.by_professional)
     results: dict[str, dict] = {}
     if mode in ("import", "both"):
-        results["import"] = sync_from_gcal_range(session, start, end, default_service=body.default_service or "corte", by_professional=by_prof, calendar_id=body.calendar_id, professional_id=body.professional_id)
+        results["import"] = sync_from_gcal_range(
+            session,
+            start,
+            end,
+            default_service=body.default_service or "corte",
+            by_professional=by_prof,
+            calendar_id=body.calendar_id,
+            professional_id=body.professional_id,
+        )
     if mode in ("push", "both"):
-        results["push"] = reconcile_db_to_gcal_range(session, start, end, by_professional=by_prof, calendar_id=body.calendar_id, professional_id=body.professional_id)
-    return {"ok": True, "mode": mode, "range": (start.isoformat(), end.isoformat()), "results": results}
+        results["push"] = reconcile_db_to_gcal_range(
+            session,
+            start,
+            end,
+            by_professional=by_prof,
+            calendar_id=body.calendar_id,
+            professional_id=body.professional_id,
+        )
+
+    per_task_ok = {name: res.get("ok", True) for name, res in results.items()}
+    overall_ok = all(per_task_ok.values()) if per_task_ok else True
+    errors = {
+        name: res.get("error")
+        for name, res in results.items()
+        if res.get("ok", True) is False and res.get("error")
+    }
+
+    payload = {
+        "ok": overall_ok,
+        "mode": mode,
+        "range": (start.isoformat(), end.isoformat()),
+        "results": results,
+    }
+    if errors:
+        payload["errors"] = errors
+    return payload
 
 class AdminConflictsIn(BaseModel):
     start: str | None = None
@@ -435,6 +550,7 @@ class AdminConflictsIn(BaseModel):
 
 @router.post("/admin/conflicts")
 def admin_conflicts(body: AdminConflictsIn | None = None, session: Session = Depends(get_session), _=Depends(require_api_key)):
+    """Detecta discrepancias entre la BD y Google Calendar en el rango solicitado."""
     from datetime import date, timedelta
     body = body or AdminConflictsIn()
     start = date.fromisoformat(body.start) if body.start else date.today()
@@ -461,6 +577,7 @@ from app.integrations.google_calendar import build_calendar, clear_calendar, lis
 
 @router.post("/admin/clear_calendars")
 def admin_clear_calendars(body: AdminClearCalendarsIn | None = None, _=Depends(require_api_key)):
+    """Limpia calendarios de Google con opciones de dry-run y filtro por eventos de PeluBot."""
     from app.data import PRO_CALENDAR
     body = body or AdminClearCalendarsIn()
     if not (body.dry_run or (body.confirm and body.confirm.upper() == "DELETE")):
@@ -504,6 +621,7 @@ class AdminCleanupOrphansIn(BaseModel):
 
 @router.post("/admin/cleanup_orphans")
 def admin_cleanup_orphans(body: AdminCleanupOrphansIn | None = None, session: Session = Depends(get_session), _=Depends(require_api_key)):
+    """Elimina eventos en Google Calendar cuyo reservation_id ya no existe en la BD."""
     """Borra eventos en GCal con private.reservation_id cuyo ID no existe en la BD local.
     Requiere confirm='DELETE' si dry_run es False.
     """
@@ -560,6 +678,7 @@ def admin_cleanup_orphans(body: AdminCleanupOrphansIn | None = None, session: Se
 
 @router.post("/admin/wipe_reservations")
 def admin_wipe_reservations(body: AdminWipeReservationsIn | None = None, session: Session = Depends(get_session), _=Depends(require_api_key)):
+    """Elimina todas las reservas locales tras confirmación explícita."""
     body = body or AdminWipeReservationsIn()
     if not (body.confirm and body.confirm.upper() == "DELETE"):
         return {"ok": False, "error": "Confirmación requerida: confirm='DELETE'"}
@@ -574,6 +693,7 @@ def admin_wipe_reservations(body: AdminWipeReservationsIn | None = None, session
 # --- Info y optimización de base de datos ---
 @router.get("/admin/db_info")
 def admin_db_info(session: Session = Depends(get_session), _=Depends(require_api_key)):
+    """Muestra metadatos de la base de datos y estadísticas básicas de reservas."""
     db_url_env = os.getenv("DATABASE_URL")
     is_sqlite = str(engine.url).startswith("sqlite")
     sqlite_path = None
@@ -620,6 +740,22 @@ def admin_db_info(session: Session = Depends(get_session), _=Depends(require_api
         "pragma": pragma,
     }
 
+@router.get("/admin/db_integrity")
+def admin_db_integrity(_=Depends(require_api_key)):
+    """Ejecuta `PRAGMA integrity_check` en SQLite."""
+    """Ejecuta PRAGMA integrity_check y devuelve ok/detail.
+    Útil para verificar integridad tras operaciones o caídas.
+    """
+    is_sqlite = str(engine.url).startswith("sqlite")
+    if not is_sqlite:
+        return {"ok": False, "detail": "Solo soportado en SQLite"}
+    try:
+        with engine.connect() as conn:
+            res = conn.exec_driver_sql("PRAGMA integrity_check;").scalar()
+        return {"ok": (res == "ok"), "detail": res}
+    except Exception as e:
+        return {"ok": False, "detail": str(e)}
+
 class AdminDbOptimizeIn(BaseModel):
     vacuum: bool | None = True
     analyze: bool | None = True
@@ -627,6 +763,7 @@ class AdminDbOptimizeIn(BaseModel):
 
 @router.post("/admin/db_optimize")
 def admin_db_optimize(body: AdminDbOptimizeIn | None = None, _=Depends(require_api_key)):
+    """Lanza VACUUM/ANALYZE/PRAGMA optimize en SQLite según parámetros."""
     body = body or AdminDbOptimizeIn()
     is_sqlite = str(engine.url).startswith("sqlite")
     actions = {"vacuum": False, "analyze": False, "optimize": False}
@@ -658,6 +795,7 @@ class AdminDbCheckpointOut(BaseModel):
 
 @router.post("/admin/db_checkpoint", response_model=AdminDbCheckpointOut)
 def admin_db_checkpoint(_=Depends(require_api_key)):
+    """Fuerza un checkpoint WAL en SQLite."""
     is_sqlite = str(engine.url).startswith("sqlite")
     if not is_sqlite:
         return AdminDbCheckpointOut(ok=False, error="Solo soportado en SQLite")

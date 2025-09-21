@@ -30,12 +30,14 @@ from app.models import ReservationDB
 
 
 def _parse_date(s: str | None) -> date | None:
+    """Convierte ISO YYYY-MM-DD en `date`, devolviendo `None` si no se aporta."""
     if not s:
         return None
     return date.fromisoformat(s)
 
 
 def main() -> None:
+    """Ejecuta la sincronización import/push con parámetros leídos del entorno."""
     create_db_and_tables()
 
     start_env = os.getenv("START")

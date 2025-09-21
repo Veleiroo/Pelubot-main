@@ -1,6 +1,10 @@
+"""Pruebas adicionales del backend: readiness y autenticación."""
+
+import os
 from datetime import date, timedelta
 
 API_KEY = "test-api-key"
+os.environ["API_KEY"] = API_KEY
 
 
 def _next_workday(days_ahead: int = 32) -> date:
@@ -36,6 +40,58 @@ def test_auth_required_on_protected_endpoints(app_client):
     assert app_client.post("/reservations", json={}).status_code == 401
     assert app_client.post("/cancel_reservation", json={}).status_code == 401
     assert app_client.post("/reservations/reschedule", json={}).status_code == 401
+
+
+def test_public_reservations_enabled_without_key(app_client, monkeypatch):
+    import app.api.routes as routes
+
+    monkeypatch.setattr(routes, "PUBLIC_RESERVATIONS_ENABLED", True)
+
+    target = _next_workday()
+    slots = app_client.post(
+        "/slots",
+        json={"service_id": "corte", "date_str": target.isoformat(), "professional_id": "ana"},
+    )
+    assert slots.status_code == 200
+    start = slots.json()["slots"][0]
+
+    res = app_client.post(
+        "/reservations",
+        json={"service_id": "corte", "professional_id": "ana", "start": start},
+    )
+    assert res.status_code == 200
+    msg = res.json()["message"]
+    res_id_part = msg.split("ID: ")[1]
+    res_id = res_id_part.split(",")[0].split()[0]
+
+    app_client.delete(
+        f"/reservations/{res_id}",
+        headers={"X-API-Key": API_KEY},
+    )
+
+
+def test_admin_sync_propagates_errors(app_client, monkeypatch):
+    import app.api.routes as routes
+
+    def fake_import(*args, **kwargs):
+        return {"ok": False, "error": "boom"}
+
+    def fake_push(*args, **kwargs):
+        return {"ok": True}
+
+    monkeypatch.setattr(routes, "sync_from_gcal_range", fake_import)
+    monkeypatch.setattr(routes, "reconcile_db_to_gcal_range", fake_push)
+
+    r = app_client.post(
+        "/admin/sync",
+        json={"mode": "import"},
+        headers={"X-API-Key": API_KEY},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False, body
+    assert body["results"]["import"]["ok"] is False
+    assert body["errors"]["import"] == "boom"
 
 
 def test_reservations_order_and_created_at_tz(app_client):
@@ -103,4 +159,3 @@ def test_delete_cancel_and_double_cancel(app_client):
     # segunda vez -> 404
     r_del2 = app_client.delete(f"/reservations/{res_id}", headers={"X-API-Key": API_KEY})
     assert r_del2.status_code == 404
-

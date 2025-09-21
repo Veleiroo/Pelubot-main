@@ -35,3 +35,6 @@ uvicorn*.pid
 **/__pycache__/**
 *.pyc
 *.pyo
+
+# Backups locales de la base de datos
+backups/

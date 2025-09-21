@@ -22,7 +22,7 @@ export default function HeroSection() {
             <div
                 className="absolute inset-0 bg-cover bg-center bg-no-repeat"
                 style={{
-                    backgroundImage: 'url(/assets/barber-tools.jpg)',
+                    backgroundImage: 'url(/assets/hero.jpg)',
                 }}
             >
                 <div className="absolute inset-0 bg-black/70"></div>

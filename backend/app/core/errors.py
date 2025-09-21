@@ -1,3 +1,5 @@
+"""Gestión de errores homogénea para la API de PeluBot."""
+
 import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -7,7 +9,9 @@ from fastapi.encoders import jsonable_encoder
 
 logger = logging.getLogger(__name__)
 
+
 def install_exception_handlers(app: FastAPI):
+    """Registra handlers coherentes para HTTP, validaciones y errores genéricos."""
     """
     Handlers globales coherentes y compatibles con los tests:
     - HTTPException -> {"detail": "..."}

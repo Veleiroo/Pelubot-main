@@ -43,13 +43,24 @@ def _path_template(request: Request) -> str:
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
+    """Registra latencia y contador de peticiones para cada solicitud."""
     async def dispatch(self, request: Request, call_next: Callable):
         path = _path_template(request)
         method = request.method
         start = time.perf_counter()
+        status_code = 500
         try:
             response: Response = await call_next(request)
+            status_code = getattr(response, "status_code", 200)
             return response
+        except Exception:
+            # Si FastAPI fija status_code en request.state (ej.: HTTPException), lo usamos.
+            try:
+                maybe_state = getattr(request, "state", None)
+                status_code = getattr(maybe_state, "status_code", 500)
+            except Exception:
+                status_code = 500
+            raise
         finally:
             dur = time.perf_counter() - start
             try:
@@ -57,26 +68,16 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             except Exception:
                 pass
             try:
-                status = getattr(request, "state", None)
-                code = None
-                if status is not None:
-                    code = getattr(status, "status_code", None)
-                if code is None:
-                    code = 200
-            except Exception:
-                code = 200
-            try:
-                # No tenemos el response aquí tras finally si hubo excepción; aproximamos a 200
-                HTTP_REQUESTS.labels(method=method, path=path, status=str(200)).inc()
+                HTTP_REQUESTS.labels(method=method, path=path, status=str(status_code)).inc()
             except Exception:
                 pass
 
 
 def install_metrics(app: FastAPI) -> None:
+    """Registra el middleware de métricas y expone `/metrics`."""
     app.add_middleware(MetricsMiddleware)
 
     @app.get("/metrics")
     def metrics_endpoint():
         data = generate_latest(REGISTRY)
         return Response(content=data, media_type=CONTENT_TYPE_LATEST)
-

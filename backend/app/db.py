@@ -6,6 +6,31 @@ import os
 from pathlib import Path
 from sqlmodel import SQLModel, create_engine, Session
 
+# Nueva: conexión directa sqlite3 con PRAGMAs reforzados para utilidades/diagnóstico
+# Nota: La app sigue usando SQLAlchemy/SQLModel; esta función es auxiliar e idempotente.
+import sqlite3
+
+def connect(db_path: str) -> sqlite3.Connection:
+    """Crea una conexión sqlite3 con PRAGMAs seguros por defecto.
+    - WAL para concurrencia
+    - synchronous=NORMAL (usar FULL si se prioriza durabilidad máxima)
+    - foreign_keys=ON para respetar FK (si existieran)
+    - busy_timeout=10000 ms para evitar database is locked en picos
+    - temp_store=MEMORY y mmap_size (si host lo permite) para rendimiento
+    """
+    con = sqlite3.connect(db_path, timeout=10, isolation_level=None, check_same_thread=False)
+    # PRAGMAs clave
+    con.execute("PRAGMA journal_mode = WAL;")
+    con.execute("PRAGMA synchronous = NORMAL;")  # usar FULL si se prioriza durabilidad máxima
+    con.execute("PRAGMA foreign_keys = ON;")
+    con.execute("PRAGMA busy_timeout = 10000;")  # 10s
+    con.execute("PRAGMA temp_store = MEMORY;")
+    try:
+        con.execute("PRAGMA mmap_size = 134217728;")  # 128MB
+    except Exception:
+        pass
+    return con
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = BASE_DIR / "data" / "pelubot.db"
 DEFAULT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -28,33 +53,61 @@ try:
                 cursor = dbapi_connection.cursor()
                 # WAL = mejor concurrencia; synchronous=NORMAL para buen balance seguridad/rendimiento
                 cursor.execute("PRAGMA journal_mode=WAL;")
-                cursor.execute("PRAGMA synchronous=NORMAL;")
+                cursor.execute("PRAGMA synchronous=NORMAL;")  # usar FULL si se prioriza durabilidad máxima
                 cursor.execute("PRAGMA foreign_keys=ON;")
+                cursor.execute("PRAGMA busy_timeout=10000;")  # 10s
+                cursor.execute("PRAGMA temp_store=MEMORY;")
+                try:
+                    cursor.execute("PRAGMA mmap_size=134217728;")  # 128MB si el host lo permite
+                except Exception:
+                    pass
                 cursor.close()
             except Exception:
                 # No interrumpir el arranque si falla el PRAGMA (p.ej., otros motores)
                 pass
 except Exception:
-    # Los eventos son best-effort; si fallan, no bloqueamos
+    # NOTA: los eventos son de mejor esfuerzo; si fallan, no bloqueamos el arranque.
     pass
 
 def create_db_and_tables() -> None:
+    """Crea la estructura de la base de datos y garantiza índices/trigger clave."""
     SQLModel.metadata.create_all(engine)
-    # Crear índices en SQLite si faltan (para BDs ya existentes)
+    # Crear índices/trigger en SQLite si faltan (para BDs ya existentes). Idempotente.
     if str(engine.url).startswith("sqlite"):
         try:
             with engine.connect() as conn:
-                # Índice compuesto para consultas por profesional y rango temporal
+                # Asegurar foreign_keys on en la sesión de migración
+                conn.exec_driver_sql("PRAGMA foreign_keys = ON;")
+                # Índices para consultas por profesional/servicio y rango temporal
                 conn.exec_driver_sql(
                     "CREATE INDEX IF NOT EXISTS ix_res_prof_start_end ON reservationdb (professional_id, start, end);"
                 )
-                # Nota: la restricción única ya se define en el modelo (UniqueConstraint),
-                # por lo que SQLite crea el índice único automáticamente. Evitamos duplicarlo aquí.
+                conn.exec_driver_sql(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_res_prof_start ON reservationdb (professional_id, start);"
+                )
+                conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_res_service_start ON reservationdb (service_id, start);"
+                )
+                # Trigger updated_at: actualiza solo si no lo ha actualizado ya la capa ORM
+                # Evita bucle usando condición sobre OLD/NEW
+                conn.exec_driver_sql(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS trg_reservationdb_updated
+                    AFTER UPDATE ON reservationdb
+                    FOR EACH ROW
+                    WHEN NEW.updated_at <= OLD.updated_at
+                    BEGIN
+                      UPDATE reservationdb SET updated_at = CURRENT_TIMESTAMP
+                      WHERE id = NEW.id AND NEW.updated_at <= OLD.updated_at;
+                    END;
+                    """
+                )
         except Exception:
             # No bloquear si falla (por compatibilidad)
             pass
 
 
 def get_session():
+    """Context manager de sesión SQLModel para usar con FastAPI."""
     with Session(engine) as session:
         yield session

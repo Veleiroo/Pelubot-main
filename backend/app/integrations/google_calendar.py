@@ -11,7 +11,7 @@ from googleapiclient.discovery import build
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 try:
     from zoneinfo import ZoneInfo
 except Exception:
@@ -43,6 +43,7 @@ def iso_datetime(dt_or_str, tz: str = "Europe/Madrid") -> str:
     return s + "+02:00"
 
 def _load_sa_creds() -> Optional[SA]:
+    """Carga credenciales de service account desde un JSON embebido o mediante ruta."""
     sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not sa_json:
         return None
@@ -54,6 +55,7 @@ def _load_sa_creds() -> Optional[SA]:
     return creds
 
 def _load_user_creds() -> Optional[UserCreds]:
+    """Carga credenciales OAuth de usuario y refresca tokens expirados."""
     oa_json = os.getenv("GOOGLE_OAUTH_JSON")
     if not oa_json:
         here = os.path.dirname(__file__)
@@ -62,6 +64,7 @@ def _load_user_creds() -> Optional[UserCreds]:
             oa_json = candidate
         else:
             return None
+    info_path = None
     if oa_json.strip().startswith("{"):
         info = json.loads(oa_json)
     else:
@@ -86,13 +89,32 @@ def _load_user_creds() -> Optional[UserCreds]:
                 continue
         if path is None:
             path = p if p.is_absolute() else (Path(os.getcwd()) / p)
+        info_path = path
         info = json.load(open(path, "r", encoding="utf-8"))
     creds = UserCreds.from_authorized_user_info(info, SCOPES)
-    if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
+    if creds:
+        try:
+            needs_refresh = bool(getattr(creds, "expired", False))
+            expiry = getattr(creds, "expiry", None)
+            if not needs_refresh and expiry:
+                threshold = datetime.now(timezone.utc) + timedelta(minutes=5)
+                try:
+                    if expiry.tzinfo is None:
+                        expiry = expiry.replace(tzinfo=timezone.utc)
+                except Exception:
+                    pass
+                if expiry and expiry <= threshold:
+                    needs_refresh = True
+            if needs_refresh and getattr(creds, "refresh_token", None):
+                creds.refresh(Request())
+                if info_path:
+                    info_path.write_text(creds.to_json(), encoding="utf-8")
+        except Exception:
+            pass
     return creds
 
 class _FakeFreebusy:
+    """Simula la operación freebusy del cliente oficial."""
     def __init__(self):
         self._body = None
     def query(self, body):
@@ -111,12 +133,14 @@ class _FakeFreebusy:
         return {"calendars": calendars}
 
 class _FakeEventsOp:
+    """Replica el wrapper de resultados con método `execute()`."""
     def __init__(self, result):
         self._result = result
     def execute(self):
         return self._result
 
 class _FakeEvents:
+    """Expone operaciones básicas de eventos sobre un diccionario en memoria."""
     def __init__(self, store: dict):
         self._store = store
     def insert(self, calendarId: str, body: dict):
@@ -135,6 +159,7 @@ class _FakeEvents:
         return _FakeEventsOp({"items": []})
 
 class FakeCalendarService:
+    """Cliente falso para tests y modo demo."""
     def __init__(self):
         self._events_store: dict[str, dict] = {}
     def freebusy(self):
@@ -181,6 +206,7 @@ def build_calendar() -> Any:
     raise RuntimeError("No hay credenciales. Exporta GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_OAUTH_JSON")
 
 def freebusy(service: Any, calendar_id: str, time_min_iso: str, time_max_iso: str, tz: str = "Europe/Madrid") -> List[Dict[str, str]]:
+    """Consulta intervalos ocupados para un calendario concreto."""
     body = {"timeMin": iso_datetime(time_min_iso, tz), "timeMax": iso_datetime(time_max_iso, tz), "timeZone": tz, "items": [{"id": calendar_id}]}
     try:
         fb = service.freebusy().query(body=body).execute()
@@ -204,12 +230,14 @@ def freebusy_multi(service: Any, calendar_ids: list[str], time_min_iso: str, tim
         raise RuntimeError(f"Error consultando freebusy (multi): {e}")
 
 def list_calendars(service: Any) -> List[Dict[str, Any]]:
+    """Obtiene la lista de calendarios accesibles con las credenciales activas."""
     try:
         return service.calendarList().list().execute().get("items", [])
     except Exception as e:
         raise RuntimeError(f"Error listando calendarios: {e}")
 
 def create_event(service: Any, calendar_id: str, start_dt, end_dt, summary: str, private_props: Dict[str, str] = None, color_id: Optional[str] = None, tz: str = "Europe/Madrid") -> Dict[str, Any]:
+    """Inserta un evento en Google Calendar incluyendo metadatos privados de PeluBot."""
     if private_props is None:
         private_props = {}
     body = {
@@ -226,6 +254,7 @@ def create_event(service: Any, calendar_id: str, start_dt, end_dt, summary: str,
         raise RuntimeError(f"Error creando evento: {e}")
 
 def patch_event(service: Any, calendar_id: str, event_id: str, start_dt, end_dt, tz: str = "Europe/Madrid") -> Dict[str, Any]:
+    """Actualiza las franjas de inicio y fin de un evento existente."""
     body = {
         "start": {"dateTime": iso_datetime(start_dt, tz), "timeZone": tz},
         "end": {"dateTime": iso_datetime(end_dt, tz), "timeZone": tz},
@@ -236,12 +265,14 @@ def patch_event(service: Any, calendar_id: str, event_id: str, start_dt, end_dt,
         raise RuntimeError(f"Error modificando evento: {e}")
 
 def delete_event(service: Any, calendar_id: str, event_id: str) -> None:
+    """Elimina un evento concreto, propagando el error si ocurre."""
     try:
         service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
     except Exception as e:
         raise RuntimeError(f"Error eliminando evento: {e}")
 
 def list_events_range(service: Any, calendar_id: str, time_min_iso: str, time_max_iso: str, tz: str = "Europe/Madrid") -> List[Dict[str, Any]]:
+    """Lista eventos de un calendario en el rango dado (una sola página)."""
     try:
         resp = service.events().list(calendarId=calendar_id, timeMin=iso_datetime(time_min_iso, tz), timeMax=iso_datetime(time_max_iso, tz), singleEvents=True, orderBy="startTime", timeZone=tz).execute()
         return resp.get("items", [])
@@ -249,6 +280,7 @@ def list_events_range(service: Any, calendar_id: str, time_min_iso: str, time_ma
         raise RuntimeError(f"Error listando eventos: {e}")
 
 def list_events_allpages(service: Any, calendar_id: str, time_min: Optional[str] = None, time_max: Optional[str] = None, tz: str = "Europe/Madrid") -> List[Dict[str, Any]]:
+    """Obtiene todos los eventos paginando hasta consumir el rango indicado."""
     params = {"calendarId": calendar_id}
     if time_min or time_max:
         if time_min:
@@ -274,6 +306,7 @@ def list_events_allpages(service: Any, calendar_id: str, time_min: Optional[str]
     return items
 
 def clear_calendar(service: Any, calendar_id: str, time_min: Optional[str] = None, time_max: Optional[str] = None, only_pelubot: bool = False, dry_run: bool = False, tz: str = "Europe/Madrid") -> Dict[str, Any]:
+    """Elimina eventos de un calendario con filtros opcionales y modo simulación."""
     items = list_events_allpages(service, calendar_id, time_min, time_max, tz)
     deleted = skipped = 0
     for it in items:

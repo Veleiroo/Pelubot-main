@@ -1,3 +1,5 @@
+"""Pruebas del flujo de reprogramación de reservas."""
+
 from datetime import date, timedelta
 
 API_KEY = "test-api-key"
