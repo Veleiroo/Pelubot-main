@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react';
+import { Check } from '@/lib/icons';
 
 export type BookingStep = { key: string; label: string; active?: boolean; done?: boolean };
 

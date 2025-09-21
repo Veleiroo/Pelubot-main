@@ -8,7 +8,24 @@ export type Professional = { id: string; name: string; services?: string[] };
 
 type SlotsOut = { service_id: string; date: string; professional_id?: string | null; slots: string[] };
 type ActionResult = { ok: boolean; message: string };
+type ReservationCreateOut = ActionResult & { reservation_id: string; google_event_id?: string | null };
 type DaysAvailabilityOut = { service_id: string; start: string; end: string; professional_id?: string | null; available_days: string[] };
+
+export class ApiError extends Error {
+  status: number;
+  detail?: string;
+  requestId?: string;
+  rawBody?: string;
+
+  constructor(message: string, opts: { status: number; detail?: string; requestId?: string; rawBody?: string }) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = opts.status;
+    this.detail = opts.detail;
+    this.requestId = opts.requestId;
+    this.rawBody = opts.rawBody;
+  }
+}
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
@@ -32,15 +49,27 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 
     if (!res.ok) {
       let text = '';
+      let detail: string | undefined;
       try {
         text = await res.text();
-      } catch { /* noop */ }
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed && typeof parsed === 'object') {
+            detail = parsed.detail ?? parsed.message ?? undefined;
+          }
+        } catch {
+          /* texto plano */
+        }
+      } catch {
+        /* noop */
+      }
 
-      const rid = res.headers.get('X-Request-ID') || '';
-      const msg = `HTTP ${res.status}${rid ? ` [rid=${rid}]` : ''}${text ? `: ${text.slice(0, 200)}` : ''}`;
+      const rid = res.headers.get('X-Request-ID') || undefined;
+      const fallback = `HTTP ${res.status}${rid ? ` [rid=${rid}]` : ''}`;
+      const message = (detail && String(detail)) || (text ? `${fallback}: ${text.slice(0, 200)}` : fallback);
 
-      if (DEBUG) console.warn('HTTP ERR', res.status, url, `${ms}ms`, msg);
-      throw new Error(msg);
+      if (DEBUG) console.warn('HTTP ERR', res.status, url, `${ms}ms`, { detail, rid, text: text.slice(0, 200) });
+      throw new ApiError(message, { status: res.status, detail: detail ? String(detail) : undefined, requestId: rid, rawBody: text || undefined });
     }
 
     const data = (await res.json()) as T;
@@ -74,7 +103,7 @@ export const api = {
 
   // Creación de reservas. El backend espera { service_id, professional_id, start }.
   createReservation: (payload: { service_id: string; professional_id: string; start: string }) =>
-    http<ActionResult>("/reservations", { method: "POST", body: JSON.stringify(payload) }),
+    http<ReservationCreateOut>("/reservations", { method: "POST", body: JSON.stringify(payload) }),
 
   // Disponibilidad por días para un rango [start, end].
   getDaysAvailability: (

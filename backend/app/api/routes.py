@@ -16,7 +16,7 @@ from app.data import SERVICES, PROS, SERVICE_BY_ID, PRO_BY_ID
 from app.models import (
     SlotsQuery, SlotsOut,
     Reservation, CancelReservationIn, ActionResult,
-    RescheduleIn, RescheduleOut, ReservationIn,
+    RescheduleIn, RescheduleOut, ReservationIn, ReservationCreateOut,
     ReservationDB,
     DaysAvailabilityIn, DaysAvailabilityOut,
 )
@@ -385,7 +385,7 @@ def _naive(dt: datetime) -> datetime:
         return dt.replace(tzinfo=None)
     return dt
 
-@router.post("/reservations", response_model=ActionResult)
+@router.post("/reservations", response_model=ReservationCreateOut)
 def create_reservation(
     request: Request,
     payload: dict | None = Body(None),
@@ -468,12 +468,9 @@ def create_reservation(
         logger.warning("Google Calendar no disponible; reserva sin sincronización: %s", e)
 
     message = f"Reserva creada exitosamente. ID: {res_id}"
-    if gcal_id:
-        message += f", Evento Google Calendar: {gcal_id}"
-    else:
-        message += " (sin sincronización con Google Calendar)"
+    payload_out = ReservationCreateOut(ok=True, message=message, reservation_id=res_id, google_event_id=gcal_id)
     logger.info("Reservation created: id=%s gcal_event=%s calendar=%s start=%s end=%s", res_id, gcal_id, cal_id, start.isoformat(), end.isoformat())
-    return ActionResult(ok=True, message=message)
+    return payload_out
 
 # Admin
 from pydantic import BaseModel

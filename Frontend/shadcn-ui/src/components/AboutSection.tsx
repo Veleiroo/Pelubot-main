@@ -1,4 +1,4 @@
-import { Award, Users, Clock, Scissors } from 'lucide-react';
+import { Award, Users, Clock, Scissors } from '@/lib/icons';
 
 export default function AboutSection() {
   return (

@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from '@/lib/icons';
 
 const Loading = () => (
   <div className="flex items-center justify-center p-16" aria-label="Cargando">

@@ -1,4 +1,4 @@
-import { MapPin, Phone, Clock, Mail, MessageCircle } from 'lucide-react';
+import { MapPin, Phone, Clock, Mail, MessageCircle } from '@/lib/icons';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 

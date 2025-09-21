@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/lib/api';
+import { api, type Service } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { addDays, addMonths, endOfMonth, endOfWeek, format, isAfter, isBefore, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -26,10 +26,21 @@ const BookDate = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { serviceId, serviceName, professionalId, slotStart, setProfessional, setDate, setSlot, setService } = useBooking((s) => ({
+  const {
+    serviceId,
+    serviceName,
+    professionalId,
+    professionalName,
+    slotStart,
+    setProfessional,
+    setDate,
+    setSlot,
+    setService,
+  } = useBooking((s) => ({
     serviceId: s.serviceId,
     serviceName: s.serviceName,
     professionalId: s.professionalId,
+    professionalName: s.professionalName,
     slotStart: s.slotStart,
     setProfessional: s.setProfessional,
     setDate: s.setDate,
@@ -43,6 +54,8 @@ const BookDate = () => {
   const [loading, setLoading] = useState(false);
   const [pros, setPros] = useState<{ id: string; name: string; services?: string[] }[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
+  const [daysError, setDaysError] = useState<string | null>(null);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
   // Usa variable de entorno para activar Google Calendar por defecto (1/true = activo)
   const [useGcal] = useState<boolean>(() => {
     const v = (import.meta as unknown as { env: { VITE_USE_GCAL?: string | boolean } }).env
@@ -55,21 +68,38 @@ const BookDate = () => {
   const daysTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const slotsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [focusedDate, setFocusedDate] = useState<Date>(() => new Date());
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [slotsRefreshKey, setSlotsRefreshKey] = useState(0);
+  const servicesCache = useRef<Service[] | null>(null);
+
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const serviceIdParam = searchParams.get('service') || undefined;
+  const serviceNameParam = searchParams.get('service_name') || undefined;
 
   // Lee/rehidrata servicio desde URL si falta en el store.
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const sid = params.get('service') || undefined;
-    if (!serviceId && sid) setService(sid);
-    else if (sid && serviceId && sid !== serviceId) setService(sid);
-  }, [location.search, serviceId, setService]);
+    if (!serviceIdParam) return;
+    if (!serviceId || serviceId !== serviceIdParam || (serviceNameParam && serviceName !== serviceNameParam)) {
+      setService(serviceIdParam, serviceNameParam ?? serviceName);
+    }
+    const proParam = searchParams.get('pro');
+    const proNameParam = searchParams.get('pro_name');
+    if (proParam && (!professionalId || professionalId !== proParam || (proNameParam && professionalName !== proNameParam))) {
+      setProfessional(proParam, proNameParam ?? professionalName ?? null);
+    }
+    if (!proParam && professionalId && !slotStart) {
+      // Si la URL no lleva profesional explícito pero el estado sí, mantenemos selección.
+      setProfessional(professionalId, professionalName ?? null);
+    }
+  }, [serviceIdParam, serviceNameParam, serviceId, serviceName, searchParams, professionalId, professionalName, slotStart, setService, setProfessional]);
 
   // Si solo tenemos el ID del servicio, recupera su nombre para el resumen.
   useEffect(() => {
     if (!serviceId || serviceName) return;
     (async () => {
       try {
-        const items = await api.getServices();
+        const items = servicesCache.current ?? (await api.getServices());
+        servicesCache.current = items;
         const found = items.find((s) => s.id === serviceId);
         if (found) setService(serviceId, found.name);
       } catch { /* noop */ }
@@ -89,9 +119,8 @@ const BookDate = () => {
   }, [slotStart, selected, setDate]);
 
   useEffect(() => {
-    const sid = new URLSearchParams(location.search).get('service');
-    if (!serviceId && !sid) navigate('/book/service');
-  }, [serviceId, navigate, location.search]);
+    if (!serviceId && !serviceIdParam) navigate('/book/service');
+  }, [serviceId, serviceIdParam, navigate]);
 
   useEffect(() => {
     if (!serviceId) return;
@@ -111,6 +140,7 @@ const BookDate = () => {
       if (daysTimer.current) clearTimeout(daysTimer.current);
       if (daysAbort.current) daysAbort.current.abort();
       setLoading(true);
+      setDaysError(null);
       const ctrl = new AbortController();
       daysAbort.current = ctrl;
 
@@ -129,8 +159,10 @@ const BookDate = () => {
             { signal: ctrl.signal }
           );
           if (mounted) setAvail(new Set(out.available_days));
-        } catch {
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : 'Error comprobando disponibilidad de días';
           if (mounted) setAvail(new Set());
+          if (mounted) setDaysError(msg);
         } finally {
           if (mounted) setLoading(false);
         }
@@ -141,7 +173,7 @@ const BookDate = () => {
     fetchAvail(month);
 
     return () => { mounted = false; };
-  }, [serviceId, professionalId, month, useGcal]);
+  }, [serviceId, professionalId, month, useGcal, refreshKey]);
 
   const today = useMemo(() => {
     const t = new Date();
@@ -170,9 +202,27 @@ const BookDate = () => {
     if (!selectedValid || slots.length === 0 || !slotStart) return;
     const params = new URLSearchParams();
     if (serviceId) params.set('service', serviceId);
+    const resolvedServiceName = serviceName ?? serviceNameParam ?? servicesCache.current?.find((s) => s.id === serviceId)?.name;
+    if (resolvedServiceName) params.set('service_name', resolvedServiceName);
     params.set('start', slotStart);
-    if (professionalId) params.set('pro', professionalId);
-    navigate(`/book/confirm?${params.toString()}`);
+    let resolvedProfessionalName = professionalName ?? undefined;
+    if (professionalId) {
+      params.set('pro', professionalId);
+      const pro = pros.find((p) => p.id === professionalId);
+      if (pro?.name) {
+        params.set('pro_name', pro.name);
+        resolvedProfessionalName = pro.name;
+      }
+    }
+    navigate(`/book/confirm?${params.toString()}`, {
+      state: {
+        serviceId,
+        serviceName: resolvedServiceName,
+        professionalId,
+        professionalName: resolvedProfessionalName ?? null,
+        slotStart,
+      },
+    });
   };
 
   // Al seleccionar una fecha válida se solicitan los huecos.
@@ -185,6 +235,7 @@ const BookDate = () => {
 
     setDate(toYmd(selected as Date));
     setSlotsLoading(true);
+    setSlotsError(null);
 
     if (slotsTimer.current) clearTimeout(slotsTimer.current);
     if (slotsAbort.current) slotsAbort.current.abort();
@@ -206,8 +257,10 @@ const BookDate = () => {
             { signal: ctrl.signal }
           );
           if (mounted) setSlots(out.slots);
-        } catch {
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : 'Error cargando horarios';
           if (mounted) setSlots([]);
+          if (mounted) setSlotsError(msg);
         } finally {
           if (mounted) setSlotsLoading(false);
         }
@@ -218,7 +271,10 @@ const BookDate = () => {
       mounted = false;
       ctrl.abort();
     };
-  }, [serviceId, professionalId, selectedValid, useGcal, selected, setDate]);
+  }, [serviceId, professionalId, selectedValid, useGcal, selected, setDate, slotsRefreshKey]);
+
+  const onRetryDays = () => setRefreshKey((v) => v + 1);
+  const onRetrySlots = () => setSlotsRefreshKey((v) => v + 1);
 
   const steps = [
     { key: 'service', label: 'Servicio', done: true },
@@ -291,7 +347,15 @@ const BookDate = () => {
       {/* Selector de profesional */}
       <div className="flex items-center gap-3 mb-3">
         <Label htmlFor="professional-select">Profesional:</Label>
-        <Select value={professionalId ?? ANY_PRO} onValueChange={(v) => setProfessional(v === ANY_PRO ? null : v)}>
+        <Select
+          value={professionalId ?? ANY_PRO}
+          onValueChange={(v) => {
+            const nextId = v === ANY_PRO ? null : v;
+            const nextName = nextId ? pros.find((p) => p.id === nextId)?.name ?? null : null;
+            setProfessional(nextId, nextName);
+            setSlotsRefreshKey((key) => key + 1);
+          }}
+        >
           <SelectTrigger id="professional-select" className="w-64" aria-label="Seleccionar profesional">
             <SelectValue placeholder="Cualquiera" />
           </SelectTrigger>
@@ -391,6 +455,12 @@ const BookDate = () => {
             <div className="text-sm text-neutral-200 bg-neutral-800 px-3 py-2 rounded">Comprobando disponibilidad…</div>
           </div>
         )}
+        {daysError && !loading && (
+          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center rounded-md gap-3">
+            <div className="text-sm text-neutral-200">{daysError}</div>
+            <Button variant="secondary" onClick={onRetryDays}>Reintentar</Button>
+          </div>
+        )}
       </div>
 
       {/* Horarios disponibles */}
@@ -446,6 +516,12 @@ const BookDate = () => {
             </div>
           )}
         </CardContent>
+        {slotsError && !slotsLoading && (
+          <div className="px-4 pb-4 flex flex-col items-center gap-2">
+            <div className="text-sm text-red-400">{slotsError}</div>
+            <Button size="sm" onClick={onRetrySlots}>Reintentar</Button>
+          </div>
+        )}
       </Card>
 
       {/* Botón continuar */}

@@ -60,9 +60,8 @@ def test_public_reservations_enabled_without_key(app_client, monkeypatch):
         json={"service_id": "corte", "professional_id": "ana", "start": start},
     )
     assert res.status_code == 200
-    msg = res.json()["message"]
-    res_id_part = msg.split("ID: ")[1]
-    res_id = res_id_part.split(",")[0].split()[0]
+    res_id = res.json().get("reservation_id")
+    assert res_id
 
     app_client.delete(
         f"/reservations/{res_id}",
@@ -111,10 +110,12 @@ def test_reservations_order_and_created_at_tz(app_client):
     payload1 = {"service_id": "corte", "professional_id": "ana", "start": start1}
     r1 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload1)
     assert r1.status_code == 200
+    res_id1 = r1.json().get("reservation_id")
 
     payload2 = {"service_id": "corte", "professional_id": "luis", "start": start2}
     r2 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload2)
     assert r2.status_code == 200
+    res_id2 = r2.json().get("reservation_id")
 
     # listar y validar orden y created_at con tz
     rlist = app_client.get("/reservations")
@@ -151,7 +152,7 @@ def test_delete_cancel_and_double_cancel(app_client):
     create_payload = {"service_id": "corte", "professional_id": "ana", "start": start}
     r_create = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=create_payload)
     assert r_create.status_code == 200
-    res_id = r_create.json()["message"].split("ID: ")[1].split(",")[0]
+    res_id = r_create.json().get("reservation_id")
 
     # cancelar por DELETE
     r_del = app_client.delete(f"/reservations/{res_id}", headers={"X-API-Key": API_KEY})

@@ -22,7 +22,7 @@ def test_reschedule_flow(app_client, monkeypatch):
     r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=create_payload)
     assert r.status_code == 200
     msg = r.json()["message"]
-    res_id = msg.split("ID: ")[1].split(",")[0]
+    res_id = r.json()["reservation_id"]
 
     # reprogramar
     resched_payload = {"reservation_id": res_id, "new_start": new_start}

@@ -6,9 +6,10 @@ import { toast } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BookingSection } from '@/components/book/BookingSection';
 import { ServiceCard } from '@/components/book/ServiceCard';
-import { Scissors, Palette, Sparkles, LucideIcon, Crown, Zap } from 'lucide-react';
+import { Scissors, Palette, Sparkles, LucideIcon, Crown, Zap } from '@/lib/icons';
 import { BookingSteps } from '@/components/BookingSteps';
 import { BookingLayout } from '@/components/BookingLayout';
+import { Button } from '@/components/ui/button';
 
 const Service = () => {
   const navigate = useNavigate();
@@ -17,21 +18,23 @@ const Service = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const loadServices = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const items = await api.getServices();
+      setServices(items);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error cargando servicios';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const items = await api.getServices();
-        if (mounted) setServices(items);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Error cargando servicios';
-        setError(msg);
-        toast.error(msg);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
+    loadServices();
   }, []);
 
   if (loading)
@@ -67,6 +70,7 @@ const Service = () => {
               <Zap className="h-6 w-6 text-red-400" />
             </div>
             <div className="text-red-400 text-sm font-medium">{error}</div>
+            <Button className="mt-4" onClick={loadServices}>Reintentar</Button>
           </div>
         </BookingSection>
       </>

@@ -73,6 +73,11 @@ class ActionResult(BaseModel):
     ok: bool
     message: str
 
+
+class ReservationCreateOut(ActionResult):
+    reservation_id: str
+    google_event_id: Optional[str] = None
+
 class RescheduleIn(BaseModel):
     """Solicitud de reprogramación de reserva."""
     reservation_id: str = Field(..., json_schema_extra={"example": "res_1"})

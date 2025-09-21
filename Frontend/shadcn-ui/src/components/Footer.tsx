@@ -1,4 +1,4 @@
-import { Scissors, Instagram, Facebook, Twitter, MapPin, Phone, Mail } from 'lucide-react';
+import { Scissors, Instagram, Facebook, Twitter, MapPin, Phone, Mail } from '@/lib/icons';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();

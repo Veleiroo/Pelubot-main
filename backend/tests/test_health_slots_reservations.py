@@ -44,8 +44,8 @@ def test_create_list_cancel_reservation_flow(app_client):
     assert r.status_code == 200, r.text
     data = r.json()
     assert data["ok"] is True
-    # Extrae ID del mensaje "Reserva creada y sincronizada. ID: <id>, Evento: ..."
-    res_id = data["message"].split("ID: ")[1].split(",")[0]
+    res_id = data.get("reservation_id")
+    assert res_id
 
     # 3) conflictiva: volver a reservar el mismo slot debe fallar
     r2 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
@@ -79,7 +79,8 @@ def test_bulk_reservations_fill_schedule(app_client):
             assert "no está disponible" in r.json()["detail"].lower()
             break
         assert r.status_code == 200, r.text
-        res_id = r.json()["message"].split("ID: ")[1].split(",")[0]
+        res_id = r.json().get("reservation_id")
+        assert res_id
         created_ids.append(res_id)
 
     # Intentar crear una reserva adicional debe fallar porque no quedan huecos

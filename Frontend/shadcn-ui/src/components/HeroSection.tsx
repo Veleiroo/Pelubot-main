@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Scissors, Star } from 'lucide-react';
+import { Scissors, Star } from '@/lib/icons';
 import { useNavigate } from 'react-router-dom';
 
 export default function HeroSection() {

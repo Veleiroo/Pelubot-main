@@ -1,4 +1,4 @@
-import { Scissors, Zap, Sparkles, Crown, Brush, Star } from 'lucide-react';
+import { Scissors, Zap, Sparkles, Crown, Brush, Star } from '@/lib/icons';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 

@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Index from '@/pages/Index';
 import NotFound from '@/pages/NotFound';
 const BookService = lazy(() => import('@/pages/book/Service'));
-import BookDate from '@/pages/book/Date';
+const BookDate = lazy(() => import('@/pages/book/Date'));
 const BookConfirm = lazy(() => import('@/pages/book/Confirm'));
 import Loading from '@/components/Loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -35,7 +35,14 @@ const App = () => (
                             </Suspense>
                         }
                     />
-                    <Route path="/book/date" element={<BookDate />} />
+                    <Route
+                        path="/book/date"
+                        element={
+                            <Suspense fallback={<Loading />}>
+                                <BookDate />
+                            </Suspense>
+                        }
+                    />
                     {/** Ruta /book/time eliminada: flujo es Service -> Date -> Confirm */}
                     <Route
                         path="/book/confirm"

@@ -2,23 +2,49 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useBooking } from '@/store/booking';
 import { Button } from '@/components/ui/button';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { BookingSteps } from '@/components/BookingSteps';
 import { BookingSection } from '@/components/book/BookingSection';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fmtEuro, fmtDateLong, fmtTime } from '@/lib/format';
-import { CheckCircle2, Calendar, Clock, User, Scissors, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, Calendar, Clock, User, Scissors, ArrowLeft } from '@/lib/icons';
+
+type ConfirmLocationState = {
+  serviceId?: string;
+  serviceName?: string;
+  professionalId?: string | null;
+  professionalName?: string | null;
+  slotStart?: string;
+};
 
 const BookConfirm = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { serviceId, professionalId, slotStart, reset, setService, setProfessional, setSlot } = useBooking();
+  const {
+    serviceId,
+    serviceName,
+    professionalId,
+    professionalName,
+    slotStart,
+    reset,
+    setService,
+    setProfessional,
+    setSlot,
+  } = useBooking();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [reservationId, setReservationId] = useState<string | null>(null);
   const [services, setServices] = useState<{ id: string; name: string; duration_min: number; price_eur: number }[]>([]);
   const [pros, setPros] = useState<{ id: string; name: string }[]>([]);
+  const params = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const serviceNameParam = params.get('service_name') || undefined;
+  const proNameParam = params.get('pro_name') || undefined;
+  const locationState = useMemo(
+    () => (location.state ?? null) as ConfirmLocationState | null,
+    [location.state]
+  );
 
   useEffect(() => {
     (async () => {
@@ -35,34 +61,81 @@ const BookConfirm = () => {
     })();
   }, []);
 
-  const service = useMemo(() => services.find(s => s.id === serviceId), [services, serviceId]);
-  const professional = useMemo(() => pros.find(p => p.id === professionalId), [pros, professionalId]);
+  const service = useMemo(() => services.find((s) => s.id === serviceId), [services, serviceId]);
+  const professional = useMemo(() => pros.find((p) => p.id === professionalId), [pros, professionalId]);
+  const serviceLabel = service?.name || serviceNameParam || locationState?.serviceName || serviceName || serviceId;
+  const professionalLabel =
+    professional?.name ||
+    proNameParam ||
+    locationState?.professionalName ||
+    professionalName ||
+    (professionalId ? professionalId : 'Cualquiera disponible');
 
   useEffect(() => {
     if (serviceId && slotStart) return;
-    const p = new URLSearchParams(location.search);
-    const sid = p.get('service') || undefined;
-    const start = p.get('start') || undefined;
-    const pro = p.get('pro');
-    if (sid) setService(sid);
+    const sid = params.get('service') || locationState?.serviceId || undefined;
+    const start = params.get('start') || locationState?.slotStart || undefined;
+    const pro = params.get('pro');
+    const resolvedPro = pro !== null ? pro : locationState?.professionalId ?? null;
+    const resolvedProName =
+      proNameParam ||
+      locationState?.professionalName ||
+      professional?.name ||
+      professionalName ||
+      null;
+
+    if (sid) setService(sid, serviceNameParam ?? locationState?.serviceName ?? serviceName);
     if (start) setSlot(start);
-    if (pro !== null) setProfessional(pro || null);
-  }, [serviceId, slotStart, location.search, setService, setSlot, setProfessional]);
+    if (resolvedPro !== null) setProfessional(resolvedPro || null, resolvedProName);
+  }, [
+    serviceId,
+    serviceName,
+    professionalName,
+    professional,
+    slotStart,
+    params,
+    setService,
+    setSlot,
+    setProfessional,
+    serviceNameParam,
+    locationState,
+  ]);
+
+  const toUserFacingError = (err: unknown) => {
+    if (err instanceof ApiError) {
+      const detail = err.detail || err.message;
+      if (/hora ocupada/i.test(detail) || /inicio no está disponible/i.test(detail)) {
+        return 'Ese horario ya no está disponible. Elige otro hueco.';
+      }
+      if (/no ofrece ese servicio/i.test(detail)) {
+        return 'Ese profesional no ofrece ese servicio. Prueba con otra persona.';
+      }
+      if (/service_id no existe/i.test(detail)) {
+        return 'El servicio seleccionado ya no existe.';
+      }
+      if (/professional_id no existe/i.test(detail)) {
+        return 'El profesional seleccionado ya no existe.';
+      }
+      return detail;
+    }
+    if (err instanceof Error) return err.message;
+    return 'Error creando la reserva';
+  };
 
   const onConfirm = async () => {
     setLoading(true);
     setError(null);
     setOk(null);
+    setReservationId(null);
     try {
-      let message: string | null = null;
+      let result: Awaited<ReturnType<typeof api.createReservation>> | null = null;
 
       if (professionalId) {
-        const res = await api.createReservation({
+        result = await api.createReservation({
           service_id: serviceId,
           professional_id: professionalId,
           start: slotStart,
         });
-        message = res.message;
       } else {
         const pros = await api.getProfessionals();
         const candidates = pros.filter((p) => !p.services || p.services.includes(serviceId));
@@ -71,12 +144,12 @@ const BookConfirm = () => {
         let lastError = '';
         for (const p of candidates) {
           try {
-            const res = await api.createReservation({
+            result = await api.createReservation({
               service_id: serviceId,
               professional_id: p.id,
               start: slotStart,
             });
-            message = res.message;
+            setProfessional(p.id, p.name);
             success = true;
             break;
           } catch (e: unknown) {
@@ -86,14 +159,17 @@ const BookConfirm = () => {
         if (!success) throw new Error(`No fue posible crear la reserva: ${lastError}`);
       }
 
-      setOk(message);
+      if (result) {
+        setOk(result.message);
+        setReservationId(result.reservation_id);
+      }
       toast.success('Reserva confirmada');
       setTimeout(() => {
         reset();
         navigate('/');
       }, 3000);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error creando la reserva';
+      const msg = toUserFacingError(e);
       setError(msg);
       toast.error(msg);
     } finally {
@@ -150,7 +226,7 @@ const BookConfirm = () => {
               <Scissors className="h-4 w-4" />
               <span>Servicio</span>
             </div>
-            <div className="text-lg font-medium text-foreground">{service?.name || serviceId}</div>
+            <div className="text-lg font-medium text-foreground">{serviceLabel}</div>
             <div className="text-sm text-muted-foreground">{service?.duration_min} min · {fmtEuro(service?.price_eur)}</div>
           </div>
           <div className="space-y-2">
@@ -158,7 +234,7 @@ const BookConfirm = () => {
               <User className="h-4 w-4" />
               <span>Profesional</span>
             </div>
-            <div className="text-lg font-medium text-foreground">{professional?.name || 'Cualquiera disponible'}</div>
+            <div className="text-lg font-medium text-foreground">{professionalLabel}</div>
           </div>
           <div className="space-y-2 md:col-span-2">
             <div className="flex items-center gap-2 text-sm text-emerald-400 font-medium">
@@ -192,6 +268,9 @@ const BookConfirm = () => {
             <div>
               <div className="text-emerald-400 font-semibold">¡Reserva creada!</div>
               <div className="text-emerald-300 text-sm mt-1 break-all">{ok}</div>
+              {reservationId && (
+                <div className="text-emerald-300 text-xs mt-2" data-testid="reservation-id">ID: {reservationId}</div>
+              )}
             </div>
           </div>
         </div>

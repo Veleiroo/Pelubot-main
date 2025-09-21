@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon } from '@/lib/icons';
 
 export function ServiceCard({
   title,

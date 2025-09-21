@@ -84,3 +84,7 @@ Al añadir pasos/pantallas:
 - Reutiliza los mismos contenedores y espaciados (`space-y-6` entre bloques), y la misma paleta.
 - Asegura foco visible y feedback deshabilitado en CTAs (`disabled:opacity-50 disabled:pointer-events-none`).
 - Mantén grids responsivos (1/2/3 columnas) y tipografía uniforme.
+
+## Assets
+
+- `Frontend/shadcn-ui/public/assets` aloja imágenes optimizadas (máximo 1200px de ancho, ~200 kB cada una). Si añades nuevos recursos, conserva ese tope y adjunta créditos/licencias en un `README.md` dentro de la carpeta.

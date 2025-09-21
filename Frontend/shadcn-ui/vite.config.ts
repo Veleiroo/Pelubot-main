@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
   ],
+  cacheDir: "node_modules/.vite-app",
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from '@/lib/icons';
 import { DayPicker } from 'react-day-picker';
 import { es as esLocale } from 'date-fns/locale';
 import type { Locale } from 'date-fns';

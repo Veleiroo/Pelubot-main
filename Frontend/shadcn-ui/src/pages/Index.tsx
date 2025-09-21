@@ -1,25 +1,41 @@
-import { useNavigate } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
 import Navigation from '@/components/Navigation';
-import HeroSection from '@/components/HeroSection';
-import AboutSection from '@/components/AboutSection';
-import ServicesSection from '@/components/ServicesSection';
-import GallerySection from '@/components/GallerySection';
-import ContactSection from '@/components/ContactSection';
-import Footer from '@/components/Footer';
+
+const HeroSection = lazy(() => import('@/components/HeroSection'));
+const AboutSection = lazy(() => import('@/components/AboutSection'));
+const ServicesSection = lazy(() => import('@/components/ServicesSection'));
+const GallerySection = lazy(() => import('@/components/GallerySection'));
+const ContactSection = lazy(() => import('@/components/ContactSection'));
+const Footer = lazy(() => import('@/components/Footer'));
+
+const SectionFallback = ({ label }: { label: string }) => (
+    <div className="py-20 text-center text-neutral-500" aria-live="polite">
+        Cargando {label}...
+    </div>
+);
 
 export default function Index() {
-    const navigate = useNavigate();
-    const handleReservation = () => navigate('/book/service');
-
     return (
         <div className="min-h-screen bg-black">
             <Navigation />
-            <HeroSection onReservation={handleReservation} />
-            <AboutSection />
-            <ServicesSection />
-            <GallerySection />
-            <ContactSection onReservation={handleReservation} />
-            <Footer />
+            <Suspense fallback={<SectionFallback label="inicio" />}>
+                <HeroSection />
+            </Suspense>
+            <Suspense fallback={<SectionFallback label="sobre nosotros" />}>
+                <AboutSection />
+            </Suspense>
+            <Suspense fallback={<SectionFallback label="servicios" />}>
+                <ServicesSection />
+            </Suspense>
+            <Suspense fallback={<SectionFallback label="galería" />}>
+                <GallerySection />
+            </Suspense>
+            <Suspense fallback={<SectionFallback label="contacto" />}>
+                <ContactSection />
+            </Suspense>
+            <Suspense fallback={<SectionFallback label="pie de página" />}>
+                <Footer />
+            </Suspense>
         </div>
     );
 }

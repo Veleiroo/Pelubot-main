@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
+import { Menu, X } from '@/lib/icons';
 import { useNavigate } from 'react-router-dom';
 
 export default function Navigation() {
