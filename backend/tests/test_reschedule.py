@@ -11,14 +11,14 @@ def test_reschedule_flow(app_client, monkeypatch):
         target += timedelta(days=1)
 
     # slots
-    r = app_client.post("/slots", json={"service_id": "corte", "date_str": target.isoformat(), "professional_id": "luis"})
+    r = app_client.post("/slots", json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"})
     assert r.status_code == 200
     slots = r.json()["slots"]
     assert len(slots) >= 2
     start, new_start = slots[0], slots[1]
 
     # crear
-    create_payload = {"service_id": "corte", "professional_id": "luis", "start": start}
+    create_payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start}
     r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=create_payload)
     assert r.status_code == 200
     msg = r.json()["message"]

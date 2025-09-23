@@ -348,15 +348,17 @@ def _parse_gcal_dt(s: str) -> datetime:
 def _detect_service_from_summary(summary: str, default_sid: str) -> str:
     """Heurística para inferir el servicio a partir del resumen de GCal."""
     s = (summary or "").lower()
-    if "tinte" in s:
-        return "tinte"
-    if "barba" in s:
-        return "barba"
+    if "corte + barba" in s or "corte y barba" in s:
+        return "corte_barba"
+    if "corte" in s and "jubil" in s:
+        return "corte_jubilado"
     if "corte" in s:
-        return "corte"
+        return "corte_cabello"
+    if "barba" in s:
+        return "arreglo_barba"
     return default_sid
 
-def sync_from_gcal_range(session: Session, start_date: date, end_date: date, default_service: str = "corte", by_professional: bool = True, calendar_id: str | None = None, professional_id: str | None = None, tz: str = os.getenv("TZ", "Europe/Madrid")) -> dict:
+def sync_from_gcal_range(session: Session, start_date: date, end_date: date, default_service: str = "corte_cabello", by_professional: bool = True, calendar_id: str | None = None, professional_id: str | None = None, tz: str = os.getenv("TZ", "Europe/Madrid")) -> dict:
     """Importa eventos de GCal a la BD (upsert) en [start_date, end_date]."""
     from app.data import PRO_CALENDAR
     try:

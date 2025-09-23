@@ -7,8 +7,8 @@ Ayudante de demo para desarrollo:
 Variables de entorno:
   BASE                por defecto http://127.0.0.1:8776
   API_KEY             por defecto dev-key
-  SERVICE_ID          por defecto corte
-  PROFESSIONAL_ID     por defecto ana
+SERVICE_ID          por defecto corte_cabello
+  PROFESSIONAL_ID     por defecto deinis
   DAYS_AHEAD          por defecto 10
   CLEAR_ALL           por defecto true (si es true, borra todo; si es false, solo eventos de Pelubot)
 
@@ -25,8 +25,8 @@ from urllib import request
 
 BASE = os.getenv("BASE", "http://127.0.0.1:8776")
 API_KEY = os.getenv("API_KEY", "dev-key")
-SERVICE_ID = os.getenv("SERVICE_ID", "corte")
-PROFESSIONAL_ID = os.getenv("PROFESSIONAL_ID", "ana")
+SERVICE_ID = os.getenv("SERVICE_ID", "corte_cabello")
+PROFESSIONAL_ID = os.getenv("PROFESSIONAL_ID", "deinis")
 DAYS_AHEAD = int(os.getenv("DAYS_AHEAD", "10"))
 CLEAR_ALL = (os.getenv("CLEAR_ALL", "true").lower() in ("1","true","yes","y","si","sí"))
 

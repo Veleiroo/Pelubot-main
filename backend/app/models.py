@@ -84,7 +84,7 @@ class RescheduleIn(BaseModel):
     new_date: Optional[str] = Field(None, json_schema_extra={"example": "2025-09-06"})
     new_time: Optional[str] = Field(None, json_schema_extra={"example": "18:30"})
     new_start: Optional[str] = Field(None, json_schema_extra={"example": "2025-09-06T18:30:00+02:00"})
-    professional_id: Optional[str] = Field(None, json_schema_extra={"example": "ana"})
+    professional_id: Optional[str] = Field(None, json_schema_extra={"example": "deinis"})
 
 class RescheduleOut(BaseModel):
     """Respuesta de reprogramación."""

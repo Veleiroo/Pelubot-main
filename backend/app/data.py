@@ -7,15 +7,15 @@ from app.models import Service, Professional
 
 # Servicios disponibles
 SERVICES: List[Service] = [
-    Service(id="corte", name="Corte de pelo", duration_min=30, price_eur=15.0),
-    Service(id="tinte", name="Tinte", duration_min=90, price_eur=45.0),
-    Service(id="barba", name="Arreglo de barba", duration_min=20, price_eur=10.0),
+    Service(id="corte_cabello", name="Corte de cabello", duration_min=30, price_eur=13.0),
+    Service(id="corte_barba", name="Corte + arreglo de barba", duration_min=45, price_eur=18.0),
+    Service(id="arreglo_barba", name="Arreglo de barba", duration_min=15, price_eur=10.0),
+    Service(id="corte_jubilado", name="Corte de jubilado", duration_min=30, price_eur=7.0),
 ]
 
-# Profesionales y servicios que prestan
+# Profesionales y servicios que prestan (temporal hasta actualizar asignaciones)
 PROS: List[Professional] = [
-    Professional(id="ana", name="Ana", services=["corte", "tinte"]),
-    Professional(id="luis", name="Luis", services=["corte", "barba"]),
+    Professional(id="deinis", name="Deinis Barber", services=["corte_cabello", "corte_barba", "arreglo_barba", "corte_jubilado"]),
 ]
 
 # Índices rápidos
@@ -35,9 +35,8 @@ WEEKLY_SCHEDULE = {
 
 # Mapa profesional → calendario (IDs reales)
 PRO_CALENDAR: Dict[str, str] = {
-    "ana":  "8c0608d1b29961a8fa08221739a09adcfcef8da54cd5045b8eb68c020a882051@group.calendar.google.com",
-    "luis": "988f3f3dcfed070004cceb7e67f0556677ae60a7b98637e965046467585d5edd@group.calendar.google.com",
+    "deinis": "deinis-barber@example.com",
 }
 
 # Uso de busy de GCAL por profesional (se desactiva por defecto)
-PRO_USE_GCAL_BUSY: Dict[str, bool] = {"ana": False, "luis": False}
+PRO_USE_GCAL_BUSY: Dict[str, bool] = {"deinis": False}

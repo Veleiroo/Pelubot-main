@@ -50,14 +50,14 @@ def test_public_reservations_enabled_without_key(app_client, monkeypatch):
     target = _next_workday()
     slots = app_client.post(
         "/slots",
-        json={"service_id": "corte", "date_str": target.isoformat(), "professional_id": "ana"},
+        json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"},
     )
     assert slots.status_code == 200
     start = slots.json()["slots"][0]
 
     res = app_client.post(
         "/reservations",
-        json={"service_id": "corte", "professional_id": "ana", "start": start},
+        json={"service_id": "corte_cabello", "professional_id": "deinis", "start": start},
     )
     assert res.status_code == 200
     res_id = res.json().get("reservation_id")
@@ -95,24 +95,30 @@ def test_admin_sync_propagates_errors(app_client, monkeypatch):
 
 def test_reservations_order_and_created_at_tz(app_client):
     target = _next_workday()
-    # obtener slots para ana y luis
-    r_ana = app_client.post("/slots", json={"service_id": "corte", "date_str": target.isoformat(), "professional_id": "ana"})
-    r_luis = app_client.post("/slots", json={"service_id": "corte", "date_str": target.isoformat(), "professional_id": "luis"})
-    assert r_ana.status_code == 200 and r_luis.status_code == 200
-    slots_ana = r_ana.json()["slots"]
-    slots_luis = r_luis.json()["slots"]
-    assert len(slots_ana) >= 1 and len(slots_luis) >= 1
+    r_slots = app_client.post(
+        "/slots",
+        json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"},
+    )
+    assert r_slots.status_code == 200
+    slots = r_slots.json()["slots"]
+    assert len(slots) >= 2
 
-    # crear dos reservas en el mismo día con distintos profesionales (evita solapes)
-    start1 = slots_ana[0]
-    start2 = slots_luis[0]
+    start1 = slots[0]
 
-    payload1 = {"service_id": "corte", "professional_id": "ana", "start": start1}
+    payload1 = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start1}
     r1 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload1)
     assert r1.status_code == 200
     res_id1 = r1.json().get("reservation_id")
 
-    payload2 = {"service_id": "corte", "professional_id": "luis", "start": start2}
+    r_slots_after = app_client.post(
+        "/slots",
+        json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"},
+    )
+    assert r_slots_after.status_code == 200
+    remaining_slots = r_slots_after.json()["slots"]
+    assert remaining_slots, "after reservar debe seguir habiendo huecos"
+
+    payload2 = {"service_id": "corte_cabello", "professional_id": "deinis", "start": remaining_slots[0]}
     r2 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload2)
     assert r2.status_code == 200
     res_id2 = r2.json().get("reservation_id")
@@ -132,13 +138,13 @@ def test_reservations_order_and_created_at_tz(app_client):
 
 def test_overlap_same_slot_is_rejected(app_client):
     target = _next_workday()
-    r = app_client.post("/slots", json={"service_id": "corte", "date_str": target.isoformat(), "professional_id": "luis"})
+    r = app_client.post("/slots", json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"})
     assert r.status_code == 200
     slots = r.json()["slots"]
     assert len(slots) >= 1
     start = slots[0]
 
-    payload = {"service_id": "corte", "professional_id": "luis", "start": start}
+    payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start}
     r1 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
     assert r1.status_code == 200
     r2 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
@@ -147,9 +153,9 @@ def test_overlap_same_slot_is_rejected(app_client):
 
 def test_delete_cancel_and_double_cancel(app_client):
     target = _next_workday()
-    r = app_client.post("/slots", json={"service_id": "corte", "date_str": target.isoformat(), "professional_id": "ana"})
+    r = app_client.post("/slots", json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"})
     start = r.json()["slots"][0]
-    create_payload = {"service_id": "corte", "professional_id": "ana", "start": start}
+    create_payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start}
     r_create = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=create_payload)
     assert r_create.status_code == 200
     res_id = r_create.json().get("reservation_id")

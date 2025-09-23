@@ -46,7 +46,7 @@ def scenario() -> None:
 
     slots_resp = client.post(
         "/slots",
-        json={"service_id": "corte", "date_str": date_str, "professional_id": "ana"},
+        json={"service_id": "corte_cabello", "date_str": date_str, "professional_id": "deinis"},
     )
     slots_resp.raise_for_status()
     slots = slots_resp.json().get("slots") or []
@@ -54,7 +54,7 @@ def scenario() -> None:
         return
 
     start = slots[0]
-    payload = {"service_id": "corte", "professional_id": "ana", "start": start}
+    payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start}
 
     res_create = client.post(
         "/reservations",

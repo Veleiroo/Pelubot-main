@@ -504,7 +504,7 @@ def admin_sync(body: AdminSyncIn | None = None, session: Session = Depends(get_s
             session,
             start,
             end,
-            default_service=body.default_service or "corte",
+            default_service=body.default_service or "corte_cabello",
             by_professional=by_prof,
             calendar_id=body.calendar_id,
             professional_id=body.professional_id,

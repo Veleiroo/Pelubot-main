@@ -11,8 +11,8 @@ Flujo de humo (end-to-end):
 Variables de entorno:
   BASE=http://127.0.0.1:8776
   API_KEY=dev-key
-  SERVICE_ID=corte
-  PROFESSIONAL_ID=ana
+  SERVICE_ID=corte_cabello
+  PROFESSIONAL_ID=deinis
   DAYS_AHEAD=10
 """
 from __future__ import annotations
@@ -23,8 +23,8 @@ from datetime import date, timedelta
 
 BASE = os.getenv("BASE", "http://127.0.0.1:8776")
 API_KEY = os.getenv("API_KEY", "dev-key")
-SERVICE_ID = os.getenv("SERVICE_ID", "corte")
-PROFESSIONAL_ID = os.getenv("PROFESSIONAL_ID", "ana")
+SERVICE_ID = os.getenv("SERVICE_ID", "corte_cabello")
+PROFESSIONAL_ID = os.getenv("PROFESSIONAL_ID", "deinis")
 DAYS_AHEAD = int(os.getenv("DAYS_AHEAD", "10"))
 
 

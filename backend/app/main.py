@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
     try:
         if os.getenv("AUTO_SYNC_FROM_GCAL", "false").lower() in ("1","true","yes","si","sí","y"):
             days = int(os.getenv("AUTO_SYNC_FROM_GCAL_DAYS", "7"))
-            default_service = os.getenv("DEFAULT_SERVICE_FOR_SYNC", "corte")
+            default_service = os.getenv("DEFAULT_SERVICE_FOR_SYNC", "corte_cabello")
             start = date.today()
             end = start + timedelta(days=max(0, days-1))
             with Session(engine) as s:

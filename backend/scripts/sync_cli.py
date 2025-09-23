@@ -58,7 +58,7 @@ def main() -> None:
     by_professional = (os.getenv("BY_PROFESSIONAL", "true").lower() in ("1","true","yes","y","si","sí"))
     calendar_id = os.getenv("CALENDAR_ID")
     professional_id = os.getenv("PROFESSIONAL_ID")
-    default_service = os.getenv("DEFAULT_SERVICE_FOR_SYNC", "corte")
+    default_service = os.getenv("DEFAULT_SERVICE_FOR_SYNC", "corte_cabello")
 
     mode = (os.getenv("MODE") or "import").lower()  # import | push | both
     with Session(engine) as s:

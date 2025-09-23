@@ -13,11 +13,11 @@ def test_health(app_client):
 
 def test_slots_validation_errors(app_client):
     # formato de fecha incorrecto
-    r = app_client.post("/slots", json={"service_id": "corte", "date_str": "06-09-2025"})
+    r = app_client.post("/slots", json={"service_id": "corte_cabello", "date_str": "06-09-2025"})
     assert r.status_code == 400
     assert "YYYY-MM-DD" in r.json()["detail"]
     # pasado
-    r = app_client.post("/slots", json={"service_id": "corte", "date_str": "2024-01-01"})
+    r = app_client.post("/slots", json={"service_id": "corte_cabello", "date_str": "2024-01-01"})
     assert r.status_code == 400
     assert "pasado" in r.json()["detail"].lower()
 
@@ -28,7 +28,7 @@ def test_create_list_cancel_reservation_flow(app_client):
         target += timedelta(days=1)
 
     # 1) obtener slots
-    r = app_client.post("/slots", json={"service_id": "corte", "date_str": target.isoformat(), "professional_id": "ana"})
+    r = app_client.post("/slots", json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"})
     assert r.status_code == 200
     slots = r.json()["slots"]
     assert isinstance(slots, list) and len(slots) > 0
@@ -36,8 +36,8 @@ def test_create_list_cancel_reservation_flow(app_client):
 
     # 2) crear reserva (requiere API Key)
     payload = {
-        "service_id": "corte",
-        "professional_id": "ana",
+        "service_id": "corte_cabello",
+        "professional_id": "deinis",
         "start": start
     }
     r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
@@ -65,14 +65,14 @@ def test_bulk_reservations_fill_schedule(app_client):
         target += timedelta(days=1)
 
     # Obtener todos los huecos iniciales para Ana
-    resp = app_client.post("/slots", json={"service_id": "corte", "date_str": target.isoformat(), "professional_id": "ana"})
+    resp = app_client.post("/slots", json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"})
     assert resp.status_code == 200
     slots = resp.json()["slots"]
-    assert len(slots) >= 6  # corte son 30 min, jornada típica dará varios huecos
+    assert len(slots) >= 6  # corte de cabello son 30 min, jornada típica dará varios huecos
 
     created_ids = []
     for start in slots:
-        payload = {"service_id": "corte", "professional_id": "ana", "start": start}
+        payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start}
         r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
         if r.status_code == 400:
             # En caso de carreras, el hueco ya no está disponible (esperado cuando el turno se llena)
@@ -86,7 +86,7 @@ def test_bulk_reservations_fill_schedule(app_client):
     # Intentar crear una reserva adicional debe fallar porque no quedan huecos
     if created_ids:
         last_slot = slots[min(len(created_ids), len(slots)) - 1]
-        payload = {"service_id": "corte", "professional_id": "ana", "start": last_slot}
+        payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": last_slot}
         r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
         assert r.status_code == 400
         assert "no está disponible" in r.json()["detail"].lower()
