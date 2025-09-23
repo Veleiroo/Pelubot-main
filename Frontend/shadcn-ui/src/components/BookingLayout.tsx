@@ -1,27 +1,37 @@
 import { ReactNode } from 'react';
-import { BookingSteps, BookingStep } from '@/components/BookingSteps';
+import { BookingSteps } from '@/components/BookingSteps';
 
 interface BookingLayoutProps {
-  steps: BookingStep[];
+  step: 1 | 2 | 3;
   title: string;
   subtitle?: string;
   summary?: string;
   children: ReactNode;
 }
 
-export function BookingLayout({ steps, title, subtitle, summary, children }: BookingLayoutProps) {
+export function BookingLayout({ step, title, subtitle, summary, children }: BookingLayoutProps) {
   return (
-    <div className="mx-auto max-w-4xl p-6 text-white space-y-6">
-      <BookingSteps steps={steps} />
-      <div className="text-center space-y-1">
-        <h1 className="text-3xl font-bold mb-2">{title}</h1>
-        {subtitle && <p className="text-neutral-400">{subtitle}</p>}
-        {summary && <p className="text-sm text-neutral-300" aria-live="polite">{summary}</p>}
+    <div className="mx-auto max-w-4xl px-4 py-6 text-foreground md:px-6">
+      <div className="mb-4">
+        <BookingSteps step={step} />
       </div>
-      {children}
+      <header className="mx-auto max-w-3xl text-center text-white">
+        <h1 className="text-base font-semibold md:text-lg">{title}</h1>
+        {summary && (
+          <div className="mt-1 text-xs text-white/70" aria-live="polite">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
+              <span className="size-2 rounded-full bg-emerald-500" />
+              {summary}
+            </span>
+          </div>
+        )}
+        {subtitle && <p className="mt-1 text-xs text-white/60 md:text-sm">{subtitle}</p>}
+      </header>
+      <div className="mx-auto mt-6 w-full max-w-3xl space-y-6">
+        {children}
+      </div>
     </div>
   );
 }
 
 export default BookingLayout;
-

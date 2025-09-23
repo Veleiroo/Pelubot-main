@@ -1,5 +1,6 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import Navigation from '@/components/Navigation';
+import { loadBookDate, loadBookConfirm } from '@/lib/route-imports';
 
 const HeroSection = lazy(() => import('@/components/HeroSection'));
 const AboutSection = lazy(() => import('@/components/AboutSection'));
@@ -15,6 +16,35 @@ const SectionFallback = ({ label }: { label: string }) => (
 );
 
 export default function Index() {
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const w = window as typeof window & {
+            requestIdleCallback?: (cb: IdleRequestCallback, options?: IdleRequestOptions) => number;
+            cancelIdleCallback?: (id: number) => void;
+        };
+
+        const schedulePrefetch = () => {
+            loadBookDate();
+            loadBookConfirm();
+        };
+
+        let idleHandle: number = -1;
+        if (w.requestIdleCallback) {
+            idleHandle = w.requestIdleCallback(schedulePrefetch, { timeout: 3000 });
+        } else {
+            idleHandle = window.setTimeout(schedulePrefetch, 1500);
+        }
+
+        return () => {
+            if (idleHandle === -1) return;
+            if (w.cancelIdleCallback) {
+                w.cancelIdleCallback(idleHandle);
+            } else {
+                clearTimeout(idleHandle);
+            }
+        };
+    }, []);
+
     return (
         <div className="min-h-screen bg-black">
             <Navigation />

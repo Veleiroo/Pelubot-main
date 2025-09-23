@@ -1,6 +1,24 @@
-// Base de API robusto: si la env está vacía (""), usa fallback
-const _rawBase = String(import.meta.env?.VITE_API_BASE_URL ?? '').trim();
-const BASE = _rawBase || "http://127.0.0.1:8776";
+// Base de API: prioriza VITE_API_BASE_URL y, si falta, recurre al mismo origen.
+const BASE = (() => {
+  const raw = String(import.meta.env?.VITE_API_BASE_URL ?? '').trim();
+  if (raw) return raw.replace(/\/$/, '');
+
+  const path = String(import.meta.env?.VITE_API_BASE_PATH ?? '').trim();
+  const normalizedPath = path ? (path.startsWith('/') ? path : `/${path}`) : '';
+
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin.replace(/\/$/, '');
+    if (!normalizedPath) {
+      if (import.meta.env.PROD) {
+        console.warn('VITE_API_BASE_URL no definido; usando origen actual');
+      }
+      return '';
+    }
+    return `${origin}${normalizedPath}`.replace(/\/$/, '');
+  }
+
+  return normalizedPath || '';
+})();
 const DEBUG = /^(1|true|yes|y)$/i.test(String(import.meta.env.VITE_ENABLE_DEBUG ?? "0"));
 
 export type Service = { id: string; name: string; duration_min: number; price_eur: number };

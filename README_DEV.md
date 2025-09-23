@@ -88,3 +88,23 @@ Al añadir pasos/pantallas:
 ## Assets
 
 - `Frontend/shadcn-ui/public/assets` aloja imágenes optimizadas (máximo 1200px de ancho, ~200 kB cada una). Si añades nuevos recursos, conserva ese tope y adjunta créditos/licencias en un `README.md` dentro de la carpeta.
+
+## Tests E2E (Playwright)
+
+- Antes de lanzar los tests asegúrate de reconstruir el frontend (`pnpm run build`), ya que el runner usa `vite preview` sobre la carpeta `dist`.
+- Para ejecutar el flujo end-to-end desde `Frontend/shadcn-ui`:
+  ```bash
+  pnpm run test:e2e:preview                               # build + preview + test
+  ```
+  Si necesitas ajustar el puerto, exporta `PLAYWRIGHT_PORT` antes de lanzar el script (por defecto 4173).
+  Ajusta `PLAYWRIGHT_PORT` si necesitas otro puerto libre.
+- Puedes reutilizar un servidor dev (`pnpm run test:e2e:dev`) cuando quieras depurar con hot reload; paciencia con el arranque porque Vite recompila todo antes de abrir 4173.
+- Para ejecutar manualmente: `pnpm run build && PLAYWRIGHT_MODE=preview PLAYWRIGHT_PORT=4174 pnpm exec playwright test`.
+
+## Variables de entorno clave
+
+- `VITE_API_BASE_URL`: URL absoluta del backend (incluye protocolo y host). Si se omite, el front usa el mismo origen del navegador.
+- `VITE_API_BASE_PATH`: Ruta relativa añadida al origen cuando no se define `VITE_API_BASE_URL` (ej. `/api`).
+- `VITE_ENABLE_DEBUG`: activa la ruta `/debug` (`1`/`true`).
+- `VITE_USE_GCAL`: fuerza la sincronización con Google Calendar para los slots (`1`/`true`).
+- `PLAYWRIGHT_MODE`, `PLAYWRIGHT_PORT`: controlan el servidor que arranca Playwright (`preview`/`dev`).

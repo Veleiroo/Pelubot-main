@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { buildBookingState } from '@/lib/booking-route';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useBooking } from '@/store/booking';
 import { api } from '@/lib/api';
@@ -10,6 +11,7 @@ import { Label } from '@/components/ui/label';
 const Debug = () => {
   const BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8776';
   const navigate = useNavigate();
+  const location = useLocation();
   const [health, setHealth] = useState<unknown>(null);
   const [ready, setReady] = useState<unknown>(null);
   const [services, setServices] = useState<unknown[]>([]);
@@ -50,7 +52,7 @@ const Debug = () => {
     setProfessional(professionalId || null);
     setStoreDate(date);
     setSlot(slot);
-    navigate('/book/confirm?service=' + encodeURIComponent(serviceId));
+    navigate('/book/confirm?service=' + encodeURIComponent(serviceId), { state: buildBookingState(location) });
   };
 
   return (

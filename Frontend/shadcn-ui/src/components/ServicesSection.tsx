@@ -1,114 +1,131 @@
-import { Scissors, Zap, Sparkles, Crown, Brush, Star } from '@/lib/icons';
+import { Scissors, Sparkles, Crown, Brush } from '@/lib/icons';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useCallback, type ReactNode } from 'react';
+import { useBooking } from '@/store/booking';
+import { loadBookDate, loadBookConfirm } from '@/lib/route-imports';
+import { buildBookingState } from '@/lib/booking-route';
+
+type MarketingService = {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  price: string;
+  features: string[];
+  serviceId?: string;
+};
 
 export default function ServicesSection() {
   const navigate = useNavigate();
-  const services = [
+  const location = useLocation();
+  const setService = useBooking((s) => s.setService);
+  const services: MarketingService[] = [
     {
-      icon: <Scissors className="text-brand" size={32} />,
-      title: "Corte Clásico",
-      description: "Cortes tradicionales con técnicas modernas. Perfecto para el hombre elegante.",
-      price: "€25",
-      features: ["Lavado incluido", "Peinado", "Consulta personalizada"]
+      icon: <Scissors className="text-brand" size={28} />,
+      title: 'Corte de cabello',
+      description: 'Un corte preciso y personalizado que se adapta a tu estilo del día a día.',
+      price: '13 €',
+      features: ['Lavado relajante', 'Peinado y acabado', 'Recomendaciones de estilo'],
+      serviceId: 'corte_cabello',
     },
     {
-      icon: <Zap className="text-brand" size={32} />,
-      title: "Afeitado Premium",
-      description: "Afeitado tradicional con navaja. Una experiencia de lujo incomparable.",
-      price: "€20",
-      features: ["Toallas calientes", "Aceites premium", "Masaje facial"]
+      icon: <Sparkles className="text-brand" size={28} />,
+      title: 'Corte + arreglo de barba',
+      description: 'El combo ideal para salir impecable: cabello definido y barba perfectamente contorneada.',
+      price: '18 €',
+      features: ['Definición de contornos', 'Hidratación de barba', 'Styling final'],
+      serviceId: 'corte_barba',
     },
     {
-      icon: <Crown className="text-brand" size={32} />,
-      title: "Corte + Barba",
-      description: "El combo perfecto. Corte de cabello y arreglo de barba profesional.",
-      price: "€35",
-      features: ["Diseño de barba", "Productos premium", "Acabado perfecto"]
+      icon: <Brush className="text-brand" size={28} />,
+      title: 'Arreglo de barba',
+      description: 'Perfilado y cuidado profesional para mantener tu barba con forma y textura.',
+      price: '10 €',
+      features: ['Afeitado con navaja', 'Aceites nutritivos', 'Toalla caliente'],
+      serviceId: 'arreglo_barba',
     },
     {
-      icon: <Sparkles className="text-brand" size={32} />,
-      title: "Tratamiento Capilar",
-      description: "Cuidado especializado para tu cabello. Nutrición y fortalecimiento.",
-      price: "€30",
-      features: ["Análisis capilar", "Mascarilla nutritiva", "Masaje relajante"]
+      icon: <Crown className="text-brand" size={28} />,
+      title: 'Corte de jubilado',
+      description: 'Corte clásico con la misma dedicación de siempre, a un precio especial para jubilados.',
+      price: '7 €',
+      features: ['Atención prioritaria', 'Servicio detallado', 'Consejos de mantenimiento'],
+      serviceId: 'corte_jubilado',
     },
-    {
-      icon: <Brush className="text-brand" size={32} />,
-      title: "Peinado Especial",
-      description: "Para eventos especiales. Looks únicos para ocasiones importantes.",
-      price: "€15",
-      features: ["Consulta de estilo", "Productos de fijación", "Retoque gratuito"]
-    },
-    {
-      icon: <Star className="text-brand" size={32} />,
-      title: "Experiencia VIP",
-      description: "El servicio completo. Todo lo que necesitas en una sola sesión.",
-      price: "€60",
-      features: ["Todos los servicios", "Bebida incluida", "Atención personalizada"]
-    }
   ];
 
-  const handleReservation = () => {
-    navigate('/book/service');
-  };
+  const handleReservation = useCallback((svc?: MarketingService) => {
+    if (svc?.serviceId) {
+      setService(svc.serviceId, svc.title);
+      loadBookDate();
+      loadBookConfirm();
+      const params = new URLSearchParams({ service: svc.serviceId, service_name: svc.title });
+      navigate(`/book/date?${params.toString()}` , { state: buildBookingState(location) });
+      return;
+    }
+    loadBookDate();
+    loadBookConfirm();
+    navigate('/book/date', { state: buildBookingState(location) });
+  }, [location, navigate, setService]);
 
   return (
-    <section id="servicios" className="py-20 bg-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+    <section id="servicios" className="bg-black py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-14 text-center">
+          <h2 className="mb-4 text-4xl font-bold text-white md:text-5xl">
             Nuestros <span className="text-brand">Servicios</span>
           </h2>
-          <p className="text-gray-300 text-lg max-w-2xl mx-auto">
-            Ofrecemos una gama completa de servicios profesionales para el cuidado masculino, 
-            desde cortes clásicos hasta tratamientos especializados.
+          <p className="mx-auto max-w-2xl text-base text-gray-300 md:text-lg">
+            Ofrecemos una gama completa de servicios profesionales para el cuidado masculino, desde cortes clásicos
+            hasta tratamientos especializados.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid gap-6 md:gap-7 xl:gap-8 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
           {services.map((service, index) => (
-            <div
+            <article
               key={index}
-              className="bg-[#1a1a1a] border border-gray-800 rounded-lg p-8 hover:border-brand transition-all duration-300 group hover:transform hover:scale-105"
+              className="group relative flex h-full flex-col items-center rounded-xl border border-white/10 bg-[#111111] p-6 text-center transition-all duration-300 hover:-translate-y-1 hover:border-brand/60 hover:shadow-[0_18px_45px_-20px_rgba(16,185,129,0.8)]"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="p-3 bg-black rounded-lg group-hover:bg-brand/10 transition-colors">
+              <div className="flex w-full items-center justify-center gap-3">
+                <div className="rounded-lg border border-white/10 bg-black/70 p-2.5 transition-colors group-hover:border-brand/60">
                   {service.icon}
                 </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-brand">{service.price}</div>
-                </div>
+                <span className="inline-flex items-center rounded-full bg-brand/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand sm:text-sm">
+                  {service.price}
+                </span>
               </div>
 
-              <h3 className="text-xl font-bold text-white mb-3">{service.title}</h3>
-              <p className="text-gray-400 mb-6 leading-relaxed">{service.description}</p>
+              <div className="mt-5 space-y-2">
+                <h3 className="text-lg font-semibold text-white">{service.title}</h3>
+                <p className="text-sm leading-relaxed text-gray-400">{service.description}</p>
+              </div>
 
-              <ul className="space-y-2 mb-6">
+              <ul className="mt-4 space-y-1.5 text-sm text-gray-300">
                 {service.features.map((feature, featureIndex) => (
-                  <li key={featureIndex} className="flex items-center text-gray-300">
-                    <div className="w-2 h-2 bg-brand rounded-full mr-3"></div>
-                    {feature}
+                  <li key={featureIndex} className="flex items-center justify-center gap-2 leading-relaxed">
+                    <span className="inline-block size-1.5 rounded-full bg-brand/70" />
+                    <span>{feature}</span>
                   </li>
                 ))}
               </ul>
 
               <Button
-                onClick={handleReservation}
-                className="w-full bg-transparent border border-brand text-brand hover:bg-brand hover:text-black transition-all duration-300"
+                onClick={() => handleReservation(service)}
+                className="mt-6 inline-flex w-auto min-w-[160px] justify-center rounded-lg border border-brand bg-transparent px-6 py-2 text-sm font-semibold text-brand transition-colors hover:bg-brand hover:text-black"
               >
-                Reservar Ahora
+                Reservar ahora
               </Button>
-            </div>
+            </article>
           ))}
         </div>
 
-        <div className="text-center mt-12">
-          <p className="text-gray-400 mb-6">¿No encuentras lo que buscas?</p>
+        <div className="mt-12 text-center">
+          <p className="mb-4 text-sm text-gray-400 md:text-base">¿No encuentras lo que buscas?</p>
           <Button
-            onClick={handleReservation}
+            onClick={() => handleReservation()}
             size="lg"
-            className="bg-brand hover:bg-[#00B894] text-black font-bold px-8 py-4"
+            className="bg-brand px-7 py-3 text-sm font-bold text-black transition-colors hover:bg-[#00B894] md:px-8 md:py-4 md:text-base"
           >
             Consulta Personalizada
           </Button>

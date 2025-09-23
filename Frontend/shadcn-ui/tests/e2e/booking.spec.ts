@@ -86,12 +86,9 @@ test('cliente puede reservar una cita completa', async ({ page }) => {
     });
   });
 
-  await page.goto('/book/service');
+  await page.goto(`/book/date?service=corte&service_name=${encodeURIComponent('Corte de pelo')}`);
   await page.waitForLoadState('networkidle');
-  await expect(page.getByText('Selecciona un servicio')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Seleccionar', exact: false }).first().click();
-  await expect(page).toHaveURL(/\/book\/date/);
+  await expect(page.getByText('Selecciona fecha y hora')).toBeVisible();
   const dayCell = page.getByRole('gridcell', { name: new RegExp(`^${DAY_LABEL}$`) });
   await dayCell.waitFor({ state: 'attached' });
   await dayCell.click();

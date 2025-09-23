@@ -1,84 +1,45 @@
-import { Check } from '@/lib/icons';
+type Props = { step: 1 | 2 | 3 };
 
-export type BookingStep = { key: string; label: string; active?: boolean; done?: boolean };
+export function BookingSteps({ step }: Props) {
+  const items: Array<{ label: string; index: 1 | 2 | 3 }> = [
+    { label: 'Servicio', index: 1 },
+    { label: 'Fecha y hora', index: 2 },
+    { label: 'Confirmar', index: 3 },
+  ];
 
-const DEFAULT_STEPS: BookingStep[] = [
-	{ key: 'service', label: 'Servicio' },
-	{ key: 'date', label: 'Fecha y hora' },
-	{ key: 'confirm', label: 'Confirmar' },
-];
+  return (
+    <div className="mx-auto w-full max-w-3xl px-2 md:px-6">
+      <div className="grid grid-cols-3 items-start gap-3">
+        {items.map((item, idx) => {
+          const reached = step >= item.index;
+          const completed = step > item.index;
 
-export function BookingSteps({ steps = DEFAULT_STEPS }: { steps?: BookingStep[] }) {
-	const activeIdx = steps.findIndex((s) => s.active);
-	const lastDoneIdx = (() => {
-		let idx = -1;
-		steps.forEach((s, i) => {
-			if (s.done) idx = i;
-		});
-		return idx;
-	})();
-	const idxForProgress = activeIdx >= 0 ? activeIdx : lastDoneIdx;
-	const count = steps.length;
-	const progress =
-		count > 1 && idxForProgress >= 0 ? (idxForProgress / (count - 1)) * 100 : 0;
-
-	return (
-		<nav aria-label="Progreso de reserva" className="mx-auto max-w-4xl px-6 sm:px-8 mb-8">
-			{/* Barra de progreso simple y accesible */}
-			<div
-				className="h-1 w-full bg-[var(--border)] rounded-full overflow-hidden mb-4"
-				aria-hidden
-			>
-				<div
-					className="h-full bg-accent transition-all duration-200"
-					style={{ width: `${progress}%` }}
-				/>
-			</div>
-			<ol className="flex items-center justify-between">
-				{steps.map((s, i) => {
-					const isCurrent =
-						s.active ?? (activeIdx === -1 ? i === 0 : i === activeIdx);
-					const isDone = s.done ?? (activeIdx >= 0 ? i < activeIdx : i <= lastDoneIdx);
-					const enabled = false; // sin navegación por pasos por ahora
-					return (
-						<li key={s.key} className="flex flex-col items-center">
-							<button
-								aria-current={isCurrent ? 'step' : undefined}
-								aria-label={s.label}
-								disabled={!enabled}
-								className={[
-									'flex items-center justify-center w-9 h-9 rounded-full text-xs font-semibold transition-colors duration-150',
-									isDone
-										? 'bg-accent text-accent-foreground'
-										: isCurrent
-										? 'ring-2 ring-accent text-foreground'
-										: 'text-muted-foreground',
-								].join(' ')}
-							>
-								{isDone ? (
-									<Check className="h-4 w-4" />
-								) : (
-									<span>{i + 1}</span>
-								)}
-							</button>
-							<span
-								className={[
-									'mt-2 text-xs transition-colors duration-150',
-									isCurrent
-										? 'text-foreground font-medium'
-										: isDone
-										? 'text-foreground'
-										: 'text-muted-foreground',
-								].join(' ')}
-							>
-								{s.label}
-							</span>
-						</li>
-					);
-				})}
-			</ol>
-		</nav>
-	);
+          return (
+            <div key={item.index} className="flex flex-col items-center gap-2 text-center">
+              <div className="relative flex w-full items-center justify-center">
+                {idx > 0 && (
+                  <span
+                    className={`absolute left-0 top-1/2 h-px w-1/2 -translate-y-1/2 ${reached ? 'bg-emerald-500' : 'bg-white/10'}`}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="grid size-7 place-items-center rounded-full border border-white/15 bg-white/5">
+                  <span className={`size-3 rounded-full ${reached ? 'bg-emerald-500' : 'bg-white/25'}`} />
+                </span>
+                {idx < items.length - 1 && (
+                  <span
+                    className={`absolute right-0 top-1/2 h-px w-1/2 -translate-y-1/2 ${completed ? 'bg-emerald-500' : 'bg-white/10'}`}
+                    aria-hidden="true"
+                  />
+                )}
+              </div>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-white/60 md:text-xs">{item.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export default BookingSteps;

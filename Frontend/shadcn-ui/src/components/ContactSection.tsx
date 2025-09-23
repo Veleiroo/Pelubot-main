@@ -1,11 +1,14 @@
 import { MapPin, Phone, Clock, Mail, MessageCircle } from '@/lib/icons';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { loadBookDate, loadBookConfirm } from '@/lib/route-imports';
+import { buildBookingState } from '@/lib/booking-route';
 
 export default function ContactSection() {
   const navigate = useNavigate();
+  const location = useLocation();
   const handleWhatsApp = () => {
-    navigate('/book/service');
+    window.open('https://wa.me/34123456789?text=Hola%20Deinis%2C%20quiero%20reservar%20una%20cita.', '_blank', 'noreferrer');
   };
 
   const handleCall = () => {
@@ -71,13 +74,13 @@ export default function ContactSection() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 mt-8">
-                <Button
-                  onClick={handleWhatsApp}
-                  className="bg-brand hover:bg-[#00B894] text-black font-semibold flex items-center justify-center"
-                >
-                  <MessageCircle className="mr-2" size={20} />
-                  WhatsApp
-                </Button>
+      <Button
+        onClick={handleWhatsApp}
+        className="bg-brand hover:bg-[#00B894] text-black font-semibold flex items-center justify-center"
+      >
+        <MessageCircle className="mr-2" size={20} />
+        Escríbenos por WhatsApp
+      </Button>
                 <Button
                   onClick={handleCall}
                   variant="outline"
@@ -153,11 +156,17 @@ export default function ContactSection() {
               </div>
 
               <Button
-                onClick={handleWhatsApp}
+                onClick={() => {
+                  loadBookDate();
+                  loadBookConfirm();
+                  navigate('/book/date', { state: buildBookingState(location) });
+                }}
+                onMouseEnter={loadBookDate}
+                onFocus={loadBookDate}
                 size="lg"
                 className="w-full mt-8 bg-brand hover:bg-[#00B894] text-black font-bold"
               >
-                RESERVAR CITA AHORA
+                Reservar cita online
               </Button>
             </div>
           </div>

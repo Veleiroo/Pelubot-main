@@ -1,21 +1,69 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X } from '@/lib/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { loadBookDate, loadBookConfirm } from '@/lib/route-imports';
+import { buildBookingState } from '@/lib/booking-route';
 
 export default function Navigation() {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
+    const mobileMenuRef = useRef<HTMLDivElement | null>(null);
 
     const scrollToSection = (sectionId: string) => {
         const element = document.getElementById(sectionId);
-        if (element) element.scrollIntoView({ behavior: 'smooth' });
+        if (element) {
+            const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            element.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth' });
+        }
         setIsOpen(false);
     };
 
     const handleReservation = () => {
-        navigate('/book/service');
+        loadBookDate();
+        loadBookConfirm();
+        navigate('/book/date', { state: buildBookingState(location) });
     };
+
+    useEffect(() => {
+        if (!isOpen) {
+            document.body.style.removeProperty('overflow');
+            return;
+        }
+
+        document.body.style.setProperty('overflow', 'hidden');
+
+        const menuEl = mobileMenuRef.current;
+        const focusableSelectors = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+        const focusable = menuEl ? Array.from(menuEl.querySelectorAll<HTMLElement>(focusableSelectors)) : [];
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (first) first.focus();
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsOpen(false);
+                return;
+            }
+            if (event.key === 'Tab' && focusable.length > 0) {
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last?.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first?.focus();
+                }
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.body.style.removeProperty('overflow');
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isOpen]);
 
     return (
         <nav className="fixed top-0 w-full bg-black/90 backdrop-blur-sm z-50 border-b border-gray-800">
@@ -62,6 +110,8 @@ export default function Navigation() {
                             </button>
                             <Button
                                 onClick={handleReservation}
+                                onMouseEnter={loadBookDate}
+                                onFocus={loadBookDate}
                                 className="bg-brand hover:bg-[#00B894] text-black font-semibold ml-4"
                             >
                                 Reserva tu Cita
@@ -84,13 +134,19 @@ export default function Navigation() {
 
                 {/* Mobile Navigation */}
                 {isOpen && (
-                    <div className="md:hidden">
-                        <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-black/95">
-                            <button
-                                onClick={() => scrollToSection('inicio')}
-                                className="text-gray-300 hover:text-brand block px-3 py-2 text-base font-medium w-full text-left transition-colors"
-                            >
-                                Inicio
+                    <>
+                        <div
+                            className="fixed inset-0 bg-black/60 md:hidden"
+                            aria-hidden="true"
+                            onClick={() => setIsOpen(false)}
+                        />
+                        <div className="md:hidden" ref={mobileMenuRef}>
+                            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-black/95 focus:outline-none">
+                                <button
+                                    onClick={() => scrollToSection('inicio')}
+                                    className="text-gray-300 hover:text-brand block px-3 py-2 text-base font-medium w-full text-left transition-colors"
+                                >
+                                    Inicio
                             </button>
                             <button
                                 onClick={() => scrollToSection('sobre-nosotros')}
@@ -118,12 +174,15 @@ export default function Navigation() {
                             </button>
                             <Button
                                 onClick={() => { setIsOpen(false); handleReservation(); }}
+                                onMouseEnter={loadBookDate}
+                                onFocus={loadBookDate}
                                 className="bg-brand hover:bg-[#00B894] text-black font-semibold w-full mt-4"
                             >
                                 Reserva tu Cita
                             </Button>
                         </div>
                     </div>
+                    </>
                 )}
             </div>
         </nav>

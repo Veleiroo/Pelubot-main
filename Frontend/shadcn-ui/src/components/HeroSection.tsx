@@ -1,18 +1,20 @@
 import { Button } from '@/components/ui/button';
 import { Scissors, Star } from '@/lib/icons';
-import { useNavigate } from 'react-router-dom';
 
 export default function HeroSection() {
-    const navigate = useNavigate();
-
-    const handleReservation = () => {
-        navigate('/book/service');
+    const scrollToServices = () => {
+        const element = document.getElementById('servicios');
+        if (element) {
+            const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            element.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth' });
+        }
     };
 
     const scrollToContact = () => {
         const element = document.getElementById('contacto');
         if (element) {
-            element.scrollIntoView({ behavior: 'smooth' });
+            const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            element.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth' });
         }
     };
 
@@ -52,7 +54,7 @@ export default function HeroSection() {
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                     <Button
-                        onClick={handleReservation}
+                        onClick={scrollToServices}
                         size="lg"
                         className="bg-brand hover:bg-[#00B894] text-black font-bold text-lg px-8 py-4 transition-all duration-300 transform hover:scale-105"
                     >

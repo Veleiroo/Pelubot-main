@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, ChevronLeft, ChevronRight } from '@/lib/icons';
+import { buildBookingState } from '@/lib/booking-route';
 
 export default function GallerySection() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedImage, setSelectedImage] = useState<number | null>(null);
 
   const galleryImages = [
@@ -60,7 +62,7 @@ export default function GallerySection() {
   };
 
   const handleReservation = () => {
-    navigate('/book/service');
+    navigate('/book/date', { state: buildBookingState(location) });
   };
 
   return (

@@ -1,23 +1,14 @@
-# Arquitectura de PeluBot
+# Arquitectura General de PeluBot
 
-## Componentes
-- **Backend (FastAPI)**
-  - Paquete `app/` con submódulos:
-    - `api/` (rutas), `services/` (lógica), `integrations/` (Google Calendar), `core/` (logging, middleware, errores), `utils/` (fechas), `db.py`, `models.py`, `data.py`.
-  - Exposición REST para catálogo, slots, reservas y endpoints de administración.
-- **Frontend (React + Vite + shadcn/ui)**
-  - Flujo de reservas y consumo de la API.
-- **Base de datos**
-  - SQLite en desarrollo; preparado para Postgres.
-- **Integraciones externas**
-  - Google Calendar para sincronizar reservas.
-  - Telegram/WhatsApp como canales opcionales.
+## Visión general
 
-## Flujos principales
-1. El usuario consulta huecos disponibles (`GET /slots`).
-2. La reserva se persiste y crea un evento en Google Calendar.
-3. Procesos periódicos reconcilian BD y Calendar.
+- **Backend**: FastAPI + SQLModel con SQLite, expone `/services`, `/professionals`, `/slots`, `/reservations`, y endpoints de administración y monitorización (`/health`, `/ready`, `/admin/*`). Incluye capas de logging, métricas y rate limiting.
+- **Frontend**: React 19 + Vite + Tailwind + shadcn. El flujo principal (`/book/service → /book/date → /book/confirm`) usa Zustand para el estado y React Query para fetches.
+- **E2E**: Playwright (`Frontend/shadcn-ui/tests/e2e/booking.spec.ts`) ejecuta el flujo completo mockeando el backend.
+- **Infra**: Docker Compose con servicios `backend`, `frontend`, `frontend-dev`.
 
-## Dependencias clave
-- Python 3.11+, FastAPI, SQLModel.
-- Node 18+, pnpm, React.
+## Saludos
+
+```
+A mi me gusta Github
+```

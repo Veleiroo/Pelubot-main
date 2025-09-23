@@ -1,58 +1,62 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api, Service as Svc } from '@/lib/api';
 import { useBooking } from '@/store/booking';
 import { toast } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BookingSection } from '@/components/book/BookingSection';
 import { ServiceCard } from '@/components/book/ServiceCard';
-import { Scissors, Palette, Sparkles, LucideIcon, Crown, Zap } from '@/lib/icons';
+import { Scissors, Sparkles, LucideIcon, Crown, Zap, Brush } from '@/lib/icons';
 import { BookingSteps } from '@/components/BookingSteps';
 import { BookingLayout } from '@/components/BookingLayout';
 import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { buildBookingState } from '@/lib/booking-route';
 
 const Service = () => {
   const navigate = useNavigate();
-  const setService = useBooking((s) => s.setService);
-  const [services, setServices] = useState<Svc[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const location = useLocation();
+  const { setService, serviceId: selectedServiceId } = useBooking((s) => ({
+    setService: s.setService,
+    serviceId: s.serviceId,
+  }));
+  const {
+    data: services = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<Svc[], Error>({
+    queryKey: ['services'],
+    queryFn: api.getServices,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    onError: (err) => toast.error(err.message),
+  });
 
-  const loadServices = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const items = await api.getServices();
-      setServices(items);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error cargando servicios';
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadServices();
-  }, []);
-
-  if (loading)
+  if (isLoading)
     return (
       <>
-        <BookingSteps />
+        <BookingSteps step={1} />
         <BookingSection title="Selecciona un servicio" subtitle="Elige el servicio que deseas reservar">
-          <div role="list" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div role="list" className="grid grid-cols-1 gap-4 md:gap-6 auto-rows-fr sm:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Skeleton className="h-12 w-12 rounded-xl" />
-                  <div className="space-y-2 flex-1">
-                    <Skeleton className="h-5 w-32" />
-                    <Skeleton className="h-4 w-24" />
+              <div key={i} className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+                <div className="flex h-full flex-col justify-between gap-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-12 w-12 rounded-xl" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-32" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-4 w-28" />
+                    </div>
                   </div>
+                  <Skeleton className="h-9 w-full rounded-xl" />
                 </div>
-                <Skeleton className="h-10 w-full rounded-md" />
               </div>
             ))}
           </div>
@@ -60,17 +64,17 @@ const Service = () => {
       </>
     );
 
-  if (error)
+  if (isError)
     return (
       <>
-        <BookingSteps />
+        <BookingSteps step={1} />
         <BookingSection title="Selecciona un servicio" subtitle="Elige el servicio que deseas reservar">
           <div className="text-center py-12">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 mb-4">
               <Zap className="h-6 w-6 text-red-400" />
             </div>
-            <div className="text-red-400 text-sm font-medium">{error}</div>
-            <Button className="mt-4" onClick={loadServices}>Reintentar</Button>
+            <div className="text-red-400 text-sm font-medium">{error?.message ?? 'Error cargando servicios'}</div>
+            <Button className="mt-4" onClick={() => refetch()}>Reintentar</Button>
           </div>
         </BookingSection>
       </>
@@ -79,34 +83,29 @@ const Service = () => {
   const onSelect = (svc: Svc) => {
     setService(svc.id, svc.name);
     // Pasamos el servicio en la URL para evitar cualquier condición de carrera del store.
-    navigate(`/book/date?service=${encodeURIComponent(svc.id)}`);
+    navigate(`/book/date?service=${encodeURIComponent(svc.id)}`, { state: buildBookingState(location) });
   };
 
   const iconMap: Record<string, LucideIcon> = {
-    corte: Scissors,
-    tinte: Palette,
-    barba: Sparkles,
-    premium: Crown,
+    corte_cabello: Scissors,
+    corte_barba: Sparkles,
+    arreglo_barba: Brush,
+    corte_jubilado: Crown,
   };
 
-  const steps = [
-    { key: 'service', label: 'Servicio', active: true },
-    { key: 'date', label: 'Fecha y hora' },
-    { key: 'confirm', label: 'Confirmar' },
-  ];
-
   return (
-    <BookingLayout steps={steps} title="Selecciona un servicio" subtitle="Elige el servicio que deseas reservar">
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <BookingLayout step={1} title="Selecciona un servicio" subtitle="Elige el servicio que deseas reservar">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 auto-rows-fr sm:grid-cols-3">
         {services.map((s) => (
           <ServiceCard
             key={s.id}
             title={s.name}
             duration={`${s.duration_min} minutos`}
             price={`${s.price_eur} €`}
-            icon={iconMap[s.id]}
+            icon={iconMap[s.id] ?? Scissors}
             onSelect={() => onSelect(s)}
             attrsId={`svc-${s.id}`}
+            selected={selectedServiceId === s.id}
           />
         ))}
       </div>

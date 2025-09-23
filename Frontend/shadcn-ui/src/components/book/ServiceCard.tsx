@@ -1,42 +1,61 @@
-import { Button } from '@/components/ui/button';
 import { LucideIcon } from '@/lib/icons';
+import { cn } from '@/lib/utils';
 
-export function ServiceCard({
-  title,
-  duration,
-  price,
-  icon: Icon,
-  onSelect,
-  attrsId,
-}: {
+interface Props {
   title: string;
   duration: string;
   price: string;
   icon?: LucideIcon;
   onSelect: () => void;
   attrsId?: string;
-}) {
+  selected?: boolean;
+}
+
+export function ServiceCard({ title, duration, price, icon: Icon, onSelect, attrsId, selected = false }: Props) {
   return (
-    <div
-      role="listitem"
-      className="rounded-2xl border border-[var(--border)] bg-[var(--card)] backdrop-blur shadow-lg shadow-black/20 transition-colors duration-150 p-5"
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-describedby={attrsId}
+      aria-pressed={selected}
+      className={cn(
+        'group h-full w-full rounded-2xl border bg-card p-6 text-left shadow-soft transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        selected
+          ? 'border-brand ring-1 ring-brand/40'
+          : 'border-border hover:border-brand/60 hover:shadow-lg'
+      )}
     >
-      <div className="flex items-center gap-2 mb-2">
-        {Icon ? <Icon className="h-4 w-4 text-emerald-400" /> : null}
-        <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+      <div className="flex h-full flex-col justify-between gap-4">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            {Icon ? (
+              <span className="grid h-12 w-12 flex-none place-items-center rounded-xl bg-brand/10 text-brand">
+                <Icon className="h-6 w-6" aria-hidden="true" />
+              </span>
+            ) : null}
+            <div>
+              <h3 className="text-lg font-semibold leading-6 text-foreground">{title}</h3>
+              <p className="text-sm leading-6 text-muted-foreground">{price}</p>
+            </div>
+          </div>
+
+          <dl id={attrsId} className="grid gap-1 text-sm leading-6 text-muted-foreground">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-foreground">Duración</span>
+              <span>{duration}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-foreground">Precio</span>
+              <span>{price}</span>
+            </div>
+          </dl>
+        </div>
+
+        <span className="inline-flex w-fit items-center rounded-xl bg-brand px-3 py-2 text-sm font-medium text-black transition group-hover:brightness-110">
+          Seleccionar servicio
+        </span>
       </div>
-      <ul id={attrsId} className="text-sm text-muted-foreground space-y-1">
-        <li className="before:content-['•'] before:mr-2 before:text-emerald-400">Duración: {duration}</li>
-        <li className="before:content-['•'] before:mr-2 before:text-emerald-400">Precio: {price}</li>
-      </ul>
-      <Button
-        aria-describedby={attrsId}
-        onClick={onSelect}
-        className="w-full mt-4 h-10 rounded-md bg-accent text-[var(--accent-contrast)] font-medium hover:bg-emerald-400 transition-colors duration-150"
-      >
-        Seleccionar
-      </Button>
-    </div>
+    </button>
   );
 }
 
