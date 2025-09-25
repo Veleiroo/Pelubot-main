@@ -1,6 +1,7 @@
 """Pruebas de salud y flujo básico de reservas."""
 
 from datetime import date, timedelta
+import pytest
 import os
 
 API_KEY = "test-api-key"
@@ -21,14 +22,26 @@ def test_slots_validation_errors(app_client):
     assert r.status_code == 400
     assert "pasado" in r.json()["detail"].lower()
 
-def test_create_list_cancel_reservation_flow(app_client):
+@pytest.mark.parametrize(
+    "service_id",
+    [
+        "corte_cabello",
+        "corte_barba",
+        "arreglo_barba",
+        "corte_jubilado",
+    ],
+)
+def test_create_list_cancel_reservation_flow(app_client, service_id: str):
     # Fecha futura cercana (evitar domingo)
     target = date.today() + timedelta(days=30)
     while target.weekday() == 6:
         target += timedelta(days=1)
 
     # 1) obtener slots
-    r = app_client.post("/slots", json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"})
+    r = app_client.post(
+        "/slots",
+        json={"service_id": service_id, "date_str": target.isoformat(), "professional_id": "deinis"},
+    )
     assert r.status_code == 200
     slots = r.json()["slots"]
     assert isinstance(slots, list) and len(slots) > 0
@@ -36,7 +49,7 @@ def test_create_list_cancel_reservation_flow(app_client):
 
     # 2) crear reserva (requiere API Key)
     payload = {
-        "service_id": "corte_cabello",
+        "service_id": service_id,
         "professional_id": "deinis",
         "start": start
     }
@@ -65,7 +78,10 @@ def test_bulk_reservations_fill_schedule(app_client):
         target += timedelta(days=1)
 
     # Obtener todos los huecos iniciales para Ana
-    resp = app_client.post("/slots", json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"})
+    resp = app_client.post(
+        "/slots",
+        json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"},
+    )
     assert resp.status_code == 200
     slots = resp.json()["slots"]
     assert len(slots) >= 6  # corte de cabello son 30 min, jornada típica dará varios huecos
