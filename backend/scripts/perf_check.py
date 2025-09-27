@@ -31,6 +31,9 @@ os.environ["API_KEY"] = API_KEY
 os.environ.setdefault("PELUBOT_FAKE_GCAL", "1")
 
 client = TestClient(app)
+CUSTOMER_NAME = os.getenv("CUSTOMER_NAME", "Perf Check")
+CUSTOMER_PHONE = os.getenv("CUSTOMER_PHONE", "+34999999999")
+CUSTOMER_EMAIL = os.getenv("CUSTOMER_EMAIL", "perf@example.com")
 
 
 def next_workday(days_ahead: int = 14) -> date:
@@ -54,7 +57,14 @@ def scenario() -> None:
         return
 
     start = slots[0]
-    payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start}
+    payload = {
+        "service_id": "corte_cabello",
+        "professional_id": "deinis",
+        "start": start,
+        "customer_name": CUSTOMER_NAME,
+        "customer_phone": CUSTOMER_PHONE,
+        "customer_email": CUSTOMER_EMAIL,
+    }
 
     res_create = client.post(
         "/reservations",

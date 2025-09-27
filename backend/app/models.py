@@ -2,7 +2,7 @@
 Modelos principales de datos para la API de reservas.
 Incluye servicios, profesionales, reservas y estructuras de consulta.
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, EmailStr
 from typing import List, Optional
 from datetime import datetime, date, timezone
 from sqlmodel import SQLModel, Field as SQLField
@@ -32,6 +32,10 @@ class Reservation(BaseModel):
     end: datetime
     google_event_id: Optional[str] = None
     google_calendar_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[EmailStr] = None
+    customer_phone: Optional[str] = None
+    notes: Optional[str] = None
 
 class SlotsQuery(BaseModel):
     """Consulta de huecos disponibles."""
@@ -100,6 +104,10 @@ class ReservationIn(BaseModel):
     professional_id: str
     start: datetime
     end: Optional[datetime] = None
+    customer_name: str = Field(..., min_length=2, max_length=120)
+    customer_email: Optional[EmailStr] = Field(default=None)
+    customer_phone: str = Field(..., min_length=6, max_length=40)
+    notes: Optional[str] = Field(default=None, max_length=500)
 
     @field_validator("start")
     @classmethod
@@ -108,6 +116,35 @@ class ReservationIn(BaseModel):
             v = v.replace(tzinfo=TZ)
         validate_target_dt(v)
         return v
+
+    @field_validator("customer_name")
+    @classmethod
+    def _validate_customer_name(cls, v: str) -> str:
+        name = v.strip()
+        if len(name) < 2:
+            raise ValueError("customer_name debe tener al menos 2 caracteres útiles")
+        return name
+
+    @field_validator("customer_phone")
+    @classmethod
+    def _validate_customer_phone(cls, v: str) -> str:
+        if v is None:
+            raise ValueError("customer_phone es obligatorio")
+        phone = v.strip()
+        if not phone:
+            raise ValueError("customer_phone es obligatorio")
+        digits = [c for c in phone if c.isdigit()]
+        if len(digits) < 6:
+            raise ValueError("customer_phone debe contener al menos 6 dígitos")
+        return phone
+
+    @field_validator("notes")
+    @classmethod
+    def _normalize_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        note = v.strip()
+        return note or None
 
 class ReservationDB(SQLModel, table=True):
     __table_args__ = (
@@ -123,6 +160,10 @@ class ReservationDB(SQLModel, table=True):
     end: datetime = SQLField(sa_type=DateTime(timezone=True))
     google_event_id: Optional[str] = SQLField(default=None, nullable=True, index=True)
     google_calendar_id: Optional[str] = SQLField(default=None, nullable=True, index=True)
+    customer_name: Optional[str] = SQLField(default=None, nullable=True)
+    customer_email: Optional[str] = SQLField(default=None, nullable=True)
+    customer_phone: Optional[str] = SQLField(default=None, nullable=True)
+    notes: Optional[str] = SQLField(default=None, nullable=True)
     created_at: datetime = SQLField(default_factory=lambda: datetime.now(timezone.utc), sa_type=DateTime(timezone=True), nullable=False)
     updated_at: datetime = SQLField(default_factory=lambda: datetime.now(timezone.utc), sa_type=DateTime(timezone=True), nullable=False)
 

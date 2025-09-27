@@ -5,9 +5,10 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, type Location as RouterLocation } from 'react-router-dom';
 import Index from '@/pages/Index';
 import NotFound from '@/pages/NotFound';
-import { loadBookDate, loadBookConfirm, loadDebugPage } from '@/lib/route-imports';
+import { loadBookDate, loadBookConfirm, loadDebugPage, loadBookService } from '@/lib/route-imports';
 const BookDate = lazy(loadBookDate);
 const BookConfirm = lazy(loadBookConfirm);
+const BookService = lazy(loadBookService);
 import Loading from '@/components/Loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import BookingDialog from '@/components/BookingDialog';
@@ -33,6 +34,7 @@ const AppRoutes = () => {
         <>
             <Routes location={backgroundLocation ?? location}>
                 <Route path="/" element={<Index />} />
+                <Route path="/book/service" element={renderWithSuspense(BookService)} />
                 <Route path="/book/date" element={renderWithSuspense(BookDate)} />
                 <Route path="/book/confirm" element={renderWithSuspense(BookConfirm)} />
                 {DEBUG && <Route path="/debug" element={renderWithSuspense(DebugPage)} />}
@@ -41,6 +43,14 @@ const AppRoutes = () => {
 
             {backgroundLocation && (
                 <Routes>
+                    <Route
+                        path="/book/service"
+                        element={
+                            <BookingDialog background={backgroundLocation}>
+                                {renderWithSuspense(BookService)}
+                            </BookingDialog>
+                        }
+                    />
                     <Route
                         path="/book/date"
                         element={

@@ -7,10 +7,18 @@ type BookingState = {
   professionalName?: string | null;
   date?: string; // YYYY-MM-DD
   slotStart?: string; // ISO string
+  customerName: string;
+  customerEmail?: string | null;
+  customerPhone: string;
+  notes?: string | null;
   setService: (serviceId: string, serviceName?: string) => void;
   setProfessional: (proId: string | null, proName?: string | null) => void;
   setDate: (date: string) => void;
   setSlot: (isoStart: string) => void;
+  setCustomerName: (name: string) => void;
+  setCustomerEmail: (email: string | null) => void;
+  setCustomerPhone: (phone: string) => void;
+  setNotes: (notes: string | null) => void;
   reset: () => void;
 };
 
@@ -21,6 +29,10 @@ export const useBooking = create<BookingState>((set) => ({
   professionalName: null,
   date: undefined,
   slotStart: undefined,
+  customerName: "",
+  customerEmail: null,
+  customerPhone: "",
+  notes: null,
   setService: (serviceId, serviceName) =>
     set((state) => ({
       serviceId,
@@ -34,6 +46,10 @@ export const useBooking = create<BookingState>((set) => ({
     set({ professionalId, professionalName, slotStart: undefined }),
   setDate: (date) => set({ date, slotStart: undefined }),
   setSlot: (isoStart) => set({ slotStart: isoStart }),
+  setCustomerName: (name) => set({ customerName: name }),
+  setCustomerEmail: (email) => set({ customerEmail: email }),
+  setCustomerPhone: (phone) => set({ customerPhone: phone }),
+  setNotes: (notes) => set({ notes }),
   reset: () =>
     set({
       serviceId: undefined,
@@ -42,5 +58,9 @@ export const useBooking = create<BookingState>((set) => ({
       professionalName: null,
       date: undefined,
       slotStart: undefined,
+      customerName: "",
+      customerEmail: null,
+      customerPhone: "",
+      notes: null,
     }),
 }));

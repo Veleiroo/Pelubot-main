@@ -232,11 +232,14 @@ const BookDate = () => {
       }),
   });
 
-  const slots = slotsData?.slots ?? [];
+  const slots = useMemo(() => slotsData?.slots ?? [], [slotsData]);
   const slotsLoading = slotsFetching && !slotsData;
   const slotsError = slotsIsError ? slotsErrorObj?.message ?? 'Error cargando horarios' : null;
   const daysError = daysIsError ? daysErrorObj?.message ?? 'Error comprobando disponibilidad de días' : null;
   const daysLoading = daysFetching && !daysData;
+  const helperMessage = selectedValid
+    ? 'Selecciona un horario para continuar.'
+    : 'Selecciona una fecha para ver horarios disponibles.';
 
   const slotsByPeriod = useMemo<Record<PeriodValue, string[]>>(() => {
     const initial = PERIOD_DEFINITIONS.reduce((acc, { value }) => {
@@ -377,252 +380,254 @@ const BookDate = () => {
       title="Selecciona fecha y hora"
       summary={resolvedServiceLabel || undefined}
     >
-      {noProfessionals && (
-        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200" aria-live="polite">
-          Por ahora ningún profesional ofrece este servicio. Puedes elegir otro servicio o volver más tarde.
-        </div>
-      )}
+      <div className="mx-auto w-full max-w-[820px] space-y-3">
+        {noProfessionals && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200" aria-live="polite">
+            Por ahora ningún profesional ofrece este servicio. Puedes elegir otro servicio o volver más tarde.
+          </div>
+        )}
 
-      {/* Calendario accesible con grid propio */}
-      <div className="relative">
-        <Card className="w-full rounded-2xl border border-white/10 bg-neutral-900/95 shadow-xl">
-          <CardContent className="p-5 md:p-6">
-            <CalendarNav month={month} onPrev={onPrevMonth} onNext={onNextMonth} />
+        <Card className="relative overflow-visible rounded-2xl border border-white/10 bg-neutral-900/95 shadow-xl">
+          <CardContent className="flex flex-col p-0">
+            <div className="flex flex-col gap-5 p-4 md:p-5 lg:grid lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1fr)] lg:gap-6 lg:p-6">
+              <section className="flex flex-col">
+                <CalendarNav month={month} onPrev={onPrevMonth} onNext={onNextMonth} />
 
-            <div className="mx-auto w-full max-w-[360px] md:max-w-[440px]">
-              <div className="mb-3 grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-wide text-white/50 md:mb-4">
-                {['lu','ma','mi','ju','vi','sá','do'].map((w) => (
-                  <div key={w} className="grid h-8 place-items-center">{w}</div>
-                ))}
-              </div>
+                <div className="mt-3">
+                  <div className="mb-3 grid grid-cols-7 gap-1.5 text-center text-[11px] uppercase tracking-wide text-white/50 lg:mb-4">
+                    {['lu','ma','mi','ju','vi','sá','do'].map((w) => (
+                      <div key={w} className="grid h-8 place-items-center text-xs font-medium">{w}</div>
+                    ))}
+                  </div>
 
-              <div
-                key={`${month.getFullYear()}-${month.getMonth()}`}
-                role="grid"
-                aria-label={format(month, 'LLLL yyyy', { locale: es })}
-                className="cal-fade grid grid-cols-7 gap-1"
-                style={{ aspectRatio: '1 / 1' }}
-                tabIndex={0}
-                onKeyDown={onGridKeyDown}
-              >
-                {days.map((d) => {
-                  const ymd = toYmd(d);
-                  const inMonth = isSameMonth(d, month);
-                  const outOfRange = isBefore(d, today) || isAfter(d, maxDate);
-                  const enabled = inMonth && !outOfRange && availableDays.has(ymd);
-                  const selectedDay = selected ? isSameDay(d, selected) : false;
-                  const isFocused = isSameDay(d, focusedDate);
-                  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                  <div
+                    key={`${month.getFullYear()}-${month.getMonth()}`}
+                    role="grid"
+                    aria-label={format(month, 'LLLL yyyy', { locale: es })}
+                    className="cal-fade grid grid-cols-7 gap-1.5"
+                    tabIndex={0}
+                    onKeyDown={onGridKeyDown}
+                  >
+                    {days.map((d) => {
+                      const ymd = toYmd(d);
+                      const inMonth = isSameMonth(d, month);
+                      const outOfRange = isBefore(d, today) || isAfter(d, maxDate);
+                      const enabled = inMonth && !outOfRange && availableDays.has(ymd);
+                      const selectedDay = selected ? isSameDay(d, selected) : false;
+                      const isFocused = isSameDay(d, focusedDate);
+                      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                      const showDot = (enabled || selectedDay) && inMonth;
 
-                  const dayClasses = cn(
-                    'size-9 md:size-10 grid place-items-center rounded-lg text-white/80 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-                    '[font-variant-numeric:tabular-nums]',
-                    isWeekend ? 'text-white/60' : 'text-white/80',
-                    !inMonth && 'cursor-not-allowed text-white/30 opacity-60 hover:bg-transparent',
-                    inMonth && !enabled && 'cursor-not-allowed text-white/30 opacity-60 hover:bg-transparent',
-                    enabled && inMonth && !selectedDay && 'hover:bg-white/5',
-                    selectedDay && 'bg-emerald-500 text-white shadow-[0_0_0_3px] shadow-emerald-500/20 hover:bg-emerald-500',
-                    isToday(d) && !selectedDay && 'outline outline-1 outline-white/10'
-                  );
+                      const dayClasses = cn(
+                        'flex h-10 w-10 flex-col items-center justify-center gap-1 rounded-lg text-[13px] font-medium leading-none transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:h-11 md:w-11',
+                        '[font-variant-numeric:tabular-nums] shadow-none',
+                        isWeekend ? 'text-white/70' : 'text-white/80',
+                        !inMonth && 'cursor-not-allowed text-white/25 opacity-80 hover:bg-transparent',
+                        inMonth && !enabled && 'cursor-not-allowed text-white/40 opacity-70 hover:bg-transparent',
+                        enabled && inMonth && !selectedDay && 'hover:bg-white/5',
+                        selectedDay && 'bg-emerald-500 text-white shadow-[0_0_0_3px] shadow-emerald-500/25 hover:bg-emerald-500',
+                        isToday(d) && !selectedDay && 'outline outline-1 outline-white/15'
+                      );
 
-                  return (
-                    <div key={ymd} className="grid place-items-center h-10">
-                      <button
-                        type="button"
-                        role="gridcell"
-                        aria-selected={selectedDay}
-                        aria-disabled={!enabled}
-                        aria-current={isToday(d) ? 'date' : undefined}
-                        data-today={isToday(d)}
-                        data-selected={selectedDay}
-                        data-enabled={enabled}
-                        data-disabled={!enabled}
-                        disabled={!enabled}
-                        tabIndex={isFocused ? 0 : -1}
-                        onClick={() => {
-                          if (!enabled) return;
-                          setSelected(d);
-                          setDate(ymd);
-                        }}
-                        className={dayClasses}
-                      >
-                        {String(d.getDate())}
-                      </button>
+                      return (
+                        <div key={ymd} className="flex items-center justify-center">
+                          <button
+                            type="button"
+                            role="gridcell"
+                            aria-selected={selectedDay}
+                            aria-disabled={!enabled}
+                            aria-current={isToday(d) ? 'date' : undefined}
+                            data-today={isToday(d)}
+                            data-selected={selectedDay}
+                            data-enabled={enabled}
+                            data-disabled={!enabled}
+                            disabled={!enabled}
+                            tabIndex={isFocused ? 0 : -1}
+                            onClick={() => {
+                              if (!enabled) return;
+                              setSelected(d);
+                              setDate(ymd);
+                            }}
+                            className={dayClasses}
+                          >
+                            <span>{String(d.getDate())}</span>
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                'h-1.5 w-1.5 rounded-full transition-opacity',
+                                selectedDay ? 'bg-white opacity-100' : 'bg-emerald-400',
+                                showDot ? 'opacity-100' : 'opacity-0'
+                              )}
+                            />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+
+              <section className="flex flex-col">
+                <div className="space-y-2 md:space-y-3">
+                  <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4">
+                    <div className="order-2 text-center text-sm text-white/70 md:order-1 md:text-left md:text-base">
+                      {selectedHuman ? 'Horarios disponibles para ' : ''}
+                      <span className="font-medium text-white">{selectedHuman ?? 'Selecciona una fecha'}</span>
                     </div>
-                  );
-              })}
+                    <div className="order-1 flex flex-col gap-1 md:order-2 md:items-end">
+                      <Label htmlFor="professional-select" className="text-xs font-medium text-white/60 md:text-right">
+                        Profesional
+                      </Label>
+                      <Select
+                        value={professionalId ?? ANY_PRO}
+                        onValueChange={(v) => {
+                          const nextId = v === ANY_PRO ? null : v;
+                          const nextName = nextId ? pros.find((p) => p.id === nextId)?.name ?? null : null;
+                          setProfessional(nextId, nextName);
+                          setDate('');
+                        }}
+                      >
+                        <SelectTrigger id="professional-select" className="w-full sm:w-60 md:w-56" aria-label="Seleccionar profesional">
+                          <SelectValue placeholder="Cualquiera" />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                          <SelectItem value={ANY_PRO}>Cualquiera</SelectItem>
+                          {pros.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-400 text-center md:text-left">{helperMessage}</p>
+                </div>
+
+                <div className="mt-4 flex-1">
+                  {slotsLoading && (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                      {Array.from({ length: 10 }).map((_, i) => (
+                        <Skeleton key={i} className="h-9 rounded-full" />
+                      ))}
+                    </div>
+                  )}
+
+                  {!slotsLoading && selectedValid && (
+                    <div className="flex h-full flex-col">
+                      <Tabs
+                        value={activePeriod}
+                        onValueChange={(value) => setActivePeriod(value as PeriodValue)}
+                      >
+                        <TabsList className="grid h-auto w-full grid-cols-3 gap-2 rounded-xl bg-white/5 p-1 text-xs text-white/70 md:text-sm">
+                          {PERIOD_DEFINITIONS.map((period) => {
+                            const periodSlots = slotsByPeriod[period.value];
+                            const isEmpty = periodSlots.length === 0;
+                            return (
+                              <TabsTrigger
+                                key={period.value}
+                                value={period.value}
+                                className={cn(
+                                  'rounded-lg px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
+                                  'text-white/70 hover:bg-white/10 hover:text-white',
+                                  'data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-[0_0_0_2px] data-[state=active]:shadow-emerald-500/20',
+                                  isEmpty && 'opacity-45'
+                                )}
+                              >
+                                {period.label}
+                              </TabsTrigger>
+                            );
+                          })}
+                        </TabsList>
+                        {PERIOD_DEFINITIONS.map((period) => {
+                          const periodSlots = slotsByPeriod[period.value];
+                          return (
+                            <TabsContent key={period.value} value={period.value} className="mt-3 max-h-[360px] overflow-y-auto pr-1 outline-none">
+                              {periodSlots.length === 0 ? (
+                                <p className="py-6 text-center text-xs text-white/50">No hay horarios en este tramo.</p>
+                              ) : (
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                  {periodSlots.map((iso) => {
+                                    const selectedSlot = slotStart === iso;
+                                    const slotDate = new Date(iso);
+                                    const label = Number.isNaN(slotDate.getTime())
+                                      ? iso.slice(11, 16)
+                                      : format(slotDate, "HH:mm'h'", { locale: es });
+                                    return (
+                                      <button
+                                        key={iso}
+                                        type="button"
+                                        aria-pressed={selectedSlot}
+                                        data-selected={selectedSlot}
+                                        className={cn(
+                                          'rounded-full px-4 py-2 text-xs font-medium text-white/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 md:text-sm',
+                                          'bg-white/5 hover:bg-white/10',
+                                          selectedSlot && 'bg-emerald-500 text-white shadow-[0_0_0_3px] shadow-emerald-500/20 hover:bg-emerald-500'
+                                        )}
+                                        onClick={() => onSelectSlot(iso)}
+                                      >
+                                        {label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </TabsContent>
+                          );
+                        })}
+                      </Tabs>
+                      {slots.length === 0 && (
+                        <p className="mt-3 text-center text-xs text-white/50">
+                          No hay horarios disponibles para esta fecha. Intenta con otra fecha o profesional.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {!slotsLoading && !selectedValid && null}
+
+                  {slotsError && !slotsLoading && (
+                    <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-black/40 px-4 py-3">
+                      <div className="text-sm text-neutral-100">{slotsError}</div>
+                      <Button size="sm" onClick={onRetrySlots}>Reintentar</Button>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+
+            <div className="sticky bottom-0 left-0 right-0 border-t border-white/10 bg-neutral-900/95 px-5 py-3 backdrop-blur md:px-5 lg:px-6">
+              <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+                <Button
+                  onClick={goBackToBackground}
+                  className="w-full bg-brand text-white hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto"
+                >
+                  Cambiar servicio
+                </Button>
+                <Button
+                  disabled={!canContinue}
+                  onClick={onNext}
+                  aria-disabled={!canContinue}
+                  className="w-full rounded-xl bg-brand px-6 py-2 text-black shadow-soft transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
+                >
+                  {canContinue ? 'Continuar' : 'Selecciona un horario'}
+                </Button>
               </div>
             </div>
           </CardContent>
+
+          {daysLoading && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40">
+              <div className="rounded-lg bg-neutral-800 px-3 py-2 text-sm text-neutral-200" role="status" aria-live="polite">
+                Comprobando disponibilidad…
+              </div>
+            </div>
+          )}
+          {daysError && !daysLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-black/70">
+              <div className="text-sm text-neutral-200" role="status" aria-live="assertive">{daysError}</div>
+              <Button size="sm" onClick={onRetryDays}>Reintentar</Button>
+            </div>
+          )}
         </Card>
-
-        {daysLoading && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40">
-            <div className="rounded-lg bg-neutral-800 px-3 py-2 text-sm text-neutral-200" role="status" aria-live="polite">
-              Comprobando disponibilidad…
-            </div>
-          </div>
-        )}
-        {daysError && !daysLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-black/60">
-            <div className="text-sm text-neutral-200" role="status" aria-live="assertive">{daysError}</div>
-            <Button size="sm" onClick={onRetryDays}>Reintentar</Button>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-3 flex items-center justify-end gap-2">
-        <Label htmlFor="professional-select" className="text-xs font-medium text-white/60">
-          Profesional
-        </Label>
-        <Select
-          value={professionalId ?? ANY_PRO}
-          onValueChange={(v) => {
-            const nextId = v === ANY_PRO ? null : v;
-            const nextName = nextId ? pros.find((p) => p.id === nextId)?.name ?? null : null;
-            setProfessional(nextId, nextName);
-            setDate('');
-          }}
-        >
-          <SelectTrigger id="professional-select" className="w-64" aria-label="Seleccionar profesional">
-            <SelectValue placeholder="Cualquiera" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ANY_PRO}>Cualquiera</SelectItem>
-            {pros.map((p) => (
-              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Horarios disponibles */}
-      <Card className="mt-5 rounded-2xl border border-white/10 bg-neutral-900/95 shadow-xl">
-        <CardContent className="p-5 md:p-6">
-          <div className="flex flex-col gap-1 text-left">
-            <div className="text-sm text-white/70 md:text-base">
-              {selectedHuman ? 'Horarios disponibles para ' : ''}
-              <span className="font-medium text-white">{selectedHuman ?? 'Selecciona una fecha'}</span>
-            </div>
-            {selectedValid && (
-              <p className="text-xs text-white/50">Haz clic en un horario para continuar</p>
-            )}
-          </div>
-
-          {slotsLoading && (
-            <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 md:gap-3">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <Skeleton key={i} className="h-9 rounded-xl" />
-              ))}
-            </div>
-          )}
-
-          {!slotsLoading && selectedValid && (
-            <div className="mt-4">
-              <Tabs
-                value={activePeriod}
-                onValueChange={(value) => setActivePeriod(value as PeriodValue)}
-              >
-                <TabsList className="grid h-auto w-full grid-cols-3 gap-2 rounded-xl bg-white/5 p-1 text-xs text-white/70 md:text-sm">
-                  {PERIOD_DEFINITIONS.map((period) => {
-                    const periodSlots = slotsByPeriod[period.value];
-                    const isEmpty = periodSlots.length === 0;
-                    return (
-                      <TabsTrigger
-                        key={period.value}
-                        value={period.value}
-                        className={cn(
-                          'rounded-lg px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
-                          'text-white/70 hover:bg-white/10 hover:text-white',
-                          'data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-[0_0_0_2px] data-[state=active]:shadow-emerald-500/20',
-                          isEmpty && 'opacity-45'
-                        )}
-                      >
-                        {period.label}
-                      </TabsTrigger>
-                    );
-                  })}
-                </TabsList>
-                {PERIOD_DEFINITIONS.map((period) => {
-                  const periodSlots = slotsByPeriod[period.value];
-                  return (
-                    <TabsContent key={period.value} value={period.value} className="mt-3 outline-none">
-                      {periodSlots.length === 0 ? (
-                        <p className="py-6 text-center text-xs text-white/50">No hay horarios en este tramo.</p>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 md:gap-3">
-                          {periodSlots.map((iso) => {
-                            const selectedSlot = slotStart === iso;
-                            const slotDate = new Date(iso);
-                            const label = Number.isNaN(slotDate.getTime())
-                              ? iso.slice(11, 16)
-                              : format(slotDate, "HH:mm'h'", { locale: es });
-                            return (
-                              <button
-                                key={iso}
-                                type="button"
-                                aria-pressed={selectedSlot}
-                                data-selected={selectedSlot}
-                                className={cn(
-                                  'rounded-full px-3.5 py-2 text-xs md:text-sm text-white/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
-                                  'bg-white/5 hover:bg-white/10',
-                                  selectedSlot && 'bg-emerald-500 text-white shadow-[0_0_0_3px] shadow-emerald-500/20 hover:bg-emerald-500'
-                                )}
-                                onClick={() => onSelectSlot(iso)}
-                              >
-                                {label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </TabsContent>
-                  );
-                })}
-              </Tabs>
-              {slots.length === 0 && (
-                <p className="mt-3 text-center text-xs text-white/50">
-                  No hay horarios disponibles para esta fecha. Intenta con otra fecha o profesional.
-                </p>
-              )}
-            </div>
-          )}
-
-          {!slotsLoading && !selectedValid && (
-            <p className="mt-4 text-center text-xs text-white/50">
-              Selecciona una fecha en el calendario para ver horarios disponibles.
-            </p>
-          )}
-        </CardContent>
-        {slotsError && !slotsLoading && (
-          <div className="flex flex-col items-center gap-2 px-4 pb-4">
-            <div className="text-sm text-neutral-200">{slotsError}</div>
-            <Button size="sm" onClick={onRetrySlots}>Reintentar</Button>
-          </div>
-        )}
-      </Card>
-
-      {!canContinue && selectedValid && (
-        <p className="mt-4 text-sm font-medium text-amber-300" role="alert">
-          Selecciona un horario disponible para continuar.
-        </p>
-      )}
-
-      <div className="mt-6 flex flex-col items-center justify-between gap-4 sm:flex-row">
-        <Button
-          onClick={goBackToBackground}
-          className="w-full bg-brand text-white hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto"
-        >
-          Cambiar servicio
-        </Button>
-        <Button
-          disabled={!canContinue}
-          onClick={onNext}
-          aria-disabled={!canContinue}
-          className="w-full rounded-xl bg-brand px-6 py-2 text-black shadow-soft transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-60 sm:w-auto"
-        >
-          {canContinue ? 'Continuar' : 'Selecciona un horario'}
-        </Button>
       </div>
     </BookingLayout>
   );

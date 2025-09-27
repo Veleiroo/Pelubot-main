@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react';
 import Navigation from '@/components/Navigation';
-import { loadBookDate, loadBookConfirm } from '@/lib/route-imports';
+import { loadBookDate, loadBookConfirm, loadBookService } from '@/lib/route-imports';
 
 const HeroSection = lazy(() => import('@/components/HeroSection'));
 const AboutSection = lazy(() => import('@/components/AboutSection'));
@@ -24,6 +24,7 @@ export default function Index() {
         };
 
         const schedulePrefetch = () => {
+            loadBookService();
             loadBookDate();
             loadBookConfirm();
         };

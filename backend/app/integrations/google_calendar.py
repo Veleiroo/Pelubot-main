@@ -1,8 +1,15 @@
 from __future__ import annotations
 from typing import Dict, Any, Optional, List
 
+from pathlib import Path
+
 from dotenv import load_dotenv
-load_dotenv()
+
+_ROOT_ENV = Path(__file__).resolve().parents[3] / ".env"
+if _ROOT_ENV.exists():
+    load_dotenv(dotenv_path=_ROOT_ENV, override=False)
+else:
+    load_dotenv(override=False)
 
 from google.oauth2.service_account import Credentials as SA
 from google.oauth2.credentials import Credentials as UserCreds
@@ -69,41 +76,71 @@ def _load_sa_creds() -> Optional[SA]:
 
 def _load_user_creds() -> Optional[UserCreds]:
     """Carga credenciales OAuth de usuario y refresca tokens expirados."""
-    oa_json = os.getenv("GOOGLE_OAUTH_JSON")
-    if not oa_json:
-        here = os.path.dirname(__file__)
-        candidate = os.path.join(os.path.dirname(here), "oauth_tokens.json")
-        if os.path.exists(candidate):
-            oa_json = candidate
-        else:
-            return None
-    info_path = None
-    if oa_json.strip().startswith("{"):
-        info = json.loads(oa_json)
-    else:
-        from pathlib import Path
-        p = Path(oa_json)
-        here = Path(__file__).resolve().parent
-        candidates = []
-        if p.is_absolute():
-            candidates.append(p)
-        else:
-            candidates.append(Path(os.getcwd()) / p)
-            candidates.append(here.parent / p)
-            candidates.append(here / p)
-            candidates.append(here / p.name)
-        path = None
+    from pathlib import Path
+
+    raw_oauth = (os.getenv("GOOGLE_OAUTH_JSON") or "").strip()
+    here = Path(__file__).resolve().parent
+    backend_root = here.parent
+
+    def _expand_candidates(items):
+        expanded = []
+        for cand in items:
+            try:
+                if cand.is_dir():
+                    expanded.extend(sorted(cand.glob("*.json")))
+                else:
+                    expanded.append(cand)
+            except Exception:
+                continue
+        return expanded
+
+    info_path: Optional[Path] = None
+    info: Dict | None = None
+
+    if not raw_oauth:
+        candidates: List[Path] = [backend_root / "oauth_tokens.json"]
+        candidates.extend(sorted((backend_root / "tmp").glob("*.json")))
         for cand in candidates:
             try:
                 if cand.exists():
-                    path = cand
+                    info_path = cand
                     break
             except Exception:
                 continue
-        if path is None:
-            path = p if p.is_absolute() else (Path(os.getcwd()) / p)
-        info_path = path
-        info = json.load(open(path, "r", encoding="utf-8"))
+        if info_path is None:
+            return None
+        info = json.loads(info_path.read_text(encoding="utf-8"))
+    elif raw_oauth.startswith("{"):
+        info = json.loads(raw_oauth)
+    else:
+        p = Path(raw_oauth)
+        candidates: List[Path] = []
+        if p.is_absolute():
+            candidates.append(p)
+        else:
+            cwd = Path(os.getcwd())
+            candidates.extend(
+                [
+                    cwd / p,
+                    backend_root / p,
+                    backend_root / "tmp" / p.name,
+                    here / p,
+                    here / p.name,
+                ]
+            )
+        for cand in _expand_candidates(candidates):
+            try:
+                if cand.exists():
+                    info_path = cand
+                    break
+            except Exception:
+                continue
+        if info_path is None:
+            return None
+        info = json.loads(info_path.read_text(encoding="utf-8"))
+
+    if info is None:
+        return None
     creds = UserCreds.from_authorized_user_info(info, SCOPES)
     if creds:
         try:
@@ -249,7 +286,7 @@ def list_calendars(service: Any) -> List[Dict[str, Any]]:
     except Exception as e:
         raise RuntimeError(f"Error listando calendarios: {e}")
 
-def create_event(service: Any, calendar_id: str, start_dt, end_dt, summary: str, private_props: Dict[str, str] = None, color_id: Optional[str] = None, tz: str = "Europe/Madrid") -> Dict[str, Any]:
+def create_event(service: Any, calendar_id: str, start_dt, end_dt, summary: str, private_props: Dict[str, str] = None, description: Optional[str] = None, color_id: Optional[str] = None, tz: str = "Europe/Madrid") -> Dict[str, Any]:
     """Inserta un evento en Google Calendar incluyendo metadatos privados de PeluBot."""
     if private_props is None:
         private_props = {}
@@ -259,6 +296,8 @@ def create_event(service: Any, calendar_id: str, start_dt, end_dt, summary: str,
         "end": {"dateTime": iso_datetime(end_dt, tz), "timeZone": tz},
         "extendedProperties": {"private": private_props},
     }
+    if description:
+        body["description"] = description
     if color_id:
         body["colorId"] = color_id
     try:

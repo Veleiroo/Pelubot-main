@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X } from '@/lib/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { loadBookDate, loadBookConfirm } from '@/lib/route-imports';
+import { loadBookDate, loadBookConfirm, loadBookService } from '@/lib/route-imports';
 import { buildBookingState } from '@/lib/booking-route';
 
 export default function Navigation() {
@@ -21,9 +21,10 @@ export default function Navigation() {
     };
 
     const handleReservation = () => {
+        loadBookService();
         loadBookDate();
         loadBookConfirm();
-        navigate('/book/date', { state: buildBookingState(location) });
+        navigate('/book/service', { state: buildBookingState(location) });
     };
 
     useEffect(() => {
@@ -110,8 +111,14 @@ export default function Navigation() {
                             </button>
                             <Button
                                 onClick={handleReservation}
-                                onMouseEnter={loadBookDate}
-                                onFocus={loadBookDate}
+                                onMouseEnter={() => {
+                                    loadBookService();
+                                    loadBookDate();
+                                }}
+                                onFocus={() => {
+                                    loadBookService();
+                                    loadBookDate();
+                                }}
                                 className="bg-brand hover:bg-[#00B894] text-black font-semibold ml-4"
                             >
                                 Reserva tu Cita
@@ -174,8 +181,14 @@ export default function Navigation() {
                             </button>
                             <Button
                                 onClick={() => { setIsOpen(false); handleReservation(); }}
-                                onMouseEnter={loadBookDate}
-                                onFocus={loadBookDate}
+                                onMouseEnter={() => {
+                                    loadBookService();
+                                    loadBookDate();
+                                }}
+                                onFocus={() => {
+                                    loadBookService();
+                                    loadBookDate();
+                                }}
                                 className="bg-brand hover:bg-[#00B894] text-black font-semibold w-full mt-4"
                             >
                                 Reserva tu Cita

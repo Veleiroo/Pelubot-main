@@ -2,6 +2,12 @@
 
 from datetime import date, timedelta
 
+CUSTOMER_FIELDS = {
+    "customer_name": "Test Suite",
+    "customer_phone": "+34960000000",
+    "customer_email": "testsuite@example.com",
+}
+
 API_KEY = "test-api-key"
 
 def test_reschedule_flow(app_client, monkeypatch):
@@ -18,7 +24,12 @@ def test_reschedule_flow(app_client, monkeypatch):
     start, new_start = slots[0], slots[1]
 
     # crear
-    create_payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start}
+    create_payload = {
+        "service_id": "corte_cabello",
+        "professional_id": "deinis",
+        "start": start,
+        **CUSTOMER_FIELDS,
+    }
     r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=create_payload)
     assert r.status_code == 200
     msg = r.json()["message"]

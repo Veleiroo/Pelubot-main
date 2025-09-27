@@ -62,7 +62,7 @@ export default function GallerySection() {
   };
 
   const handleReservation = () => {
-    navigate('/book/date', { state: buildBookingState(location) });
+    navigate('/book/service', { state: buildBookingState(location) });
   };
 
   return (

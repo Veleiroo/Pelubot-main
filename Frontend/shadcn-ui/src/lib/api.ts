@@ -20,6 +20,7 @@ const BASE = (() => {
   return normalizedPath || '';
 })();
 const DEBUG = /^(1|true|yes|y)$/i.test(String(import.meta.env.VITE_ENABLE_DEBUG ?? "0"));
+const API_KEY = String(import.meta.env?.VITE_API_KEY ?? '').trim();
 
 export type Service = { id: string; name: string; duration_min: number; price_eur: number };
 export type Professional = { id: string; name: string; services?: string[] };
@@ -28,6 +29,15 @@ type SlotsOut = { service_id: string; date: string; professional_id?: string | n
 type ActionResult = { ok: boolean; message: string };
 type ReservationCreateOut = ActionResult & { reservation_id: string; google_event_id?: string | null };
 type DaysAvailabilityOut = { service_id: string; start: string; end: string; professional_id?: string | null; available_days: string[] };
+export type ReservationCreatePayload = {
+  service_id: string;
+  professional_id: string;
+  start: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email?: string;
+  notes?: string;
+};
 
 export class ApiError extends Error {
   status: number;
@@ -50,6 +60,9 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     'Content-Type': 'application/json',
     ...(init?.headers as Record<string, string> ?? {}),
   };
+  if (API_KEY && !headers['X-API-Key']) {
+    headers['X-API-Key'] = API_KEY;
+  }
   const url = `${BASE}${path}`;
   const started = performance.now();
 
@@ -120,8 +133,11 @@ export const api = {
     }),
 
   // Creación de reservas. El backend espera { service_id, professional_id, start }.
-  createReservation: (payload: { service_id: string; professional_id: string; start: string }) =>
-    http<ReservationCreateOut>("/reservations", { method: "POST", body: JSON.stringify(payload) }),
+  createReservation: (payload: ReservationCreatePayload) =>
+    http<ReservationCreateOut>("/reservations", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // Disponibilidad por días para un rango [start, end].
   getDaysAvailability: (

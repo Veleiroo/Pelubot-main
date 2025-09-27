@@ -15,13 +15,13 @@ services:
       # Para desarrollo puedes forzar cliente de Google Calendar falso (sin llamadas externas)
       PELUBOT_FAKE_GCAL: ${PELUBOT_FAKE_GCAL:-0}
       # OAuth por defecto apunta a archivo dentro del contenedor
-      GOOGLE_OAUTH_JSON: ${GOOGLE_OAUTH_JSON:-/app/backend/oauth_tokens.json}
+      GOOGLE_OAUTH_JSON: ${GOOGLE_OAUTH_JSON:-/app/backend/tmp}
       # Base de datos SQLite persistente
       DATABASE_URL: ${DATABASE_URL:-sqlite:////app/backend/data/pelubot.db}
     volumes:
       - backend_data:/app/backend/data
-      # Monta tus tokens OAuth (si existen) como solo lectura
-      - ./backend/oauth_tokens.json:/app/backend/oauth_tokens.json:ro
+      # Monta el directorio temporal que contiene los tokens OAuth
+      - ./backend/tmp:/app/backend/tmp
     ports:
       - "${BACKEND_PORT:-8776}:8776"
 

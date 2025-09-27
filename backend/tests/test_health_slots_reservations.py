@@ -51,7 +51,10 @@ def test_create_list_cancel_reservation_flow(app_client, service_id: str):
     payload = {
         "service_id": service_id,
         "professional_id": "deinis",
-        "start": start
+        "start": start,
+        "customer_name": "Test User",
+        "customer_phone": "+34123456789",
+        "customer_email": "test@example.com",
     }
     r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
     assert r.status_code == 200, r.text
@@ -88,7 +91,13 @@ def test_bulk_reservations_fill_schedule(app_client):
 
     created_ids = []
     for start in slots:
-        payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start}
+        payload = {
+            "service_id": "corte_cabello",
+            "professional_id": "deinis",
+            "start": start,
+            "customer_name": "Carga Test",
+            "customer_phone": "+34123456789",
+        }
         r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
         if r.status_code == 400:
             # En caso de carreras, el hueco ya no está disponible (esperado cuando el turno se llena)
@@ -102,7 +111,13 @@ def test_bulk_reservations_fill_schedule(app_client):
     # Intentar crear una reserva adicional debe fallar porque no quedan huecos
     if created_ids:
         last_slot = slots[min(len(created_ids), len(slots)) - 1]
-        payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": last_slot}
+        payload = {
+            "service_id": "corte_cabello",
+            "professional_id": "deinis",
+            "start": last_slot,
+            "customer_name": "Carga Test",
+            "customer_phone": "+34123456789",
+        }
         r = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
         assert r.status_code == 400
         assert "no está disponible" in r.json()["detail"].lower()

@@ -25,6 +25,29 @@
 - `make dev-demo` — flujo de demo end-to-end
 - `make conflicts` — detecta conflictos en un rango
 
+## Reset sincronización y validación integral
+1. Limpiar estado previo (BD + Google Calendar):
+  ```bash
+  make wipe-reservations
+  DRY_RUN=0 make gcal-clear-range
+  ```
+2. Ejecutar la validación completa (crea y cancela una reserva por servicio, comprobando `google_event_id`):
+  ```bash
+  API_KEY=<tu_api_key> python backend/scripts/validate_services.py
+  ```
+  - El script imprime un registro JSON por servicio con la hora utilizada, el `reservation_id` y el evento generado en Google.
+  - Por defecto cancela cada reserva inmediatamente; añade `--keep` si quieres revisar los eventos en el calendario antes de borrarlos.
+3. Lanzar una prueba de estrés ligera (20 ciclos create/cancel sobre el servicio base):
+  ```bash
+  API_KEY=<tu_api_key> python backend/scripts/validate_services.py --stress 20
+  ```
+  - Ajusta `--stress N` para más iteraciones y `--stress-service/--stress-pro` si quieres focos distintos.
+4. Revisar la salida final:
+  - `"conflictos"` sin discrepancias confirma que no quedan orfanatos en GCal.
+  - `"stress"` indica número de iteraciones exitosas; cualquier fallo se lista con el motivo.
+
+> Referencia: el script vive en `backend/scripts/validate_services.py` y utiliza el catálogo de `app/data.py` para iterar todos los servicios disponibles.
+
 ## Frontend (desarrollo)
 - Variables en `Frontend/shadcn-ui/.env`:
   - `VITE_API_BASE_URL=http://127.0.0.1:8776` (o `/api` si usas nginx)

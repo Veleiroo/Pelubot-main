@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCallback, type ReactNode } from 'react';
 import { useBooking } from '@/store/booking';
-import { loadBookDate, loadBookConfirm } from '@/lib/route-imports';
+import { loadBookDate, loadBookConfirm, loadBookService } from '@/lib/route-imports';
 import { buildBookingState } from '@/lib/booking-route';
 
 type MarketingService = {
@@ -55,17 +55,18 @@ export default function ServicesSection() {
   ];
 
   const handleReservation = useCallback((svc?: MarketingService) => {
+    loadBookService();
     if (svc?.serviceId) {
       setService(svc.serviceId, svc.title);
       loadBookDate();
       loadBookConfirm();
       const params = new URLSearchParams({ service: svc.serviceId, service_name: svc.title });
-      navigate(`/book/date?${params.toString()}` , { state: buildBookingState(location) });
+      navigate(`/book/date?${params.toString()}`, { state: buildBookingState(location) });
       return;
     }
     loadBookDate();
     loadBookConfirm();
-    navigate('/book/date', { state: buildBookingState(location) });
+    navigate('/book/service', { state: buildBookingState(location) });
   }, [location, navigate, setService]);
 
   return (

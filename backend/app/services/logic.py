@@ -313,18 +313,43 @@ def apply_reschedule(session: Session, payload: RescheduleIn) -> Tuple[bool, str
     session.refresh(r)
     return True, "Reserva reprogramada.", r
 
+def _build_customer_description(reservation: Reservation) -> tuple[str | None, dict[str, str]]:
+    lines: list[str] = []
+    private: dict[str, str] = {
+        "reservation_id": reservation.id,
+        "professional_id": reservation.professional_id,
+        "service_id": reservation.service_id,
+    }
+    if reservation.customer_name:
+        private["customer_name"] = reservation.customer_name
+        lines.append(f"Cliente: {reservation.customer_name}")
+    if reservation.customer_phone:
+        private["customer_phone"] = reservation.customer_phone
+        lines.append(f"Teléfono: {reservation.customer_phone}")
+    if reservation.customer_email:
+        private["customer_email"] = str(reservation.customer_email)
+        lines.append(f"Email: {reservation.customer_email}")
+    if reservation.notes:
+        private["notes"] = reservation.notes[:250]
+        lines.append(f"Notas: {reservation.notes}")
+    description = "\n".join(lines) if lines else None
+    return description, private
+
+
 def create_gcal_reservation(reservation: Reservation, calendar_id: str = None, tz: str = "Europe/Madrid") -> dict:
-    """Crea el evento correspondiente en Google Calendar."""
+    """Crea el evento correspondiente en Google Calendar con metadata del cliente."""
     service = build_calendar()
     if not calendar_id:
         calendar_id = get_calendar_for_professional(reservation.professional_id)
+    description, private_props = _build_customer_description(reservation)
     return create_event(
         service,
         calendar_id,
         reservation.start,
         reservation.end,
         summary=f"Reserva: {reservation.service_id} - {reservation.professional_id}",
-        private_props={"reservation_id": reservation.id, "professional_id": reservation.professional_id},
+        private_props=private_props,
+        description=description,
         tz=tz,
     )
 
@@ -452,13 +477,55 @@ def reconcile_db_to_gcal_range(session: Session, start_date: date, end_date: dat
                     except Exception:
                         pass
                     # NOTA: se recrea el evento en el calendario correcto para mantener la asignación por profesional.
-                    ev = create_event(svc, target_cal, r.start, r.end, summary=f"Reserva: {r.service_id} - {r.professional_id}", private_props={"reservation_id": r.id, "professional_id": r.professional_id, "service_id": r.service_id}, tz=tz)
+                    res_model = Reservation(
+                        id=r.id,
+                        service_id=r.service_id,
+                        professional_id=r.professional_id,
+                        start=r.start,
+                        end=r.end,
+                        customer_name=getattr(r, "customer_name", None),
+                        customer_email=getattr(r, "customer_email", None),
+                        customer_phone=getattr(r, "customer_phone", None),
+                        notes=getattr(r, "notes", None),
+                    )
+                    desc, priv = _build_customer_description(res_model)
+                    ev = create_event(
+                        svc,
+                        target_cal,
+                        r.start,
+                        r.end,
+                        summary=f"Reserva: {r.service_id} - {r.professional_id}",
+                        private_props=priv,
+                        description=desc,
+                        tz=tz,
+                    )
                     r.google_event_id = ev.get("id"); r.google_calendar_id = target_cal
                     session.add(r); created += 1
                     continue
                 if not r.google_event_id or r.google_event_id not in gmap:
                     # NOTA: si falta evento en GCal, lo recreamos para restablecer la sincronización.
-                    ev = create_event(svc, target_cal, r.start, r.end, summary=f"Reserva: {r.service_id} - {r.professional_id}", private_props={"reservation_id": r.id, "professional_id": r.professional_id, "service_id": r.service_id}, tz=tz)
+                    res_model = Reservation(
+                        id=r.id,
+                        service_id=r.service_id,
+                        professional_id=r.professional_id,
+                        start=r.start,
+                        end=r.end,
+                        customer_name=getattr(r, "customer_name", None),
+                        customer_email=getattr(r, "customer_email", None),
+                        customer_phone=getattr(r, "customer_phone", None),
+                        notes=getattr(r, "notes", None),
+                    )
+                    desc, priv = _build_customer_description(res_model)
+                    ev = create_event(
+                        svc,
+                        target_cal,
+                        r.start,
+                        r.end,
+                        summary=f"Reserva: {r.service_id} - {r.professional_id}",
+                        private_props=priv,
+                        description=desc,
+                        tz=tz,
+                    )
                     r.google_event_id = ev.get("id"); r.google_calendar_id = target_cal
                     session.add(r); created += 1
                     continue

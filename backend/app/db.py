@@ -102,6 +102,20 @@ def create_db_and_tables() -> None:
                     END;
                     """
                 )
+                # Añadir columnas nuevas si la tabla proviene de esquemas antiguos (sin Alembic todavía)
+                try:
+                    cols = conn.exec_driver_sql("PRAGMA table_info('reservationdb');").fetchall()
+                    existing_cols = {row[1] for row in cols}
+                    for col, ddl in {
+                        "customer_name": "TEXT",
+                        "customer_email": "TEXT",
+                        "customer_phone": "TEXT",
+                        "notes": "TEXT",
+                    }.items():
+                        if col not in existing_cols:
+                            conn.exec_driver_sql(f"ALTER TABLE reservationdb ADD COLUMN {col} {ddl};")
+                except Exception:
+                    pass
         except Exception:
             # No bloquear si falla (por compatibilidad)
             pass

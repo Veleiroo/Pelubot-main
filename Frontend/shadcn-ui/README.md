@@ -18,6 +18,10 @@ VITE_API_BASE_URL=http://127.0.0.1:8776
 VITE_ENABLE_CALENDAR=true
 # Opcional: expone la ruta /debug (solo en dev)
 VITE_ENABLE_DEBUG=true
+# Opcional: si el backend requiere API Key para crear reservas
+# VITE_API_KEY=tu_api_key
+# Opcional: fuerza peticiones a Google Calendar desde el frontend
+# VITE_USE_GCAL=true
 ```
 El backend controla si las reservas son públicas mediante la variable `PUBLIC_RESERVATIONS_ENABLED`. No se envía API key en el bundle.
 

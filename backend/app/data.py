@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from typing import List, Dict
 from datetime import time
 """Catálogo estático de servicios, profesionales y configuración horaria."""
@@ -34,8 +35,9 @@ WEEKLY_SCHEDULE = {
 }
 
 # Mapa profesional → calendario (IDs reales)
+_default_calendar = os.getenv("GCAL_CALENDAR_ID", "deinis-barber@example.com")
 PRO_CALENDAR: Dict[str, str] = {
-    "deinis": "deinis-barber@example.com",
+    "deinis": os.getenv("PRO_DEINIS_CALENDAR_ID", _default_calendar),
 }
 
 # Uso de busy de GCAL por profesional (se desactiva por defecto)

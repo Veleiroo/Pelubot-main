@@ -4,9 +4,15 @@ Incluye configuración de CORS, logging, middleware y ciclo de vida.
 """
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
-load_dotenv()
+
+_ROOT_ENV = Path(__file__).resolve().parents[2] / ".env"
+if _ROOT_ENV.exists():
+    load_dotenv(dotenv_path=_ROOT_ENV, override=False)
+else:
+    load_dotenv(override=False)
 
 from fastapi import FastAPI
 import logging

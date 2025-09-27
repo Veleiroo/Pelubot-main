@@ -257,6 +257,7 @@ docker-dev:
 docker-prod:
 	# Stop dev frontend if running
 	-$(DOCKER) stop frontend-dev >/dev/null 2>&1 || true
+	$(DOCKER) build backend
 	$(DOCKER) build --no-cache frontend
 	$(DOCKER) up -d backend frontend
 	@echo "Prod en marcha: http://localhost:$${FRONTEND_PORT:-8080} (nginx)"

@@ -29,6 +29,9 @@ SERVICE_ID = os.getenv("SERVICE_ID", "corte_cabello")
 PROFESSIONAL_ID = os.getenv("PROFESSIONAL_ID", "deinis")
 DAYS_AHEAD = int(os.getenv("DAYS_AHEAD", "10"))
 CLEAR_ALL = (os.getenv("CLEAR_ALL", "true").lower() in ("1","true","yes","y","si","sí"))
+CUSTOMER_NAME = os.getenv("CUSTOMER_NAME", "Demo User")
+CUSTOMER_PHONE = os.getenv("CUSTOMER_PHONE", "+34123456789")
+CUSTOMER_EMAIL = os.getenv("CUSTOMER_EMAIL", "demo@example.com")
 
 
 def _get(path: str):
@@ -78,7 +81,14 @@ def demo_flow():
     first = arr[0]
     created = _post(
         "/reservations",
-        {"service_id": SERVICE_ID, "professional_id": PROFESSIONAL_ID, "start": first},
+        {
+            "service_id": SERVICE_ID,
+            "professional_id": PROFESSIONAL_ID,
+            "start": first,
+            "customer_name": CUSTOMER_NAME,
+            "customer_phone": CUSTOMER_PHONE,
+            "customer_email": CUSTOMER_EMAIL,
+        },
         headers={"X-API-Key": API_KEY},
     )
     conf = _post(

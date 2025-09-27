@@ -1,7 +1,7 @@
 import { MapPin, Phone, Clock, Mail, MessageCircle } from '@/lib/icons';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { loadBookDate, loadBookConfirm } from '@/lib/route-imports';
+import { loadBookDate, loadBookConfirm, loadBookService } from '@/lib/route-imports';
 import { buildBookingState } from '@/lib/booking-route';
 
 export default function ContactSection() {
@@ -157,12 +157,19 @@ export default function ContactSection() {
 
               <Button
                 onClick={() => {
+                  loadBookService();
                   loadBookDate();
                   loadBookConfirm();
-                  navigate('/book/date', { state: buildBookingState(location) });
+                  navigate('/book/service', { state: buildBookingState(location) });
                 }}
-                onMouseEnter={loadBookDate}
-                onFocus={loadBookDate}
+                onMouseEnter={() => {
+                  loadBookService();
+                  loadBookDate();
+                }}
+                onFocus={() => {
+                  loadBookService();
+                  loadBookDate();
+                }}
                 size="lg"
                 className="w-full mt-8 bg-brand hover:bg-[#00B894] text-black font-bold"
               >

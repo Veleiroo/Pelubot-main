@@ -6,6 +6,12 @@ from datetime import date, timedelta
 API_KEY = "test-api-key"
 os.environ["API_KEY"] = API_KEY
 
+CUSTOMER_FIELDS = {
+    "customer_name": "Test Suite",
+    "customer_phone": "+34960000000",
+    "customer_email": "testsuite@example.com",
+}
+
 
 def _next_workday(days_ahead: int = 32) -> date:
     d = date.today() + timedelta(days=days_ahead)
@@ -57,7 +63,12 @@ def test_public_reservations_enabled_without_key(app_client, monkeypatch):
 
     res = app_client.post(
         "/reservations",
-        json={"service_id": "corte_cabello", "professional_id": "deinis", "start": start},
+        json={
+            "service_id": "corte_cabello",
+            "professional_id": "deinis",
+            "start": start,
+            **CUSTOMER_FIELDS,
+        },
     )
     assert res.status_code == 200
     res_id = res.json().get("reservation_id")
@@ -105,7 +116,12 @@ def test_reservations_order_and_created_at_tz(app_client):
 
     start1 = slots[0]
 
-    payload1 = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start1}
+    payload1 = {
+        "service_id": "corte_cabello",
+        "professional_id": "deinis",
+        "start": start1,
+        **CUSTOMER_FIELDS,
+    }
     r1 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload1)
     assert r1.status_code == 200
     res_id1 = r1.json().get("reservation_id")
@@ -118,7 +134,12 @@ def test_reservations_order_and_created_at_tz(app_client):
     remaining_slots = r_slots_after.json()["slots"]
     assert remaining_slots, "after reservar debe seguir habiendo huecos"
 
-    payload2 = {"service_id": "corte_cabello", "professional_id": "deinis", "start": remaining_slots[0]}
+    payload2 = {
+        "service_id": "corte_cabello",
+        "professional_id": "deinis",
+        "start": remaining_slots[0],
+        **CUSTOMER_FIELDS,
+    }
     r2 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload2)
     assert r2.status_code == 200
     res_id2 = r2.json().get("reservation_id")
@@ -144,7 +165,12 @@ def test_overlap_same_slot_is_rejected(app_client):
     assert len(slots) >= 1
     start = slots[0]
 
-    payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start}
+    payload = {
+        "service_id": "corte_cabello",
+        "professional_id": "deinis",
+        "start": start,
+        **CUSTOMER_FIELDS,
+    }
     r1 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
     assert r1.status_code == 200
     r2 = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=payload)
@@ -155,7 +181,12 @@ def test_delete_cancel_and_double_cancel(app_client):
     target = _next_workday()
     r = app_client.post("/slots", json={"service_id": "corte_cabello", "date_str": target.isoformat(), "professional_id": "deinis"})
     start = r.json()["slots"][0]
-    create_payload = {"service_id": "corte_cabello", "professional_id": "deinis", "start": start}
+    create_payload = {
+        "service_id": "corte_cabello",
+        "professional_id": "deinis",
+        "start": start,
+        **CUSTOMER_FIELDS,
+    }
     r_create = app_client.post("/reservations", headers={"X-API-Key": API_KEY}, json=create_payload)
     assert r_create.status_code == 200
     res_id = r_create.json().get("reservation_id")

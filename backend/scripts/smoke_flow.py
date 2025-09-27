@@ -26,6 +26,9 @@ API_KEY = os.getenv("API_KEY", "dev-key")
 SERVICE_ID = os.getenv("SERVICE_ID", "corte_cabello")
 PROFESSIONAL_ID = os.getenv("PROFESSIONAL_ID", "deinis")
 DAYS_AHEAD = int(os.getenv("DAYS_AHEAD", "10"))
+CUSTOMER_NAME = os.getenv("CUSTOMER_NAME", "Smoke Test")
+CUSTOMER_PHONE = os.getenv("CUSTOMER_PHONE", "+34123456789")
+CUSTOMER_EMAIL = os.getenv("CUSTOMER_EMAIL", "smoke@example.com")
 
 
 def _get(path: str):
@@ -70,7 +73,14 @@ def main() -> None:
     first, second = arr[0], arr[1]
     created = _post(
         "/reservations",
-        {"service_id": SERVICE_ID, "professional_id": PROFESSIONAL_ID, "start": first},
+        {
+            "service_id": SERVICE_ID,
+            "professional_id": PROFESSIONAL_ID,
+            "start": first,
+            "customer_name": CUSTOMER_NAME,
+            "customer_phone": CUSTOMER_PHONE,
+            "customer_email": CUSTOMER_EMAIL,
+        },
         headers={"X-API-Key": API_KEY},
     )
     out["created"] = created

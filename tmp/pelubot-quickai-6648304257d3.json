@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "pelubot-quickai",
+  "private_key_id": "6648304257d321bcc688bde09fba4a53edf518ff",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC13S05EZHELznN\nn9FDP9ZN5wI0Zyt4SROuS16j4lVVr25LGsGW+LPgBcXO6U3Zf6WVQhTmijYt5UuN\narIk7mtaxMQS+KL5y6tzIiWwzZxSUXXPdNBTlm1GFDle/iuQQA2rQCFziWJJRIMU\n0QxAjAuJC9laLgvigBYdNWCpMnYAVmmbjwYHUs1QQ0CNUbrnBzGBffxRMgEsY69G\naPDgjkJkjSXLKwnl2LhZO2UgRAfApk4wjmSqj2n+JdthIe49upvUPORbQXCn5OE4\nYYa+DnuVfw8bEb6x8NkYg0ViwDzp2X05+wJblzW9e2a9IOkPYIbLzL/bSQPE3VHu\ndW8lBca7AgMBAAECggEAJpsE9pBcOSEtTBEZAwWSIIdhWG5uM+KPYvhs5q0tIDtV\nVmwfnES/KlcPXpT4CaunIsAcX7QHPEboeuSjXGOgNmx+kuhk8FHj21TsW1PKU08n\nixpo/tV37OBuLVQXO0/dlvTOJRCM5LC+grS9vRX9fOIfCZ2suDAogZrLIh+sHPXf\nJNViPd8lV/8GDoLJqn+uevKeEaKTO5w8fKwXkDQtSL8FpBebwD33/zO2rQH4vKFh\nLVkFVSbeVK+CbS43s2INYu/QWLjwO6msxc4e/81wJiMhO6jb56Dxc4y9z65sQZsz\ni3mq9hhCEBY2nb4YjPATHpuq3VlIcFQes9L3vYbwAQKBgQDo8UA8sJp74WE7HFZe\nyt+EWaKZDyDXcmif7HQI5D/S06VLbzEbI5AtlvQjOsga6kxFnPF9oaoo5++aR1at\nd7pzb3xREfbx/nmtHuU8dii0JXGJK1kENsegvG2xLrQSbdkh5AsLnQz+gjCmJc3j\nfLGojRwJOjG7VotMiXMHJQvBAQKBgQDH3ZnhkZQxNa9E70X+F5EPvRvY8tsMBfOM\n59uCCVbfgMfKZzcHMt5AUnoVkpekb2mH8AVffKxd3+5I0Q9SaMilIwAcLsT0708U\nBGGOek8u3Hyt2lZmRHTd47LsJ3ToYtaZ7LuV4kDBKXlxK+u2BfAU4mlJ+AQvq3nu\n30+gX2TLuwKBgAp9Kn5RGXOwj1dBDGaSTgRAoQCxXLI21Z014XexB2qv2waNiDGH\npWtYG8AmWnJT0IFl8r3MdMQIxZI12iJPfNbL01Y3L95vrfzsojfZvjV2ZileCVEW\nQmDreyj6SGN4DMno4dJxDO+83wHsO9wddkZ3rCaCN1EPMZCNs99DfMcBAoGABb4V\nPMjtBBjxxz5EuY89yMD7OtmHd6n4HHVQ9kSEbXmKxAMBLsDEZ/62qUYD+2KEGrbH\nwL2ZSj0z4H25PfnqwevmhejGGe+CSyXxE6HqAoOtRWV/lAKlhPaU3nonvsGQPu3x\nWdYdXC9v4NONOzaidkcnFUv9+synfTiHVilHgR8CgYEAi4avGMNnh4YG6wSvO3jm\nrrREx/Mg+/o1UJbzUyzdjIuHG25uc0Df5TeL0wc4oVdP+J2iGyOKo9lZ1Ui3Bnoa\nnxopPXKvOo0/sNzaD2dJRt16D6GzXozXbb1/Tx8rODW7RGoWCf3UH2VGHMhBW+cH\nZDMFbOW0N3T0xVwJ3QbGl9A=\n-----END PRIVATE KEY-----\n",
+  "client_email": "deinisbarber@pelubot-quickai.iam.gserviceaccount.com",
+  "client_id": "106015728106062604438",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/deinisbarber%40pelubot-quickai.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

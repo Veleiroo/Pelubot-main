@@ -148,6 +148,10 @@ def list_reservations(session: Session = Depends(get_session)):
             "end": end.isoformat() if hasattr(end, "isoformat") else end,
             "google_event_id": r.google_event_id,
             "google_calendar_id": r.google_calendar_id,
+            "customer_name": getattr(r, "customer_name", None),
+            "customer_email": getattr(r, "customer_email", None),
+            "customer_phone": getattr(r, "customer_phone", None),
+            "notes": getattr(r, "notes", None),
             "created_at": created.isoformat() if created else None,
             "updated_at": updated.isoformat() if updated else None,
         })
@@ -272,7 +276,22 @@ def reschedule_post(
             if old_cal and old_cal != new_cal:
                 delete_gcal_reservation(r.google_event_id, old_cal)
                 # Cambio de profesional implica mover el evento entre calendarios.
-                gnew = create_gcal_reservation(Reservation(id=r.id, service_id=r.service_id, professional_id=r.professional_id, start=r.start, end=r.end, google_event_id=r.google_event_id, google_calendar_id=new_cal), calendar_id=new_cal)
+                gnew = create_gcal_reservation(
+                    Reservation(
+                        id=r.id,
+                        service_id=r.service_id,
+                        professional_id=r.professional_id,
+                        start=r.start,
+                        end=r.end,
+                        google_event_id=r.google_event_id,
+                        google_calendar_id=new_cal,
+                        customer_name=getattr(r, "customer_name", None),
+                        customer_email=getattr(r, "customer_email", None),
+                        customer_phone=getattr(r, "customer_phone", None),
+                        notes=getattr(r, "notes", None),
+                    ),
+                    calendar_id=new_cal,
+                )
                 r.google_event_id = gnew.get("id"); r.google_calendar_id = new_cal
             else:
                 # Mismo calendario: podríamos reutilizar evento con un patch.
@@ -421,6 +440,12 @@ def create_reservation(
         raise HTTPException(status_code=400, detail=str(e))
     service = SERVICE_BY_ID[payload.service_id]
     end = start + timedelta(minutes=service.duration_min)
+    customer_name = payload.customer_name.strip()
+    customer_phone = payload.customer_phone.strip()
+    customer_email = str(payload.customer_email).strip() if payload.customer_email else None
+    notes = payload.notes.strip() if payload.notes else None
+    if not customer_phone:
+        raise HTTPException(status_code=422, detail="Se requiere un teléfono de contacto")
     # Recalcular disponibilidad garantiza que el slot sigue libre tras la validación inicial.
     avail = find_available_slots(session, payload.service_id, start.date(), payload.professional_id)
     avail_naive = [_naive(dt) for dt in avail]
@@ -445,9 +470,25 @@ def create_reservation(
         if session.exec(q).first():
             session.rollback()
             raise HTTPException(status_code=400, detail="El profesional ya tiene esa hora ocupada.")
-        row = ReservationDB(id=res_id, service_id=payload.service_id, professional_id=payload.professional_id, start=start, end=end, google_event_id=None, google_calendar_id=cal_id)
+        row = ReservationDB(
+            id=res_id,
+            service_id=payload.service_id,
+            professional_id=payload.professional_id,
+            start=start,
+            end=end,
+            google_event_id=None,
+            google_calendar_id=cal_id,
+            customer_name=customer_name,
+            customer_email=customer_email,
+            customer_phone=customer_phone,
+            notes=notes,
+        )
         session.add(row)
         session.commit()
+        try:
+            RESERVATIONS_CREATED.inc()
+        except Exception:
+            pass
     except HTTPException:
         raise
     except Exception as e:
@@ -456,7 +497,20 @@ def create_reservation(
 
     # NOTA: se sincroniza después del commit para no deshacer la reserva si Google falla.
     try:
-        gcal_event = create_gcal_reservation(Reservation(id=res_id, service_id=payload.service_id, professional_id=payload.professional_id, start=start, end=end), calendar_id=cal_id)
+        gcal_event = create_gcal_reservation(
+            Reservation(
+                id=res_id,
+                service_id=payload.service_id,
+                professional_id=payload.professional_id,
+                start=start,
+                end=end,
+                customer_name=customer_name,
+                customer_email=customer_email,
+                customer_phone=customer_phone,
+                notes=notes,
+            ),
+            calendar_id=cal_id,
+        )
         gcal_id = gcal_event.get("id")
         r_upd = session.get(ReservationDB, res_id)
         if r_upd:

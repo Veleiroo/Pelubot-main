@@ -74,6 +74,7 @@ test('cliente puede reservar una cita completa', async ({ page }) => {
       professional_id: 'ana',
       start: SLOT_ISO,
     });
+    expect(route.request().headerValue('x-api-key')).toBeTruthy();
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -86,8 +87,10 @@ test('cliente puede reservar una cita completa', async ({ page }) => {
     });
   });
 
-  await page.goto(`/book/date?service=corte&service_name=${encodeURIComponent('Corte de pelo')}`);
+  await page.goto('/book/service');
   await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: /corte de pelo/i }).click();
+  await expect(page).toHaveURL(/\/book\/date/);
   await expect(page.getByText('Selecciona fecha y hora')).toBeVisible();
   const dayCell = page.getByRole('gridcell', { name: new RegExp(`^${DAY_LABEL}$`) });
   await dayCell.waitFor({ state: 'attached' });
