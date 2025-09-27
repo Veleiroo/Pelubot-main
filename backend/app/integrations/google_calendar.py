@@ -9,6 +9,7 @@ from google.oauth2.credentials import Credentials as UserCreds
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
+import base64
 import json
 import os
 from datetime import datetime, timedelta, timezone
@@ -43,11 +44,23 @@ def iso_datetime(dt_or_str, tz: str = "Europe/Madrid") -> str:
     return s + "+02:00"
 
 def _load_sa_creds() -> Optional[SA]:
-    """Carga credenciales de service account desde un JSON embebido o mediante ruta."""
-    sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-    if not sa_json:
-        return None
-    info = json.loads(sa_json) if sa_json.strip().startswith("{") else json.load(open(sa_json, "r", encoding="utf-8"))
+    """Carga credenciales de service account desde env (JSON o base64) o ruta."""
+    sa_json_b64 = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_BASE64")
+    if sa_json_b64:
+        try:
+            decoded = base64.b64decode(sa_json_b64).decode("utf-8")
+            info = json.loads(decoded)
+        except Exception:
+            return None
+    else:
+        sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_PATH")
+        if not sa_json:
+            return None
+        if sa_json.strip().startswith("{"):
+            info = json.loads(sa_json)
+        else:
+            with open(sa_json, "r", encoding="utf-8") as fh:
+                info = json.load(fh)
     creds = SA.from_service_account_info(info, scopes=SCOPES)
     subject = os.getenv("GOOGLE_IMPERSONATE_EMAIL")
     if subject:

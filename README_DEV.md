@@ -108,3 +108,21 @@ Al añadir pasos/pantallas:
 - `VITE_ENABLE_DEBUG`: activa la ruta `/debug` (`1`/`true`).
 - `VITE_USE_GCAL`: fuerza la sincronización con Google Calendar para los slots (`1`/`true`).
 - `PLAYWRIGHT_MODE`, `PLAYWRIGHT_PORT`: controlan el servidor que arranca Playwright (`preview`/`dev`).
+
+## Integración Google Calendar (Service Account)
+
+Recordatorio para configurar una cuenta de servicio que no requiera renovar tokens manualmente:
+
+1. **Proyecto & API** – En Google Cloud Console crea/elige proyecto y activa la API de Google Calendar.
+2. **Cuenta de servicio** – En IAM & Admin genera una nueva service account y descarga la clave JSON.
+3. **Permisos calendario** – Desde calendar.google.com comparte el calendario de la barbería con el `client_email` de la service account otorgando “Hacer cambios en los eventos”.
+4. **Variables/Nodo** – Guarda el JSON fuera del repo. Exporta las variables esperadas (`GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` o `GOOGLE_SERVICE_ACCOUNT_JSON_PATH`, `GCAL_CALENDAR_ID`, etc.) para que `build_calendar()` cree credenciales con `service_account.Credentials.from_service_account_info`. Puedes generar la cadena base64 con:
+
+   ```bash
+   python backend/scripts/service_account_env.py path/a/key.json
+   ```
+
+   Esto imprime el `export GOOGLE_SERVICE_ACCOUNT_JSON_BASE64=…` y el bloque para `.env`.
+5. **Revisar integración** – Una vez configurado, `ENABLE_GCAL_SYNC=1` activa la sincronización y los endpoints pueden crear/patch eventos usando la cuenta delegada.
+
+> Si prefieres seguir con OAuth + refresh token, guarda el token en un almacén seguro y renueva el access token antes de cada sync, pero la service account es más estable para producción.
