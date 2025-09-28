@@ -9,13 +9,21 @@ interface Props {
   onSelect: () => void;
   attrsId?: string;
   selected?: boolean;
+  onPreview?: () => void;
 }
 
-export function ServiceCard({ title, duration, price, icon: Icon, onSelect, attrsId, selected = false }: Props) {
+export function ServiceCard({ title, duration, price, icon: Icon, onSelect, attrsId, selected = false, onPreview }: Props) {
+  const handlePreview = () => {
+    if (onPreview) onPreview();
+  };
+
   return (
     <button
       type="button"
       onClick={onSelect}
+      onMouseEnter={handlePreview}
+      onFocus={handlePreview}
+      onTouchStart={handlePreview}
       aria-describedby={attrsId}
       aria-pressed={selected}
       className={cn(

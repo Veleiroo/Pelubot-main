@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import type { KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, type Service } from '@/lib/api';
 import { addDays, addMonths, endOfMonth, endOfWeek, format, isAfter, isBefore, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek, subMonths } from 'date-fns';
@@ -15,6 +14,7 @@ import { BookingLayout } from '@/components/BookingLayout';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { buildBookingState, getBackgroundLocation } from '@/lib/booking-route';
+import { Check } from '@/lib/icons';
 
 type PeriodValue = 'manana' | 'tarde' | 'noche';
 
@@ -147,6 +147,19 @@ const BookDate = () => {
     retry: 1,
     select: (all) => all.filter((p) => !serviceId || !p.services || p.services.includes(serviceId)),
   });
+
+  useEffect(() => {
+    if (!prosFetched) return;
+    if (pros.length === 1) {
+      const [onlyPro] = pros;
+      if (onlyPro && professionalId !== onlyPro.id) {
+        setProfessional(onlyPro.id, onlyPro.name ?? null);
+      }
+    }
+  }, [prosFetched, pros, professionalId, setProfessional]);
+
+  const showProfessionalSelect = prosFetched && pros.length > 1;
+  const singleProfessional = prosFetched && pros.length === 1 ? pros[0] : null;
 
   const monthKey = `${month.getFullYear()}-${month.getMonth()}`;
   const {
@@ -383,7 +396,20 @@ const BookDate = () => {
   const onRetryDays = () => refetchDays();
   const onRetrySlots = () => refetchSlots();
 
+  const handleRangeChange = (next: RangeValue) => {
+    if (range === next) return;
+    setRange(next);
+    if (slotStart) {
+      setSlot('');
+    }
+  };
+
   const onSelectSlot = (iso: string) => {
+    if (slotStart === iso) {
+      setSlot('');
+      return;
+    }
+
     setSlot(iso);
   };
 
@@ -395,10 +421,51 @@ const BookDate = () => {
     >
   <div className="mx-auto w-full max-w-[920px]">
         <div className="relative rounded-2xl border border-zinc-800 bg-zinc-900/80 shadow-[0_20px_80px_-60px_rgba(0,0,0,0.75)]">
-          <div className="p-5 md:p-6">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-white md:text-xl">Selecciona fecha y hora</h3>
-              <p className="mt-1 text-xs text-zinc-400 md:text-sm">Elige un día y después un horario disponible.</p>
+          <div className="p-4 md:p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="text-center md:text-left">
+                <h3 className="text-lg font-semibold text-white md:text-xl">Selecciona fecha y hora</h3>
+                <p className="mt-1 text-xs text-zinc-400 md:text-sm">Elige un día y después un horario disponible.</p>
+              </div>
+              <div className="flex w-full justify-center md:w-auto md:justify-end md:pt-1">
+                {!prosFetched ? (
+                  <div className="flex flex-col items-center gap-1 md:items-end">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-600">Profesional</span>
+                    <Skeleton className="h-8 w-32 rounded-lg bg-zinc-800/70" />
+                  </div>
+                ) : showProfessionalSelect ? (
+                  <div className="flex flex-col items-center gap-1 md:items-end">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-600">Profesional</span>
+                    <Select
+                      value={professionalId ?? ANY_PRO}
+                      onValueChange={(v) => {
+                        const nextId = v === ANY_PRO ? null : v;
+                        const nextName = nextId ? pros.find((p) => p.id === nextId)?.name ?? null : null;
+                        setProfessional(nextId, nextName);
+                        setDate('');
+                      }}
+                    >
+                      <SelectTrigger
+                        aria-label="Seleccionar profesional"
+                        className="h-8 w-36 rounded-lg border border-zinc-700/60 bg-zinc-900/70 px-3 text-xs font-medium text-zinc-300 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                      >
+                        <SelectValue placeholder="Cualquiera" />
+                      </SelectTrigger>
+                      <SelectContent align="end" sideOffset={6} className="min-w-[150px]">
+                        <SelectItem value={ANY_PRO}>Cualquiera</SelectItem>
+                        {pros.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : singleProfessional ? (
+                  <div className="flex flex-col items-center gap-1 text-xs text-zinc-400 md:items-end">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-600">Profesional</span>
+                    <span className="text-sm text-zinc-400">{singleProfessional.name ?? professionalName ?? 'Cualquiera'}</span>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {noProfessionals && (
@@ -407,13 +474,13 @@ const BookDate = () => {
               </div>
             )}
 
-            <div className="mt-6 grid gap-6 md:grid-cols-[2fr,1fr] md:gap-8">
-              <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+            <div className="mt-5 grid gap-5 md:grid-cols-[2fr,1fr] md:gap-6">
+              <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 md:p-5">
                 <CalendarNav month={month} onPrev={onPrevMonth} onNext={onNextMonth} />
 
-                <div className="mt-4 grid grid-cols-7 gap-1.5 text-center text-[11px] uppercase tracking-wide text-white/50">
+                <div className="mt-3 grid grid-cols-7 gap-1.5 text-center text-[11px] uppercase tracking-wide text-white/50">
                   {['lu','ma','mi','ju','vi','sá','do'].map((w) => (
-                    <div key={w} className="grid h-8 place-items-center text-xs font-medium">{w}</div>
+                    <div key={w} className="grid h-7 place-items-center text-xs font-medium md:h-8">{w}</div>
                   ))}
                 </div>
 
@@ -421,7 +488,7 @@ const BookDate = () => {
                   key={`${month.getFullYear()}-${month.getMonth()}`}
                   role="grid"
                   aria-label={format(month, 'LLLL yyyy', { locale: es })}
-                  className="mt-3 grid grid-cols-7 gap-1.5"
+                  className="mt-2.5 grid grid-cols-7 gap-1.5"
                   tabIndex={0}
                   onKeyDown={onGridKeyDown}
                 >
@@ -436,13 +503,13 @@ const BookDate = () => {
                     const showDot = (enabled || selectedDay) && inMonth;
 
                     const dayClasses = cn(
-                      'flex h-10 w-10 flex-col items-center justify-center gap-1 rounded-lg text-[13px] font-medium leading-none transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:h-11 md:w-11',
+                      'flex h-9 w-9 flex-col items-center justify-center gap-1 rounded-lg text-[13px] font-medium leading-none transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-100 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 md:h-10 md:w-10',
                       '[font-variant-numeric:tabular-nums] shadow-none',
                       isWeekend ? 'text-white/70' : 'text-white/80',
                       !inMonth && 'cursor-not-allowed text-white/25 opacity-80 hover:bg-transparent',
                       inMonth && !enabled && 'cursor-not-allowed text-white/40 opacity-70 hover:bg-transparent',
                       enabled && inMonth && !selectedDay && 'hover:bg-white/5',
-                      selectedDay && 'bg-emerald-500 text-white shadow-[0_0_0_3px] shadow-emerald-500/25 hover:bg-emerald-500',
+                      selectedDay && 'border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 shadow-[0_0_0_2px_rgba(16,185,129,0.25)]',
                       isToday(d) && !selectedDay && 'outline outline-1 outline-white/15'
                     );
 
@@ -482,114 +549,114 @@ const BookDate = () => {
                   })}
                 </div>
 
-                <p className="mt-4 text-xs text-zinc-400">Selecciona un día para ver horarios disponibles.</p>
+                <p className="mt-2 text-[11px] text-zinc-400">Selecciona un día para ver horarios disponibles.</p>
               </section>
 
-              <aside className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+              <aside className="space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 md:p-5">
                 <div className="space-y-2">
-                  <Label htmlFor="professional-select" className="text-xs text-zinc-400">
-                    Profesional
-                  </Label>
-                  <Select
-                    value={professionalId ?? ANY_PRO}
-                    onValueChange={(v) => {
-                      const nextId = v === ANY_PRO ? null : v;
-                      const nextName = nextId ? pros.find((p) => p.id === nextId)?.name ?? null : null;
-                      setProfessional(nextId, nextName);
-                      setDate('');
-                    }}
-                  >
-                    <SelectTrigger id="professional-select" className="w-full" aria-label="Seleccionar profesional">
-                      <SelectValue placeholder="Cualquiera" />
-                    </SelectTrigger>
-                    <SelectContent align="end">
-                      <SelectItem value={ANY_PRO}>Cualquiera</SelectItem>
-                      {pros.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
                   <h4 className="text-sm font-semibold text-white">Selecciona un horario</h4>
                   <p className="text-xs text-zinc-400">Elige un día y después una hora disponible.</p>
+                  {selectedHuman && (
+                    <p className="text-xs text-zinc-500">{selectedHuman}</p>
+                  )}
                 </div>
 
-                <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/60 p-1">
-                  <button
-                    type="button"
-                    disabled={!selectedValid || morningSlots.length === 0}
-                    onClick={() => setRange('morning')}
-                    className={cn(
-                      'h-9 px-3 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
-                      'border border-transparent text-zinc-300 hover:bg-zinc-800/60',
-                      range === 'morning' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_0_1px] shadow-emerald-500/15',
-                      (!selectedValid || morningSlots.length === 0) && 'cursor-not-allowed opacity-40'
-                    )}
-                  >
-                    Mañana
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!selectedValid || afternoonSlots.length === 0}
-                    onClick={() => setRange('afternoon')}
-                    className={cn(
-                      'h-9 px-3 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
-                      'border border-transparent text-zinc-300 hover:bg-zinc-800/60',
-                      range === 'afternoon' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_0_1px] shadow-emerald-500/15',
-                      (!selectedValid || afternoonSlots.length === 0) && 'cursor-not-allowed opacity-40'
-                    )}
-                  >
-                    Tarde
-                  </button>
-                </div>
-
-                {slotsLoading && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <Skeleton key={i} className="h-9 rounded-xl" />
-                    ))}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 p-1.5">
+                    <button
+                      type="button"
+                      aria-pressed={range === 'morning'}
+                      disabled={!selectedValid || morningSlots.length === 0}
+                      onClick={() => handleRangeChange('morning')}
+                      className={cn(
+                        'inline-flex h-10 w-full items-center justify-center rounded-md border border-transparent px-3 text-sm font-medium text-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
+                        'hover:bg-zinc-800/60',
+                        range === 'morning' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_0_1px] shadow-emerald-500/20',
+                        (!selectedValid || morningSlots.length === 0) && 'cursor-not-allowed opacity-40'
+                      )}
+                    >
+                      Mañana
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={range === 'afternoon'}
+                      disabled={!selectedValid || afternoonSlots.length === 0}
+                      onClick={() => handleRangeChange('afternoon')}
+                      className={cn(
+                        'inline-flex h-10 w-full items-center justify-center rounded-md border border-transparent px-3 text-sm font-medium text-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
+                        'hover:bg-zinc-800/60',
+                        range === 'afternoon' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_0_1px] shadow-emerald-500/20',
+                        (!selectedValid || afternoonSlots.length === 0) && 'cursor-not-allowed opacity-40'
+                      )}
+                    >
+                      Tarde
+                    </button>
                   </div>
-                )}
 
-                {!slotsLoading && (
-                  <>
-                    {selectedValid ? (
-                      displayedSlots.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2 xl:grid-cols-3 2xl:grid-cols-4">
-                          {displayedSlots.map((iso) => {
-                            const selectedSlot = slotStart === iso;
-                            const slotDate = new Date(iso);
-                            const label = Number.isNaN(slotDate.getTime())
-                              ? iso.slice(11, 16)
-                              : format(slotDate, "HH:mm'h'", { locale: es });
-                            return (
-                              <button
-                                key={iso}
-                                type="button"
-                                aria-pressed={selectedSlot}
-                                data-selected={selectedSlot}
-                                className={cn(
-                                  'h-9 rounded-xl border border-emerald-500/30 px-4 text-sm font-medium text-emerald-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
-                                  'bg-transparent hover:bg-emerald-500/10',
-                                  selectedSlot && 'bg-emerald-500/20 text-emerald-100 shadow-[0_0_0_2px] shadow-emerald-500/20'
-                                )}
-                                onClick={() => onSelectSlot(iso)}
-                              >
-                                {label}
-                              </button>
-                            );
-                          })}
-                        </div>
+                  {slotsLoading && (
+                    <div className="grid grid-cols-3 gap-3">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <Skeleton key={i} className="h-11 rounded-xl" />
+                      ))}
+                    </div>
+                  )}
+
+                  {!slotsLoading && (
+                    <>
+                      {selectedValid ? (
+                        displayedSlots.length > 0 ? (
+                          <div className="grid grid-cols-3 gap-3">
+                            {displayedSlots.map((iso, index) => {
+                              const selectedSlot = slotStart === iso;
+                              const slotDate = new Date(iso);
+                              const label = Number.isNaN(slotDate.getTime())
+                                ? iso.slice(11, 16)
+                                : format(slotDate, 'HH:mm', { locale: es });
+                              const animationDelay = `${Math.min(index, 6) * 40}ms`;
+                              return (
+                                <button
+                                  key={iso}
+                                  type="button"
+                                  aria-pressed={selectedSlot}
+                                  data-selected={selectedSlot}
+                                  className={cn(
+                                    'group relative grid h-11 w-full place-items-center rounded-xl border border-zinc-700/70 bg-transparent px-4 text-sm font-medium leading-none text-zinc-200 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
+                                    'hover:bg-zinc-800/40',
+                                    'transform-gpu animate-in fade-in-50 slide-in-from-bottom-1',
+                                    selectedSlot && 'scale-[1.05] border-emerald-500/45 bg-emerald-500/15 text-emerald-200 shadow-[0_0_0_2px_rgba(16,185,129,0.25)]',
+                                    !selectedSlot && 'scale-[1] opacity-95',
+                                    'disabled:cursor-not-allowed disabled:border-zinc-800/70 disabled:text-zinc-500 disabled:hover:bg-transparent disabled:opacity-40'
+                                  )}
+                                  style={{ animationDelay }}
+                                  onClick={() => onSelectSlot(iso)}
+                                >
+                                  <span className="w-full text-center [font-variant-numeric:tabular-nums] tracking-tight">{label}</span>
+                                  <Check
+                                    aria-hidden="true"
+                                    className={cn(
+                                      'pointer-events-none absolute right-2 h-3.5 w-3.5 text-emerald-300 opacity-0 transition-all duration-200 ease-out',
+                                      selectedSlot ? 'translate-y-0 opacity-100' : '-translate-y-1'
+                                    )}
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-zinc-400">No hay horarios disponibles en este tramo.</p>
+                        )
                       ) : (
-                        <p className="text-xs text-zinc-400">No hay horarios disponibles en este tramo.</p>
-                      )
-                    ) : (
-                      <p className="text-xs text-zinc-400">Selecciona un día en el calendario para ver horarios disponibles.</p>
-                    )}
-                  </>
-                )}
+                        <p className="text-xs text-zinc-400">Selecciona un día en el calendario para ver horarios disponibles.</p>
+                      )}
+                    </>
+                  )}
+
+                  {slotStart && (
+                    <p className="animate-in fade-in-50 slide-in-from-bottom-1 text-xs text-zinc-400">
+                      Has elegido {format(new Date(slotStart), 'HH:mm', { locale: es })}
+                    </p>
+                  )}
+                </div>
 
                 {slotsError && !slotsLoading && (
                   <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-center">
@@ -597,31 +664,28 @@ const BookDate = () => {
                     <Button size="sm" onClick={onRetrySlots}>Reintentar</Button>
                   </div>
                 )}
-
-                {selectedHuman && (
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-xs text-emerald-200">
-                    <p className="font-medium">{selectedHuman}</p>
-                    {slotStart && (
-                      <p>Horario seleccionado: {format(new Date(slotStart), "HH:mm'h'", { locale: es })}</p>
-                    )}
-                  </div>
-                )}
               </aside>
             </div>
 
-            <div className="sticky bottom-0 mt-6 -mx-5 flex flex-col gap-3 border-t border-zinc-800 bg-zinc-900/85 px-5 py-4 backdrop-blur-sm md:-mx-6 md:flex-row md:justify-end md:px-6 rounded-b-2xl">
+            <div className="sticky bottom-0 mt-5 -mx-5 flex flex-col gap-3 border-t border-zinc-800 bg-zinc-900/85 px-5 py-3 backdrop-blur-sm md:-mx-6 md:flex-row md:justify-end md:px-6 rounded-b-2xl">
               <Button
                 variant="outline"
                 onClick={goBackToBackground}
-                className="h-10 rounded-xl border-zinc-700 bg-zinc-900 px-4 text-zinc-100 transition hover:border-emerald-400/50"
+                className="h-10 rounded-xl border-zinc-700 bg-transparent px-4 text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
               >
                 Cambiar servicio
               </Button>
               <Button
                 disabled={!canContinue}
+                data-ready={canContinue}
                 onClick={onNext}
                 aria-disabled={!canContinue}
-                className="h-10 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-5 text-emerald-200 shadow-soft transition hover:bg-emerald-500/20 disabled:pointer-events-none disabled:opacity-60"
+                className={cn(
+                  'h-10 rounded-xl border border-zinc-700 bg-transparent px-5 text-zinc-100 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 disabled:pointer-events-none disabled:opacity-60',
+                  canContinue
+                    ? 'border-emerald-500/50 text-emerald-200 shadow-[0_0_0_1px_rgba(16,185,129,0.35)] hover:border-emerald-500/60 hover:bg-emerald-500/15 focus-visible:ring-emerald-400 data-[ready=true]:animate-[pulse_1.2s_ease-out_1]'
+                    : 'hover:border-zinc-600 hover:bg-zinc-800/50'
+                )}
               >
                 {canContinue ? 'Continuar' : 'Selecciona un horario'}
               </Button>

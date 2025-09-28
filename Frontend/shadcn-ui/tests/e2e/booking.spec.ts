@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 const today = new Date();
 const futureDay = new Date(today.getFullYear(), today.getMonth(), Math.min(today.getDate() + 2, 28));
@@ -20,10 +20,7 @@ const professionalsPayload = [
   { id: 'luis', name: 'Luis', services: ['corte', 'barba'] },
 ];
 
-test('cliente puede reservar una cita completa', async ({ page }) => {
-  page.on('console', (msg) => console.log('[console]', msg.text()));
-  page.on('pageerror', (err) => console.error('[pageerror]', err));
-  // Mock API responses
+const mockBookingApis = async (page: Page) => {
   await page.route('**/services', async (route) => {
     await route.fulfill({
       status: 200,
@@ -65,6 +62,15 @@ test('cliente puede reservar una cita completa', async ({ page }) => {
       }),
     });
   });
+};
+
+/**
+ * Flujo completo de reserva comprobando que no aparecen errores en la consola del navegador.
+ */
+test('cliente puede reservar una cita completa', async ({ page }) => {
+  await mockBookingApis(page);
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (err) => pageErrors.push(err));
 
   const reservationId = 'res-playwright-1';
   await page.route('**/reservations', async (route) => {
@@ -91,17 +97,53 @@ test('cliente puede reservar una cita completa', async ({ page }) => {
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: /corte de pelo/i }).click();
   await expect(page).toHaveURL(/\/book\/date/);
-  await expect(page.getByText('Selecciona fecha y hora')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Selecciona fecha y hora' })).toBeVisible();
+
   const dayCell = page.getByRole('gridcell', { name: new RegExp(`^${DAY_LABEL}$`) });
-  await dayCell.waitFor({ state: 'attached' });
+  await dayCell.waitFor({ state: 'visible' });
   await dayCell.click();
   await page.getByRole('button', { name: SLOT_LABEL }).click();
   await page.getByRole('button', { name: 'Continuar' }).click();
 
   await expect(page).toHaveURL(/\/book\/confirm/);
+  await page.getByLabel('Nombre completo').fill('Cliente Playwright');
+  await page.getByLabel('Teléfono').fill('+34 600 000 000');
+  await page.getByLabel('Notas para la barbería').fill('Test automatizado');
   await page.getByRole('button', { name: 'Confirmar reserva' }).click();
 
   await expect(page.getByText('¡Reserva creada!')).toBeVisible();
   const idLine = page.locator('[data-testid="reservation-id"]');
   await expect(idLine).toContainText(reservationId);
+  expect(pageErrors).toEqual([]);
+});
+
+/**
+ * Verifica que la ventana modal se puede cerrar haciendo clic fuera.
+ */
+test('la ventana de reserva se cierra al pulsar fuera', async ({ page }) => {
+  await mockBookingApis(page);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: /reservar ahora/i }).first().click();
+
+  await expect(page).toHaveURL(/\/book\/date/);
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+
+  const overlay = page.locator('[data-testid="booking-overlay"]');
+  await expect(overlay).toBeVisible();
+  await page.evaluate(() => {
+    const overlayEl = document.querySelector('[data-testid="booking-overlay"]');
+    if (!overlayEl) return;
+    const pointerDown = new PointerEvent('pointerdown', { bubbles: true });
+    overlayEl.dispatchEvent(pointerDown);
+    const pointerUp = new PointerEvent('pointerup', { bubbles: true });
+    overlayEl.dispatchEvent(pointerUp);
+    const click = new MouseEvent('click', { bubbles: true });
+    overlayEl.dispatchEvent(click);
+  });
+
+  await expect(dialog).toBeHidden();
+  await expect(page).toHaveURL('/');
 });

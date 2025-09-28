@@ -1,4 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { format, endOfMonth, startOfMonth } from 'date-fns';
 import { api, Service as Svc } from '@/lib/api';
 import { useBooking } from '@/store/booking';
 import { toast } from '@/components/ui/sonner';
@@ -9,18 +11,25 @@ import { Scissors, Sparkles, LucideIcon, Crown, Zap, Brush } from '@/lib/icons';
 import { BookingSteps } from '@/components/BookingSteps';
 import { BookingLayout } from '@/components/BookingLayout';
 import { Button } from '@/components/ui/button';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { buildBookingState } from '@/lib/booking-route';
 
 const Service = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const prefetched = useRef(new Set<string>());
+  const useGcal = useMemo(() => {
+    const v = (import.meta as unknown as { env: { VITE_USE_GCAL?: string | boolean } }).env?.VITE_USE_GCAL;
+    return v === '1' || v === 'true' || v === true;
+  }, []);
+
   const { setService, serviceId: selectedServiceId } = useBooking((s) => ({
     setService: s.setService,
     serviceId: s.serviceId,
   }));
   const {
-    data: services = [],
+    data,
     isLoading,
     isError,
     error,
@@ -30,8 +39,52 @@ const Service = () => {
     queryFn: api.getServices,
     staleTime: 5 * 60 * 1000,
     retry: 1,
-    onError: (err) => toast.error(err.message),
   });
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error.message);
+    }
+  }, [error]);
+
+  const services = data ?? [];
+
+  const prefetchForService = useCallback((svcId: string) => {
+    if (!svcId) return;
+    if (prefetched.current.has(svcId)) return;
+    const marker = svcId;
+    prefetched.current.add(marker);
+
+    const today = new Date();
+    const monthKey = `${today.getFullYear()}-${today.getMonth()}`;
+    const start = format(startOfMonth(today), 'yyyy-MM-dd');
+    const end = format(endOfMonth(today), 'yyyy-MM-dd');
+
+    const promises: Array<Promise<unknown>> = [
+      queryClient.prefetchQuery({
+        queryKey: ['professionals', svcId],
+        queryFn: api.getProfessionals,
+        staleTime: 60 * 1000,
+        retry: 1,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: ['days-availability', svcId, monthKey, 'any', useGcal],
+        queryFn: () =>
+          api.getDaysAvailability({
+            service_id: svcId,
+            start,
+            end,
+            use_gcal: useGcal,
+          }),
+        staleTime: 30 * 1000,
+        retry: 1,
+      }),
+    ];
+
+    Promise.all(promises).catch(() => {
+      prefetched.current.delete(marker);
+    });
+  }, [queryClient, useGcal]);
 
   if (isLoading)
     return (
@@ -81,6 +134,7 @@ const Service = () => {
     );
 
   const onSelect = (svc: Svc) => {
+    prefetchForService(svc.id);
     setService(svc.id, svc.name);
     // Pasamos el servicio en la URL para evitar cualquier condición de carrera del store.
     navigate(`/book/date?service=${encodeURIComponent(svc.id)}`, { state: buildBookingState(location) });
@@ -106,6 +160,7 @@ const Service = () => {
             onSelect={() => onSelect(s)}
             attrsId={`svc-${s.id}`}
             selected={selectedServiceId === s.id}
+            onPreview={() => prefetchForService(s.id)}
           />
         ))}
       </div>
