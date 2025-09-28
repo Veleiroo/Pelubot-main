@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { BookingLayout } from '@/components/BookingLayout';
-import { Card, CardContent } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { fmtEuro, fmtDateLong, fmtTime } from '@/lib/format';
 import { CheckCircle2, Calendar, Clock, User, Scissors, ArrowLeft } from '@/lib/icons';
 import { buildBookingState } from '@/lib/booking-route';
@@ -292,214 +292,245 @@ const BookConfirm = () => {
       subtitle="Revisa los detalles antes de confirmar tu cita"
       summary={`Servicio seleccionado: ${serviceLabel}`}
     >
-      <div className="w-full max-h-[85vh] overflow-y-auto rounded-3xl border border-zinc-900/40 bg-zinc-950/30">
-        <div className="relative flex flex-col gap-5 p-4 pb-28 md:gap-6 md:p-6">
-          <Card className="rounded-2xl border border-zinc-800 bg-zinc-900/70">
-            <CardContent className="space-y-4 p-4 md:space-y-5 md:p-5">
-              {summaryLoading ? (
-                <div className="space-y-4" role="status" aria-live="polite">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-4">
-                      <Skeleton className="h-11 w-11 rounded-xl" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-3 w-24 rounded" />
-                        <Skeleton className="h-4 w-48 rounded" />
-                        <Skeleton className="h-3 w-40 rounded" />
+      <div className="mx-auto w-full max-w-[920px]">
+        <div className="relative rounded-2xl border border-zinc-800 bg-zinc-900/80 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.8)]">
+          <div className="p-5 md:p-6">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-white md:text-xl">Revisa y confirma tu reserva</h3>
+              <p className="mt-1 text-xs text-zinc-400 md:text-sm">Verifica los datos y completa tus datos de contacto para finalizar.</p>
+            </div>
+
+            <div className="mt-6 grid gap-6 md:grid-cols-[1.65fr,1fr] md:gap-8">
+              <section className="space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+                <div className="space-y-1">
+                  <h3 className="text-base font-semibold text-white md:text-lg">Datos de contacto</h3>
+                  <p className="text-sm text-zinc-400">Necesitamos un nombre y un teléfono por si tenemos que avisarte de cambios.</p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 md:gap-5">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customer-name" className="text-sm font-medium text-zinc-200">
+                      Nombre completo <span className="text-red-400">*</span>
+                    </Label>
+                    <Input
+                      id="customer-name"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      autoComplete="name"
+                      aria-invalid={!nameValid || Boolean(formErrors.name)}
+                      aria-describedby={formErrors.name ? 'customer-name-error' : undefined}
+                      required
+                    />
+                    {formErrors.name && (
+                      <p id="customer-name-error" className="text-xs text-red-300">{formErrors.name}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customer-phone" className="text-sm font-medium text-zinc-200">
+                      Teléfono <span className="text-red-400">*</span>
+                    </Label>
+                    <Input
+                      id="customer-phone"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="Ej. +34 600 123 456"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      aria-invalid={!phoneValid || Boolean(formErrors.phone)}
+                      aria-describedby={formErrors.phone ? 'customer-phone-error' : undefined}
+                      required
+                    />
+                    {formErrors.phone && (
+                      <p id="customer-phone-error" className="text-xs text-red-300">{formErrors.phone}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customer-email" className="text-sm font-medium text-zinc-200">Correo electrónico</Label>
+                    <Input
+                      id="customer-email"
+                      type="email"
+                      autoComplete="email"
+                      value={customerEmail ?? ''}
+                      onChange={(e) => setCustomerEmail(e.target.value ? e.target.value : null)}
+                      aria-invalid={!emailValid || Boolean(formErrors.email)}
+                      aria-describedby={formErrors.email ? 'customer-email-error' : 'customer-email-helper'}
+                      placeholder="Opcional"
+                    />
+                    {formErrors.email ? (
+                      <p id="customer-email-error" className="text-xs text-red-300">{formErrors.email}</p>
+                    ) : (
+                      <p id="customer-email-helper" className="text-xs text-zinc-500">Te avisaremos también por email si lo facilitas.</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5 md:col-span-2">
+                    <Label htmlFor="customer-notes" className="text-sm font-medium text-zinc-200">Notas para la barbería</Label>
+                    <Textarea
+                      id="customer-notes"
+                      rows={3}
+                      value={notes ?? ''}
+                      onChange={(e) => setNotes(e.target.value ? e.target.value : null)}
+                      placeholder="Opcional: ¿algo que debamos saber?"
+                    />
+                    <p className="text-xs text-zinc-500">Ejemplo: alergias, preferencias, si vienes acompañado, etc.</p>
+                  </div>
+                </div>
+              </section>
+
+              <aside className="space-y-4 rounded-2xl border border-emerald-500/20 bg-zinc-900/70 p-5">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">Resumen</h4>
+                  <p className="text-xs text-emerald-100/70">Despliega cada bloque para revisar la información de tu cita.</p>
+                </div>
+
+                {summaryLoading ? (
+                  <div className="space-y-3" role="status" aria-live="polite">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="space-y-3 rounded-xl border border-zinc-800/60 bg-zinc-900/80 p-4">
+                        <Skeleton className="h-5 w-24 rounded" />
+                        <Skeleton className="h-4 w-32 rounded" />
+                        <Skeleton className="h-3 w-20 rounded" />
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <dl className="space-y-4 md:space-y-5">
-                  <div className="flex items-start gap-4">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-500/10 text-emerald-400">
-                      <Scissors className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div className="space-y-1">
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Servicio</dt>
-                      <dd className="text-base font-semibold text-white md:text-lg">{serviceLabel}</dd>
-                      <p className="text-sm text-zinc-400">
-                        {service?.duration_min} min · {fmtEuro(service?.price_eur)}
-                      </p>
-                    </div>
+                    ))}
                   </div>
+                ) : (
+                  <Accordion type="multiple" defaultValue={['service', 'professional', 'schedule']} className="space-y-3">
+                    <AccordionItem
+                      value="service"
+                      className="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-900/70 px-0 text-white"
+                    >
+                      <AccordionTrigger className="flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold">
+                        <span className="flex items-center gap-2 text-sm font-medium text-white">
+                          <Scissors className="h-4 w-4 text-emerald-300" aria-hidden="true" /> Servicio
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-2 px-4 text-sm text-zinc-300">
+                        <p className="text-base font-semibold text-white">{serviceLabel}</p>
+                        <p>{service?.duration_min} min · {fmtEuro(service?.price_eur)}</p>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                  <div className="flex items-start gap-4">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-500/10 text-emerald-400">
-                      <User className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div className="space-y-1">
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Profesional</dt>
-                      <dd className="text-base font-semibold text-white md:text-lg">{professionalLabel}</dd>
-                    </div>
-                  </div>
+                    <AccordionItem
+                      value="professional"
+                      className="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-900/70 px-0 text-white"
+                    >
+                      <AccordionTrigger className="flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold">
+                        <span className="flex items-center gap-2 text-sm font-medium text-white">
+                          <User className="h-4 w-4 text-emerald-300" aria-hidden="true" /> Profesional
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-2 px-4 text-sm text-zinc-300">
+                        <p className="text-base font-semibold text-white">{professionalLabel}</p>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                  <div className="flex items-start gap-4">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-500/10 text-emerald-400">
-                      <Clock className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div className="space-y-1">
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Fecha y hora</dt>
-                      <dd className="text-base font-semibold text-white md:text-lg">{formatDateTime(slotStart)}</dd>
-                    </div>
-                  </div>
-                </dl>
-              )}
-            </CardContent>
-          </Card>
+                    <AccordionItem
+                      value="schedule"
+                      className="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-900/70 px-0 text-white"
+                    >
+                      <AccordionTrigger className="flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold">
+                        <span className="flex items-center gap-2 text-sm font-medium text-white">
+                          <Calendar className="h-4 w-4 text-emerald-300" aria-hidden="true" /> Fecha y hora
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-2 px-4 text-sm text-zinc-300">
+                        <p className="text-base font-semibold text-white">{formatDateTime(slotStart)}</p>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                )}
 
-          <Card className="rounded-2xl border border-zinc-800 bg-zinc-900/70">
-            <CardContent className="space-y-4 p-4 md:space-y-5 md:p-5">
-              <div className="space-y-2">
-                <h3 className="text-base font-semibold text-white md:text-lg">Datos de contacto</h3>
-                <p className="text-sm text-zinc-400">Necesitamos un nombre y un teléfono para poder avisarte si surge algún cambio.</p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2 md:gap-5">
-                <div className="space-y-1.5">
-                  <Label htmlFor="customer-name" className="text-sm font-medium text-zinc-200">
-                    Nombre completo <span className="text-red-400">*</span>
-                  </Label>
-                  <Input
-                    id="customer-name"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    autoComplete="name"
-                    aria-invalid={!nameValid || Boolean(formErrors.name)}
-                    aria-describedby={formErrors.name ? 'customer-name-error' : undefined}
-                    required
-                  />
-                  {formErrors.name && (
-                    <p id="customer-name-error" className="text-xs text-red-300">{formErrors.name}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="customer-phone" className="text-sm font-medium text-zinc-200">
-                    Teléfono <span className="text-red-400">*</span>
-                  </Label>
-                  <Input
-                    id="customer-phone"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    placeholder="Ej. +34 600 123 456"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    aria-invalid={!phoneValid || Boolean(formErrors.phone)}
-                    aria-describedby={formErrors.phone ? 'customer-phone-error' : undefined}
-                    required
-                  />
-                  {formErrors.phone && (
-                    <p id="customer-phone-error" className="text-xs text-red-300">{formErrors.phone}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="customer-email" className="text-sm font-medium text-zinc-200">Correo electrónico</Label>
-                  <Input
-                    id="customer-email"
-                    type="email"
-                    autoComplete="email"
-                    value={customerEmail ?? ''}
-                    onChange={(e) => setCustomerEmail(e.target.value ? e.target.value : null)}
-                    aria-invalid={!emailValid || Boolean(formErrors.email)}
-                    aria-describedby={formErrors.email ? 'customer-email-error' : 'customer-email-helper'}
-                    placeholder="Opcional"
-                  />
-                  {formErrors.email ? (
-                    <p id="customer-email-error" className="text-xs text-red-300">{formErrors.email}</p>
-                  ) : (
-                    <p id="customer-email-helper" className="text-xs text-zinc-500">Te avisaremos también por email si lo facilitas.</p>
-                  )}
-                </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label htmlFor="customer-notes" className="text-sm font-medium text-zinc-200">Notas para la barbería</Label>
-                  <Textarea
-                    id="customer-notes"
-                    rows={3}
-                    value={notes ?? ''}
-                    onChange={(e) => setNotes(e.target.value ? e.target.value : null)}
-                    placeholder="Opcional: ¿algo que debamos saber?"
-                  />
-                  <p className="text-xs text-zinc-500">Ejemplo: alergias, preferencias, si vienes acompañado, etc.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {error && (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4" role="alert">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 text-red-300" aria-hidden="true" />
-                <div className="space-y-1">
-                  <p className="font-semibold text-red-200">No se pudo confirmar</p>
-                  <p className="text-sm text-red-100">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {ok && (
-            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4" role="status" aria-live="polite">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 text-emerald-400" aria-hidden="true" />
-                <div className="space-y-1">
-                  <p className="font-semibold text-emerald-200">¡Reserva creada!</p>
-                  <p className="break-all text-sm text-emerald-100">{ok}</p>
-                  {reservationId && (
-                    <p className="text-xs text-emerald-200/80" data-testid="reservation-id">
-                      ID: {reservationId}
+                {!summaryLoading && (
+                  <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-xs text-emerald-200">
+                    <p className="font-medium uppercase tracking-wide">Recuerda</p>
+                    <p className="mt-1 text-emerald-100/80">
+                      Podrás modificar o cancelar tu cita respondiendo al correo de confirmación.
                     </p>
-                  )}
+                  </div>
+                )}
+              </aside>
+            </div>
+
+            {error && (
+              <div className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4" role="alert">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-red-300" aria-hidden="true" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-red-200">No se pudo confirmar</p>
+                    <p className="text-sm text-red-100">{error}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          <div className="sticky bottom-0 left-0 right-0 -mx-4 mt-6 border-t border-zinc-800 bg-zinc-900/80 px-4 py-4 backdrop-blur-sm md:-mx-6 md:px-6">
-            {contactHint && (
-              <p className="text-xs text-zinc-400 text-center md:text-left" role="status" aria-live="polite">
-                {contactHint}
-              </p>
             )}
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              {ok ? (
-                <>
-                  <Button
-                    onClick={() => {
-                      reset();
-                      navigate('/book/service', { state: buildBookingState(location) });
-                    }}
-                    className="w-full rounded-xl bg-emerald-500 px-5 py-2 text-black shadow-soft transition hover:brightness-110 sm:w-auto"
-                  >
-                    Crear otra reserva
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={goHome}
-                    className="w-full rounded-xl border-zinc-700 bg-zinc-900 px-5 py-2 text-zinc-100 transition hover:border-emerald-400/60 sm:w-auto"
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" /> Volver al inicio
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={handleBack}
-                    disabled={loading}
-                    className="w-full rounded-xl border-zinc-700 bg-zinc-900 px-5 py-2 text-zinc-100 transition hover:border-emerald-400/60 disabled:opacity-40 sm:w-auto"
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" /> Volver
-                  </Button>
-                  <Button
-                    onClick={onConfirm}
-                    disabled={actionsDisabled}
-                    aria-disabled={actionsDisabled}
-                    className="w-full rounded-xl bg-emerald-500 px-5 py-2 text-black shadow-soft transition hover:brightness-110 disabled:pointer-events-none disabled:opacity-40 sm:w-auto"
-                  >
-                    {loading ? 'Confirmando…' : 'Confirmar reserva'}
-                  </Button>
-                </>
+
+            {ok && (
+              <div className="mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4" role="status" aria-live="polite">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-400" aria-hidden="true" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-emerald-200">¡Reserva creada!</p>
+                    <p className="break-all text-sm text-emerald-100">{ok}</p>
+                    {reservationId && (
+                      <p className="text-xs text-emerald-200/80" data-testid="reservation-id">
+                        ID: {reservationId}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="sticky bottom-0 mt-6 -mx-5 flex flex-col gap-4 border-t border-zinc-800 bg-zinc-900/85 px-5 py-4 backdrop-blur-sm md:-mx-6 md:flex-row md:items-center md:justify-between md:px-6 rounded-b-2xl">
+              {contactHint && !ok && (
+                <p className="text-xs text-zinc-400 md:max-w-sm" role="status" aria-live="polite">
+                  {contactHint}
+                </p>
               )}
+
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
+                {ok ? (
+                  <>
+                    <Button
+                      onClick={() => {
+                        reset();
+                        navigate('/book/service', { state: buildBookingState(location) });
+                      }}
+                      className="h-10 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-5 text-emerald-200 transition hover:bg-emerald-500/20"
+                    >
+                      Crear otra reserva
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={goHome}
+                      className="h-10 rounded-xl border-zinc-700 bg-zinc-900 px-5 text-zinc-100 transition hover:border-emerald-400/60"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" /> Volver al inicio
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={handleBack}
+                      disabled={loading}
+                      className="h-10 rounded-xl border-zinc-700 bg-zinc-900 px-5 text-zinc-100 transition hover:border-emerald-400/60 disabled:opacity-40"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" /> Volver
+                    </Button>
+                    <Button
+                      onClick={onConfirm}
+                      disabled={actionsDisabled}
+                      aria-disabled={actionsDisabled}
+                      className="h-10 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-5 text-emerald-200 shadow-soft transition hover:bg-emerald-500/25 disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      {loading ? 'Confirmando…' : 'Confirmar reserva'}
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

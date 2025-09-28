@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useNavigate, type Location as RouterLocation } from 'react-router-dom';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from '@/lib/icons';
@@ -20,22 +20,30 @@ export function BookingDialog({ background, children }: Props) {
     }
   };
 
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous || '';
+    };
+  }, []);
+
   return (
     <DialogPrimitive.Root open onOpenChange={handleOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm supports-[backdrop-filter]:backdrop-blur-sm" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/60" />
         <DialogPrimitive.Content
-          className={cn(
-            'fixed left-1/2 top-1/2 z-50 w-[min(100vw,880px)] max-h-[85vh] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl border border-white/10 bg-neutral-900/95 p-5 text-sm shadow-xl md:p-6'
-          )}
+          className={cn('fixed inset-0 z-50 grid place-items-center p-3 text-sm')}
         >
-          <DialogPrimitive.Close
-            className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-background/80 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            aria-label="Cerrar reserva"
-          >
-            <X className="h-4 w-4" />
-          </DialogPrimitive.Close>
-          <div className="max-h-[90vh] overflow-y-auto px-4 pb-6 pt-10 sm:px-6">{children}</div>
+          <div className="relative w-full max-w-[920px] max-h-[85vh] overflow-y-auto overscroll-contain rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.75)]">
+            <DialogPrimitive.Close
+              className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700/70 bg-zinc-900/90 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+              aria-label="Cerrar reserva"
+            >
+              <X className="h-4 w-4" />
+            </DialogPrimitive.Close>
+            <div className="px-5 pb-6 pt-14 md:px-6 md:pb-7">{children}</div>
+          </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
