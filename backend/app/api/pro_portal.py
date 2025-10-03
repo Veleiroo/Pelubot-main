@@ -1,10 +1,10 @@
 """Endpoints de autenticación y sesión para el portal de estilistas."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import or_
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Body
+from sqlalchemy import or_, text as _sql_text
 from sqlmodel import Session, select
 
 from app.core.auth import (
@@ -13,9 +13,24 @@ from app.core.auth import (
     get_current_stylist,
     set_stylist_session_cookie,
 )
-from app.db import get_session
-from app.models import ActionResult, StylistAuthOut, StylistDB, StylistLoginIn, StylistPublic
+from app.db import get_session, engine
+from app.models import (
+    ActionResult,
+    StylistAuthOut,
+    StylistDB,
+    StylistLoginIn,
+    StylistPublic,
+    StylistReservationsOut,
+    StylistReservationOut,
+    ReservationDB,
+    RescheduleIn,
+    RescheduleOut,
+    StylistRescheduleIn,
+)
+from app.services.logic import find_reservation, cancel_reservation, apply_reschedule
+from app.utils.date import now_tz, TZ, validate_target_dt
 from app.utils.security import needs_rehash, verify_password, hash_password
+from app.core.metrics import RESERVATIONS_CANCELLED, RESERVATIONS_RESCHEDULED
 
 router = APIRouter(prefix="/pros", tags=["pros"])
 
@@ -88,3 +103,152 @@ def stylist_me(
     token, expires_at = create_stylist_session_token(stylist.id)
     set_stylist_session_cookie(response, token, expires_at)
     return StylistAuthOut(stylist=_to_public(stylist), session_expires_at=expires_at)
+
+
+@router.get("/reservations", response_model=StylistReservationsOut)
+def stylist_reservations(
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+    days_ahead: int = 30,
+    include_past_minutes: int = 0,
+) -> StylistReservationsOut:
+    days_ahead = max(1, min(days_ahead, 180))
+    include_past_minutes = max(0, min(include_past_minutes, 1440))
+    now = now_tz()
+    start_boundary = now - timedelta(minutes=include_past_minutes)
+    end_boundary = now + timedelta(days=days_ahead)
+
+    stmt = (
+        select(ReservationDB)
+        .where(ReservationDB.professional_id == stylist.id)
+        .where(ReservationDB.start <= end_boundary)
+        .where(ReservationDB.end >= start_boundary)
+        .order_by(ReservationDB.start)
+    )
+    rows = session.exec(stmt).all()
+    reservations = [
+        StylistReservationOut(
+            id=row.id,
+            service_id=row.service_id,
+            professional_id=row.professional_id,
+            start=row.start,
+            end=row.end,
+            customer_name=row.customer_name,
+            customer_email=row.customer_email,
+            customer_phone=row.customer_phone,
+            notes=row.notes,
+            created_at=row.created_at,
+            updated_at=getattr(row, "updated_at", None),
+        )
+        for row in rows
+    ]
+    return StylistReservationsOut(reservations=reservations)
+
+
+@router.post("/reservations/{reservation_id}/cancel", response_model=ActionResult)
+def stylist_cancel_reservation(
+    reservation_id: str,
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+) -> ActionResult:
+    reservation = find_reservation(session, reservation_id)
+    if not reservation or reservation.professional_id != stylist.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reserva no encontrada")
+
+    ok = cancel_reservation(session, reservation_id)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo cancelar la reserva")
+    try:
+        RESERVATIONS_CANCELLED.inc()
+    except Exception:
+        pass
+    return ActionResult(ok=True, message=f"Reserva {reservation_id} cancelada.")
+
+
+@router.post("/reservations/{reservation_id}/reschedule", response_model=RescheduleOut)
+def stylist_reschedule_reservation(
+    reservation_id: str,
+    payload: StylistRescheduleIn = Body(...),
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+) -> RescheduleOut:
+    reservation = find_reservation(session, reservation_id)
+    if not reservation or reservation.professional_id != stylist.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reserva no encontrada")
+
+    try:
+        if str(engine.url).startswith("sqlite"):
+            try:
+                session.exec(_sql_text("BEGIN IMMEDIATE"))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    if payload.new_start:
+        try:
+            new_start_dt = datetime.fromisoformat(str(payload.new_start).replace("Z", "+00:00"))
+            if new_start_dt.tzinfo is None:
+                new_start_dt = new_start_dt.replace(tzinfo=TZ)
+            validate_target_dt(new_start_dt)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="new_start inválido (ISO 8601 requerido).")
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    else:
+        base_start = reservation.start
+        if base_start.tzinfo is None:
+            base_start = base_start.replace(tzinfo=TZ)
+        try:
+            if payload.new_date:
+                target_date = datetime.strptime(payload.new_date, "%Y-%m-%d").date()
+            else:
+                target_date = base_start.astimezone(TZ).date()
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="new_date inválida. Usa YYYY-MM-DD.")
+        try:
+            if payload.new_time:
+                target_time = datetime.strptime(payload.new_time, "%H:%M").time()
+            else:
+                target_time = base_start.astimezone(TZ).time()
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="new_time inválida. Usa HH:MM (24h).")
+        new_start_dt = datetime.combine(target_date, target_time).replace(tzinfo=TZ)
+        try:
+            validate_target_dt(new_start_dt)
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    reschedule_payload = RescheduleIn(
+        reservation_id=reservation_id,
+        new_date=payload.new_date,
+        new_time=payload.new_time,
+        new_start=payload.new_start,
+        professional_id=stylist.id,
+    )
+
+    ok, msg, updated = apply_reschedule(session, reschedule_payload)
+    if not ok or not updated:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+
+    if updated.google_event_id:
+        updated.google_event_id = None
+        updated.google_calendar_id = None
+        session.add(updated)
+        session.commit()
+        session.refresh(updated)
+        msg = f"{msg} Sincronización con Google Calendar deshabilitada para reprogramaciones."
+
+    try:
+        RESERVATIONS_RESCHEDULED.inc()
+    except Exception:
+        pass
+
+    message_out = msg if isinstance(msg, str) else "Reserva reprogramada"
+    return RescheduleOut(
+        ok=True,
+        message=message_out,
+        reservation_id=updated.id,
+        start=updated.start.isoformat() if hasattr(updated.start, "isoformat") else None,
+        end=updated.end.isoformat() if hasattr(updated.end, "isoformat") else None,
+    )

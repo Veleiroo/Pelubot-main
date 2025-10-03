@@ -2,7 +2,7 @@
 Modelos principales de datos para la API de reservas.
 Incluye servicios, profesionales, reservas y estructuras de consulta.
 """
-from pydantic import BaseModel, Field, field_validator, EmailStr
+from pydantic import BaseModel, Field, field_validator, EmailStr, model_validator
 from typing import List, Optional
 from datetime import datetime, date, timezone
 from sqlmodel import SQLModel, Field as SQLField
@@ -69,6 +69,7 @@ class StylistDB(StylistBase, table=True):
     __table_args__ = (
         UniqueConstraint("email", name="uq_stylist_email"),
         Index("ix_stylist_active", "is_active"),
+        {"extend_existing": True},
     )
 
 
@@ -89,7 +90,7 @@ class StylistLoginIn(BaseModel):
     """Payload de inicio de sesión para estilistas (ID o email + contraseña)."""
 
     identifier: str = Field(..., min_length=2, max_length=150)
-    password: str = Field(..., min_length=6, max_length=160)
+    password: str = Field(..., min_length=4, max_length=160)
 
     @field_validator("identifier")
     @classmethod
@@ -102,6 +103,36 @@ class StylistAuthOut(BaseModel):
 
     stylist: StylistPublic
     session_expires_at: datetime
+
+
+class StylistReservationOut(BaseModel):
+    id: str
+    service_id: str
+    professional_id: str
+    start: datetime
+    end: datetime
+    customer_name: Optional[str] = None
+    customer_email: Optional[EmailStr] = None
+    customer_phone: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class StylistReservationsOut(BaseModel):
+    reservations: List[StylistReservationOut]
+
+
+class StylistRescheduleIn(BaseModel):
+    new_date: Optional[str] = Field(default=None, json_schema_extra={"example": "2025-09-06"})
+    new_time: Optional[str] = Field(default=None, json_schema_extra={"example": "18:30"})
+    new_start: Optional[str] = Field(default=None, json_schema_extra={"example": "2025-09-06T18:30:00+02:00"})
+
+    @model_validator(mode="after")
+    def _ensure_any_field(self) -> "StylistRescheduleIn":
+        if not any((self.new_start, self.new_date, self.new_time)):
+            raise ValueError("Se requiere new_start o new_date/new_time para reprogramar.")
+        return self
 
 class Reservation(BaseModel):
     """Reserva realizada por un cliente."""

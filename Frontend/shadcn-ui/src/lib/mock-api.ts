@@ -16,6 +16,36 @@ const baseDate = new Date(today.getFullYear(), today.getMonth(), today.getDate()
 const availableDay = toYmd(baseDate);
 const slotIso = `${availableDay}T10:00:00+02:00`;
 
+export class MockHttpError extends Error {
+  status: number;
+  detail?: string;
+
+  constructor(status: number, message: string, detail?: string) {
+    super(message);
+    this.name = 'MockHttpError';
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+const MOCK_STYLIST = {
+  id: 'marina',
+  name: 'Marina García',
+  display_name: 'Marina',
+  services: ['corte_cabello', 'arreglo_barba'],
+  email: 'marina@example.com',
+  phone: '+34 600 123 456',
+  calendar_id: null,
+  use_gcal_busy: false,
+};
+
+const makeSessionPayload = () => ({
+  stylist: MOCK_STYLIST,
+  session_expires_at: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
+});
+
+let hasProsSession = false;
+
 const clone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj)) as T;
 const findProfessionalForService = (serviceId?: string) => {
   void serviceId; // los mocks no restringen por servicio
@@ -63,6 +93,26 @@ export function mockHttp(path: string, init?: RequestInit) {
           reservation_id: reservationId,
           google_event_id: null,
         };
+      }
+      break;
+    case '/pros/me':
+      if (method === 'GET') {
+        if (!hasProsSession) {
+          throw new MockHttpError(401, 'No active session', 'No active session (mock)');
+        }
+        return makeSessionPayload();
+      }
+      break;
+    case '/pros/login':
+      if (method === 'POST') {
+        hasProsSession = true;
+        return makeSessionPayload();
+      }
+      break;
+    case '/pros/logout':
+      if (method === 'POST') {
+        hasProsSession = false;
+        return { ok: true, message: 'Sesión cerrada (mock)' };
       }
       break;
     default:

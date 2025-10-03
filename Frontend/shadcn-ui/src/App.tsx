@@ -1,14 +1,16 @@
-import { Toaster } from '@/components/ui/sonner';
+import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, type Location as RouterLocation } from 'react-router-dom';
 import Index from '@/pages/Index';
 import NotFound from '@/pages/NotFound';
-import { loadBookDate, loadBookConfirm, loadDebugPage, loadBookService } from '@/lib/route-imports';
+import { loadBookDate, loadBookConfirm, loadDebugPage, loadBookService, loadProsLogin, loadProsOverview } from '@/lib/route-imports';
 const BookDate = lazy(loadBookDate);
 const BookConfirm = lazy(loadBookConfirm);
 const BookService = lazy(loadBookService);
+const ProsLogin = lazy(loadProsLogin);
+const ProsOverview = lazy(loadProsOverview);
 import Loading from '@/components/Loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import BookingDialog from '@/components/BookingDialog';
@@ -37,6 +39,8 @@ const AppRoutes = () => {
                 <Route path="/book/service" element={renderWithSuspense(BookService)} />
                 <Route path="/book/date" element={renderWithSuspense(BookDate)} />
                 <Route path="/book/confirm" element={renderWithSuspense(BookConfirm)} />
+                <Route path="/pros/login" element={renderWithSuspense(ProsLogin)} />
+                <Route path="/pros" element={renderWithSuspense(ProsOverview)} />
                 {DEBUG && <Route path="/debug" element={renderWithSuspense(DebugPage)} />}
                 <Route path="*" element={<NotFound />} />
             </Routes>

@@ -1,4 +1,4 @@
-import { mockHttp } from './mock-api';
+import { mockHttp, MockHttpError } from './mock-api';
 
 // Base de API: prioriza VITE_API_BASE_URL y, si falta, recurre al mismo origen.
 const BASE = (() => {
@@ -86,7 +86,12 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 
   const attemptFetch = async () => {
     const target = url || path;
-    const res = await fetch(target, { headers, signal: ctrl.signal, ...init });
+    const res = await fetch(target, {
+      headers,
+      signal: ctrl.signal,
+      credentials: init?.credentials ?? 'include',
+      ...init,
+    });
     const ms = Math.round(performance.now() - started);
 
     if (!res.ok) {
@@ -119,29 +124,41 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     return data;
   };
 
-  const shouldMockFirst = USE_MOCKS && (MOCK_FORCE || !BASE);
-  if (shouldMockFirst) {
-    const mock = mockHttp(path, init);
-    if (mock !== undefined) {
-      if (DEBUG) console.info('HTTP MOCK (sin BASE)', path, mock);
-      clearTimeout(timer);
-      return mock as T;
+  const tryMock = () => {
+    try {
+      return mockHttp(path, init);
+    } catch (error) {
+      if (error instanceof MockHttpError) {
+        throw new ApiError(error.message, { status: error.status, detail: error.detail });
+      }
+      throw error;
     }
-  }
+  };
+
+  const shouldMockFirst = USE_MOCKS && (MOCK_FORCE || !BASE);
 
   try {
-    const data = await attemptFetch();
-    return data;
-  } catch (error) {
-    if (USE_MOCKS) {
-      const mock = mockHttp(path, init);
+    if (shouldMockFirst) {
+      const mock = tryMock();
       if (mock !== undefined) {
-        if (DEBUG) console.info('HTTP MOCK fallback', path, error);
-        clearTimeout(timer);
+        if (DEBUG) console.info('HTTP MOCK (sin BASE)', path, mock);
         return mock as T;
       }
     }
-    throw error;
+
+    try {
+      const data = await attemptFetch();
+      return data;
+    } catch (error) {
+      if (USE_MOCKS) {
+        const mock = tryMock();
+        if (mock !== undefined) {
+          if (DEBUG) console.info('HTTP MOCK fallback', path, error);
+          return mock as T;
+        }
+      }
+      throw error;
+    }
   } finally {
     clearTimeout(timer);
   }
@@ -191,4 +208,27 @@ export const api = {
       }),
       signal: opts?.signal,
     }),
+  prosLogin: (payload: { identifier: string; password: string }) =>
+    http<{ stylist: StylistPublic; session_expires_at: string }>("/pros/login", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  prosLogout: () =>
+    http<ActionResult>("/pros/logout", {
+      method: "POST",
+    }),
+
+  prosMe: () => http<{ stylist: StylistPublic; session_expires_at: string }>("/pros/me"),
+};
+
+export type StylistPublic = {
+  id: string;
+  name: string;
+  services: string[];
+  display_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  calendar_id?: string | null;
+  use_gcal_busy?: boolean;
 };
