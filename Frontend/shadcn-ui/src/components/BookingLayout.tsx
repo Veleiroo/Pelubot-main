@@ -1,26 +1,24 @@
 import { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 interface BookingLayoutProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   summary?: string;
   children: ReactNode;
+  className?: string;
 }
 
-export function BookingLayout({ title, subtitle, summary, children }: BookingLayoutProps) {
+export function BookingLayout({ title, subtitle, summary, children, className }: BookingLayoutProps) {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 text-foreground md:px-6">
-      <header className="mx-auto max-w-3xl text-center text-white">
-        <h1 className="text-xl font-semibold md:text-2xl">{title}</h1>
-        {summary && (
-          <div className="mt-2 text-sm text-white/70" aria-live="polite">
-            <span className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
-              {summary}
-            </span>
-          </div>
-        )}
-        {subtitle && <p className="mt-2 text-sm text-white/60">{subtitle}</p>}
-      </header>
-      <div className="mx-auto mt-8 w-full max-w-4xl space-y-6">
+    <div className={cn('mx-auto w-full max-w-[960px] px-4 py-6 text-foreground md:px-6', className)}>
+      {(title || subtitle || summary) && (
+        <header className="mb-4 text-center text-white md:mb-6">
+          {title && <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">{title}</h1>}
+          {subtitle && <p className="mt-1 text-sm text-white/60 md:text-base">{subtitle}</p>}
+          {summary && <p className="mt-1 text-xs text-white/55 md:text-sm">{summary}</p>}
+        </header>
+      )}
+      <div className="w-full">
         {children}
       </div>
     </div>

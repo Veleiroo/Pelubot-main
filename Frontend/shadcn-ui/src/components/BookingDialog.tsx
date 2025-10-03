@@ -52,12 +52,12 @@ export function BookingDialog({ background, children }: Props) {
           <div className="relative mx-auto flex w-full max-w-[960px] justify-center">
             <div className="relative w-full overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.75)]">
               <DialogPrimitive.Close
-                className="absolute right-6 top-6 inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700/70 bg-zinc-900/95 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                className="absolute right-6 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700/70 bg-zinc-900/95 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 md:top-6"
                 aria-label="Cerrar reserva"
               >
                 <X className="h-4 w-4" />
               </DialogPrimitive.Close>
-              <div className="max-h-[85vh] overflow-y-auto overscroll-contain px-5 pb-7 pt-16 md:px-7 md:pb-8">
+              <div className="max-h-[85vh] overflow-y-auto overscroll-contain px-5 pb-7 pt-5 md:px-7 md:pb-8 md:pt-6">
                 {children}
               </div>
             </div>

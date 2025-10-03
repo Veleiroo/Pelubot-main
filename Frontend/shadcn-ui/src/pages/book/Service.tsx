@@ -67,13 +67,13 @@ const Service = () => {
         retry: 1,
       }),
       queryClient.prefetchQuery({
-        queryKey: ['days-availability', svcId, monthKey, 'any', useGcal],
+        queryKey: ['days-availability', svcId, monthKey, 'any', false],
         queryFn: () =>
           api.getDaysAvailability({
             service_id: svcId,
             start,
             end,
-            use_gcal: useGcal,
+            use_gcal: false,
           }),
         staleTime: 30 * 1000,
         retry: 1,
@@ -83,7 +83,7 @@ const Service = () => {
     Promise.all(promises).catch(() => {
       prefetched.current.delete(marker);
     });
-  }, [queryClient, useGcal]);
+  }, [queryClient]);
 
   if (isLoading)
     return (
