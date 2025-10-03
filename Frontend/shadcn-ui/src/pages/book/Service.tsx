@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { format, endOfMonth, startOfMonth } from 'date-fns';
 import { api, Service as Svc } from '@/lib/api';
 import { useBooking } from '@/store/booking';
@@ -18,10 +18,7 @@ const Service = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const prefetched = useRef(new Set<string>());
-  const useGcal = useMemo(() => {
-    const v = (import.meta as unknown as { env: { VITE_USE_GCAL?: string | boolean } }).env?.VITE_USE_GCAL;
-    return v === '1' || v === 'true' || v === true;
-  }, []);
+  const useGcal = false;
 
   const { setService, serviceId: selectedServiceId } = useBooking((s) => ({
     setService: s.setService,

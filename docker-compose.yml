@@ -11,7 +11,7 @@ services:
       # Valores por defecto; pueden sobreescribirse en .env
       TZ: ${TZ:-Europe/Madrid}
       API_KEY: ${API_KEY:-changeme}
-      USE_GCAL_BUSY: ${USE_GCAL_BUSY:-true}
+      USE_GCAL_BUSY: ${USE_GCAL_BUSY:-false}
       # Para desarrollo puedes forzar cliente de Google Calendar falso (sin llamadas externas)
       PELUBOT_FAKE_GCAL: ${PELUBOT_FAKE_GCAL:-0}
       # OAuth por defecto apunta a archivo dentro del contenedor
@@ -38,7 +38,7 @@ services:
         # Habilita la ruta de debug y logs de red en la SPA (solo para desarrollo)
         VITE_ENABLE_DEBUG: ${FRONT_ENABLE_DEBUG:-1}
         # Controla uso de Google Calendar (1=activo, 0=desactivado)
-        VITE_USE_GCAL: ${FRONT_USE_GCAL:-1}
+        VITE_USE_GCAL: ${FRONT_USE_GCAL:-0}
     container_name: pelubot-frontend
     depends_on:
       - backend
@@ -54,7 +54,7 @@ services:
       - VITE_API_BASE_URL=http://localhost:${BACKEND_PORT:-8776}
       - VITE_API_KEY=${API_KEY}
       - VITE_ENABLE_DEBUG=1
-      - VITE_USE_GCAL=${FRONT_USE_GCAL:-1}
+      - VITE_USE_GCAL=${FRONT_USE_GCAL:-0}
       - CHOKIDAR_USEPOLLING=1
     volumes:
       - ./Frontend/shadcn-ui:/app

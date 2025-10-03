@@ -68,10 +68,7 @@ const BookDate = () => {
   const [selected, setSelected] = useState<Date | undefined>(undefined);
   const [month, setMonth] = useState<Date>(() => new Date());
   const [focusedDate, setFocusedDate] = useState<Date>(() => new Date());
-  const [useGcal] = useState<boolean>(() => {
-    const v = (import.meta as unknown as { env: { VITE_USE_GCAL?: string | boolean } }).env?.VITE_USE_GCAL;
-    return v === '1' || v === 'true' || v === true;
-  });
+  const useGcal = false;
 
   const { data: servicesData = [] } = useQuery<Service[], Error>({
     queryKey: ['services'],

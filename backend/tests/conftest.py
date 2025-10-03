@@ -44,8 +44,13 @@ def app_client(monkeypatch):
     # En tus rutas usas Depends(get_session); aquí lo sobreescribimos
     main.app.dependency_overrides[routes.get_session] = get_test_session
 
+    main.app.state.test_engine = engine
     client = TestClient(main.app)
     try:
         yield client
     finally:
+        try:
+            del main.app.state.test_engine
+        except AttributeError:
+            pass
         main.app.dependency_overrides.clear()

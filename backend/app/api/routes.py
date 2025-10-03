@@ -2,7 +2,7 @@
 Rutas y endpoints de la API (estructura nueva).
 """
 from __future__ import annotations
-from datetime import datetime, time, timedelta
+from datetime import datetime, date, time, timedelta
 from typing import Dict, List, Tuple, Optional
 import os
 import uuid
@@ -25,13 +25,10 @@ from app.services.logic import (
     find_reservation, cancel_reservation,
     apply_reschedule,
     create_gcal_reservation,
-    patch_gcal_reservation,
-    delete_gcal_reservation,
     get_calendar_for_professional,
     sync_from_gcal_range,
     reconcile_db_to_gcal_range,
     detect_conflicts_range,
-    collect_gcal_busy_for_range,
 )
 from app.db import get_session, engine
 from app.utils.date import validate_target_dt, TZ, now_tz, MAX_AHEAD_DAYS
@@ -176,11 +173,6 @@ def cancel_reservation_post(
     r = find_reservation(session, payload.reservation_id)
     if not r:
         raise HTTPException(status_code=404, detail="La reserva no existe")
-    if r.google_event_id:
-        try:
-            delete_gcal_reservation(r.google_event_id, r.google_calendar_id or GCAL_CALENDAR_ID)
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"No se pudo borrar en Google Calendar: {e}")
     ok = cancel_reservation(session, payload.reservation_id)
     if ok:
         logger.info("Reservation cancelled: id=%s", payload.reservation_id)
@@ -203,11 +195,6 @@ def cancel_reservation_delete(
     r = find_reservation(session, reservation_id)
     if not r:
         raise HTTPException(status_code=404, detail="La reserva no existe")
-    if r.google_event_id:
-        try:
-            delete_gcal_reservation(r.google_event_id, r.google_calendar_id or GCAL_CALENDAR_ID)
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"No se pudo borrar en Google Calendar: {e}")
     ok = cancel_reservation(session, reservation_id)
     if ok:
         logger.info("Reservation cancelled: id=%s", reservation_id)
@@ -270,39 +257,15 @@ def reschedule_post(
     if not ok or not r:
         raise HTTPException(status_code=400, detail=msg)
     message_out = msg if (isinstance(msg, str) and "Reprogramada" in msg) else f"Reprogramada: {msg}"
+    gcal_notice: str | None = None
     if r.google_event_id:
-        try:
-            new_cal = get_calendar_for_professional(r.professional_id)
-            if old_cal and old_cal != new_cal:
-                delete_gcal_reservation(r.google_event_id, old_cal)
-                # Cambio de profesional implica mover el evento entre calendarios.
-                gnew = create_gcal_reservation(
-                    Reservation(
-                        id=r.id,
-                        service_id=r.service_id,
-                        professional_id=r.professional_id,
-                        start=r.start,
-                        end=r.end,
-                        google_event_id=r.google_event_id,
-                        google_calendar_id=new_cal,
-                        customer_name=getattr(r, "customer_name", None),
-                        customer_email=getattr(r, "customer_email", None),
-                        customer_phone=getattr(r, "customer_phone", None),
-                        notes=getattr(r, "notes", None),
-                    ),
-                    calendar_id=new_cal,
-                )
-                r.google_event_id = gnew.get("id"); r.google_calendar_id = new_cal
-            else:
-                # Mismo calendario: podríamos reutilizar evento con un patch.
-                patch_gcal_reservation(r.google_event_id, r.start, r.end, old_cal or new_cal)
-                r.google_calendar_id = old_cal or new_cal
-            session.add(r); session.commit(); session.refresh(r)
-        except Exception as e:
-            r.start, r.end, r.professional_id, r.google_calendar_id = old_start, old_end, old_pro, old_cal
-            session.add(r); session.commit()
-            raise HTTPException(status_code=502, detail=f"No se pudo reprogramar en Google Calendar: {e}")
+        gcal_notice = "Sincronización con Google Calendar deshabilitada para reprogramaciones."
+        r.google_event_id = None
+        r.google_calendar_id = None
+        session.add(r); session.commit(); session.refresh(r)
     logger.info("Reservation rescheduled: id=%s start=%s end=%s pro=%s", r.id, r.start.isoformat(), r.end.isoformat(), r.professional_id)
+    if gcal_notice:
+        message_out = f"{message_out} {gcal_notice}"
     return RescheduleOut(ok=True, message=message_out, reservation_id=r.id, start=r.start.isoformat(), end=r.end.isoformat())
 
 @router.post("/reservations/reschedule", response_model=RescheduleOut)
@@ -335,7 +298,7 @@ def get_slots(q: SlotsQuery, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="service_id no existe")
     if q.professional_id and q.professional_id not in PRO_BY_ID:
         raise HTTPException(status_code=404, detail="professional_id no existe")
-    avail = find_available_slots(session, q.service_id, d, q.professional_id, use_gcal_busy_override=q.use_gcal)
+    avail = find_available_slots(session, q.service_id, d, q.professional_id, use_gcal_busy_override=False)
     # Filtrar horas ya pasadas si es el día de hoy
     if d == today:
         now_local = now_tz().replace(tzinfo=None)
@@ -362,12 +325,7 @@ def get_days_availability(body: DaysAvailabilityIn, session: Session = Depends(g
         if body.professional_id
         else [p.id for p in PROS if body.service_id in (p.services or [])]
     )
-    gcal_busy_range = collect_gcal_busy_for_range(
-        pro_ids_for_service,
-        body.start,
-        body.end,
-        use_gcal_override=body.use_gcal,
-    )
+    gcal_busy_range: Dict[str, Dict[date, List[Tuple[datetime, datetime]]]] = {}
 
     available_days: list[str] = []
     d = body.start

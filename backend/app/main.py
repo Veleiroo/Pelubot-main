@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Usa el router de la API del paquete estructurado (reexporta rutas heredadas)
 from app.api.routes import router, API_KEY
+from app.api.pro_portal import router as pros_router
 
 from app.db import create_db_and_tables
 from sqlmodel import Session
@@ -98,6 +99,7 @@ def create_app() -> FastAPI:
     install_exception_handlers(app)
     install_metrics(app)
     app.include_router(router)
+    app.include_router(pros_router)
     return app
 
 

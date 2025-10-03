@@ -7,7 +7,7 @@ from typing import List, Optional
 from datetime import datetime, date, timezone
 from sqlmodel import SQLModel, Field as SQLField
 from sqlalchemy.types import DateTime
-from sqlalchemy import Index, UniqueConstraint, CheckConstraint, event
+from sqlalchemy import Index, UniqueConstraint, CheckConstraint, event, Column, String, JSON
 from app.utils.date import validate_target_dt, TZ
 
 class Service(BaseModel):
@@ -22,6 +22,86 @@ class Professional(BaseModel):
     id: str
     name: str
     services: List[str]
+
+
+class StylistBase(SQLModel):
+    """Base SQLModel para estilistas con metadatos de autenticación."""
+
+    id: str = SQLField(primary_key=True, description="Identificador slug único del estilista")
+    name: str = SQLField(index=True, description="Nombre interno del estilista")
+    display_name: Optional[str] = SQLField(default=None, description="Nombre público mostrado en la UI")
+    email: Optional[str] = SQLField(
+        default=None,
+        sa_column=Column(String, unique=True, nullable=True),
+        description="Email de contacto / login",
+    )
+    phone: Optional[str] = SQLField(default=None, description="Teléfono de contacto")
+    password_hash: str = SQLField(description="Hash Argon2id de la contraseña")
+    is_active: bool = SQLField(default=True, index=True, description="Marca estilista activo")
+    services: List[str] = SQLField(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False, default=list),
+        description="Lista de IDs de servicios que presta",
+    )
+    calendar_id: Optional[str] = SQLField(default=None, description="Calendario asociado (GCAL u otro)")
+    use_gcal_busy: bool = SQLField(default=False, description="Si debe consultarse Busy de Google Calendar")
+    created_at: datetime = SQLField(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+        nullable=False,
+    )
+    updated_at: datetime = SQLField(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+        nullable=False,
+    )
+    last_login_at: Optional[datetime] = SQLField(
+        default=None,
+        sa_type=DateTime(timezone=True),
+        nullable=True,
+    )
+    mfa_secret: Optional[str] = SQLField(default=None, description="Secreto TOTP cifrado")
+    notes: Optional[str] = SQLField(default=None, description="Notas internas")
+
+
+class StylistDB(StylistBase, table=True):
+    __tablename__ = "stylistdb"
+    __table_args__ = (
+        UniqueConstraint("email", name="uq_stylist_email"),
+        Index("ix_stylist_active", "is_active"),
+    )
+
+
+class StylistPublic(BaseModel):
+    """Representación pública segura del estilista."""
+
+    id: str
+    name: str
+    services: List[str]
+    display_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    calendar_id: Optional[str] = None
+    use_gcal_busy: bool = False
+
+
+class StylistLoginIn(BaseModel):
+    """Payload de inicio de sesión para estilistas (ID o email + contraseña)."""
+
+    identifier: str = Field(..., min_length=2, max_length=150)
+    password: str = Field(..., min_length=6, max_length=160)
+
+    @field_validator("identifier")
+    @classmethod
+    def _normalize_identifier(cls, v: str) -> str:
+        return v.strip()
+
+
+class StylistAuthOut(BaseModel):
+    """Respuesta del login con datos de sesión."""
+
+    stylist: StylistPublic
+    session_expires_at: datetime
 
 class Reservation(BaseModel):
     """Reserva realizada por un cliente."""
@@ -170,6 +250,14 @@ class ReservationDB(SQLModel, table=True):
 # Auto-actualiza updated_at en updates
 @event.listens_for(ReservationDB, 'before_update', propagate=True)
 def _set_updated_at(mapper, connection, target):  # type: ignore[override]
+    try:
+        target.updated_at = datetime.now(timezone.utc)
+    except Exception:
+        pass
+
+
+@event.listens_for(StylistDB, 'before_update', propagate=True)
+def _set_stylist_updated_at(mapper, connection, target):  # type: ignore[override]
     try:
         target.updated_at = datetime.now(timezone.utc)
     except Exception:
