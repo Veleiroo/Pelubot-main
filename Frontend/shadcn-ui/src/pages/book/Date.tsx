@@ -413,11 +413,7 @@ const BookDate = () => {
   };
 
   return (
-    <BookingLayout
-      step={2}
-      title="Selecciona fecha y hora"
-      summary={resolvedServiceLabel || undefined}
-    >
+    <BookingLayout title="Selecciona fecha y hora" summary={resolvedServiceLabel || undefined}>
       <div className="mx-auto w-full max-w-[1160px] px-4 sm:px-6">
         <div className="relative rounded-3xl border border-zinc-800/70 bg-zinc-900/85 shadow-[0_24px_90px_-55px_rgba(0,0,0,0.78)]">
           <div className="p-5 md:p-7 lg:p-8">

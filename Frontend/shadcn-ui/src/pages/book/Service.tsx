@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BookingSection } from '@/components/book/BookingSection';
 import { ServiceCard } from '@/components/book/ServiceCard';
 import { Scissors, Sparkles, LucideIcon, Crown, Zap, Brush } from '@/lib/icons';
-import { BookingSteps } from '@/components/BookingSteps';
 import { BookingLayout } from '@/components/BookingLayout';
 import { Button } from '@/components/ui/button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -88,9 +87,8 @@ const Service = () => {
 
   if (isLoading)
     return (
-      <>
-        <BookingSteps step={1} />
-        <BookingSection title="Selecciona un servicio" subtitle="Elige el servicio que deseas reservar">
+      <BookingLayout title="Selecciona un servicio" subtitle="Elige el servicio que deseas reservar">
+        <BookingSection title="Servicios disponibles">
           <div role="list" className="grid grid-cols-1 gap-4 md:gap-6 auto-rows-fr sm:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="rounded-2xl border border-border bg-card p-6 shadow-soft">
@@ -114,23 +112,20 @@ const Service = () => {
             ))}
           </div>
         </BookingSection>
-      </>
+      </BookingLayout>
     );
 
   if (isError)
     return (
-      <>
-        <BookingSteps step={1} />
-        <BookingSection title="Selecciona un servicio" subtitle="Elige el servicio que deseas reservar">
-          <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 mb-4">
-              <Zap className="h-6 w-6 text-red-400" />
-            </div>
-            <div className="text-red-400 text-sm font-medium">{error?.message ?? 'Error cargando servicios'}</div>
-            <Button className="mt-4" onClick={() => refetch()}>Reintentar</Button>
+      <BookingLayout title="Selecciona un servicio" subtitle="Elige el servicio que deseas reservar">
+        <div className="text-center py-12">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 mb-4">
+            <Zap className="h-6 w-6 text-red-400" />
           </div>
-        </BookingSection>
-      </>
+          <div className="text-red-400 text-sm font-medium">{error?.message ?? 'Error cargando servicios'}</div>
+          <Button className="mt-4" onClick={() => refetch()}>Reintentar</Button>
+        </div>
+      </BookingLayout>
     );
 
   const onSelect = (svc: Svc) => {
@@ -148,7 +143,7 @@ const Service = () => {
   };
 
   return (
-    <BookingLayout step={1} title="Selecciona un servicio" subtitle="Elige el servicio que deseas reservar">
+    <BookingLayout title="Selecciona un servicio" subtitle="Elige el servicio que deseas reservar">
       <div className="grid grid-cols-1 gap-4 md:gap-6 auto-rows-fr sm:grid-cols-3">
         {services.map((s) => (
           <ServiceCard

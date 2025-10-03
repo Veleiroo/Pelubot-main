@@ -1,11 +1,13 @@
 const BASE_SERVICES = [
-  { id: 'corte', name: 'Corte de pelo', duration_min: 30, price_eur: 15 },
-  { id: 'barba', name: 'Arreglo de barba', duration_min: 25, price_eur: 12 },
+  { id: 'corte_cabello', name: 'Corte de cabello clásico', duration_min: 30, price_eur: 15 },
+  { id: 'arreglo_barba', name: 'Arreglo de barba premium', duration_min: 25, price_eur: 12 },
+  { id: 'corte_jubilado', name: 'Corte Jubilado', duration_min: 35, price_eur: 13 },
 ];
 
 const BASE_PROFESSIONALS = [
-  { id: 'ana', name: 'Ana Fernández', services: ['corte', 'barba'] },
-  { id: 'luis', name: 'Luis Ortega', services: ['corte'] },
+  { id: 'ana', name: 'Ana Fernández' },
+  { id: 'luis', name: 'Luis Ortega' },
+  { id: 'marcos', name: 'Marcos Vidal' },
 ];
 
 const toYmd = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -15,6 +17,10 @@ const availableDay = toYmd(baseDate);
 const slotIso = `${availableDay}T10:00:00+02:00`;
 
 const clone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj)) as T;
+const findProfessionalForService = (serviceId?: string) => {
+  void serviceId; // los mocks no restringen por servicio
+  return BASE_PROFESSIONALS[0];
+};
 
 export function mockHttp(path: string, init?: RequestInit) {
   const method = (init?.method ?? 'GET').toUpperCase();
@@ -33,18 +39,20 @@ export function mockHttp(path: string, init?: RequestInit) {
           service_id: pickString(body, 'service_id') ?? BASE_SERVICES[0].id,
           start: pickString(body, 'start') ?? availableDay,
           end: pickString(body, 'end') ?? availableDay,
-          professional_id: pickString(body, 'professional_id') ?? null,
+          professional_id: pickString(body, 'professional_id') ?? findProfessionalForService(pickString(body, 'service_id'))?.id ?? null,
           available_days: [availableDay],
         };
       break;
     case '/slots':
-      if (method === 'POST')
+      if (method === 'POST') {
+        const serviceId = pickString(body, 'service_id') ?? BASE_SERVICES[0].id;
         return {
-          service_id: pickString(body, 'service_id') ?? BASE_SERVICES[0].id,
+          service_id: serviceId,
           date: pickString(body, 'date_str') ?? availableDay,
-          professional_id: pickString(body, 'professional_id') ?? BASE_PROFESSIONALS[0].id,
+          professional_id: pickString(body, 'professional_id') ?? findProfessionalForService(serviceId).id,
           slots: [slotIso],
         };
+      }
       break;
     case '/reservations':
       if (method === 'POST') {

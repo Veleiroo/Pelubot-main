@@ -251,8 +251,6 @@ const BookConfirm = () => {
     navigate('/book/date', { state: buildBookingState(location) });
   }, [navigate, location]);
 
-  const stepsStep = 3;
-
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
     const previous = document.body.style.overflow;
@@ -264,7 +262,7 @@ const BookConfirm = () => {
 
   if (!serviceId || !slotStart) {
     return (
-      <BookingLayout step={stepsStep} title="Confirmar reserva" subtitle="Revisa los detalles antes de confirmar">
+      <BookingLayout title="Confirmar reserva" subtitle="Revisa los detalles antes de confirmar">
         <div className="mx-auto max-w-2xl rounded-2xl border border-amber-400/30 bg-amber-400/10 p-10 text-center shadow-soft">
           <div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full border border-amber-400/40 bg-amber-400/15">
             <Calendar className="h-10 w-10 text-amber-300" />
@@ -286,7 +284,6 @@ const BookConfirm = () => {
 
   return (
     <BookingLayout
-      step={stepsStep}
       title="Confirmar reserva"
       subtitle="Revisa los detalles antes de confirmar tu cita"
       summary={`Servicio seleccionado: ${serviceLabel}`}

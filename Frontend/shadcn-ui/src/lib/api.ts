@@ -22,8 +22,14 @@ const BASE = (() => {
   return normalizedPath || '';
 })();
 const DEBUG = /^(1|true|yes|y)$/i.test(String(import.meta.env.VITE_ENABLE_DEBUG ?? "0"));
-const USE_MOCKS =
-  import.meta.env.DEV && !/^(0|false|no|n)$/i.test(String(import.meta.env.VITE_USE_MOCKS ?? '1'));
+const MOCK_MODE_RAW = String(import.meta.env?.VITE_USE_MOCKS ?? 'auto').trim().toLowerCase();
+const MOCK_MODE = (() => {
+  if (['0', 'false', 'off', 'no', 'n'].includes(MOCK_MODE_RAW)) return 'off';
+  if (['force', 'always', 'mock'].includes(MOCK_MODE_RAW)) return 'force';
+  return 'auto';
+})();
+const USE_MOCKS = import.meta.env.DEV && MOCK_MODE !== 'off';
+const MOCK_FORCE = import.meta.env.DEV && MOCK_MODE === 'force';
 const API_KEY = String(import.meta.env?.VITE_API_KEY ?? '').trim();
 
 export type Service = { id: string; name: string; duration_min: number; price_eur: number };
@@ -113,7 +119,7 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     return data;
   };
 
-  const shouldMockFirst = USE_MOCKS && !BASE;
+  const shouldMockFirst = USE_MOCKS && (MOCK_FORCE || !BASE);
   if (shouldMockFirst) {
     const mock = mockHttp(path, init);
     if (mock !== undefined) {
