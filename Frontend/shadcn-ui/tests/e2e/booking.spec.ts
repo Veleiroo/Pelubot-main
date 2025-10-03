@@ -98,11 +98,39 @@ test('cliente puede reservar una cita completa', async ({ page }) => {
   await page.getByRole('button', { name: /corte de pelo/i }).click();
   await expect(page).toHaveURL(/\/book\/date/);
   await expect(page.getByRole('heading', { level: 1, name: 'Selecciona fecha y hora' })).toBeVisible();
+  await expect(page.getByText('Día disponible')).toBeVisible();
+  await expect(page.getByText('Hoy')).toBeVisible();
+  await expect(page.getByText('Seleccionado')).toBeVisible();
+  await expect(page.getByText('Elige un día y después un horario disponible.')).toBeVisible();
 
   const dayCell = page.getByRole('gridcell', { name: new RegExp(`^${DAY_LABEL}$`) });
   await dayCell.waitFor({ state: 'visible' });
   await dayCell.click();
+  const slotsGrid = page.getByTestId('slots-grid');
+  await expect(slotsGrid).toBeVisible();
+  const layoutInfo = await slotsGrid.evaluate((el) => {
+    const element = el as HTMLElement;
+    const style = getComputedStyle(element);
+    const widths = Array.from(element.children).map((child) => (child as HTMLElement).offsetWidth);
+    return {
+      template: style.gridTemplateColumns,
+      hasAutoFitClass: element.classList.contains('grid-cols-[repeat(auto-fit,minmax(110px,1fr))]'),
+      justifyCenter: element.classList.contains('justify-center'),
+      justifyItemsCenter: element.classList.contains('justify-items-center'),
+      overflowY: style.overflowY,
+      isScrollable: element.scrollHeight - element.clientHeight > 2,
+      minWidth: widths.length ? Math.min(...widths) : 0,
+      maxWidth: widths.length ? Math.max(...widths) : 0,
+    };
+  });
+  expect(layoutInfo.hasAutoFitClass).toBeTruthy();
+  expect(layoutInfo.justifyCenter).toBeTruthy();
+  expect(layoutInfo.justifyItemsCenter).toBeTruthy();
+  expect(layoutInfo.overflowY).not.toBe('scroll');
+  expect(layoutInfo.isScrollable).toBeFalsy();
+  expect(layoutInfo.maxWidth - layoutInfo.minWidth).toBeLessThanOrEqual(2);
   await page.getByRole('button', { name: SLOT_LABEL }).click();
+  await expect(page.locator('text=/Has elegido/')).toHaveCount(0);
   await page.getByRole('button', { name: 'Continuar' }).click();
 
   await expect(page).toHaveURL(/\/book\/confirm/);

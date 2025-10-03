@@ -1,3 +1,5 @@
+import { mockHttp } from './mock-api';
+
 // Base de API: prioriza VITE_API_BASE_URL y, si falta, recurre al mismo origen.
 const BASE = (() => {
   const raw = String(import.meta.env?.VITE_API_BASE_URL ?? '').trim();
@@ -20,6 +22,8 @@ const BASE = (() => {
   return normalizedPath || '';
 })();
 const DEBUG = /^(1|true|yes|y)$/i.test(String(import.meta.env.VITE_ENABLE_DEBUG ?? "0"));
+const USE_MOCKS =
+  import.meta.env.DEV && !/^(0|false|no|n)$/i.test(String(import.meta.env.VITE_USE_MOCKS ?? '1'));
 const API_KEY = String(import.meta.env?.VITE_API_KEY ?? '').trim();
 
 export type Service = { id: string; name: string; duration_min: number; price_eur: number };
@@ -74,8 +78,9 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 12_000);
 
-  try {
-    const res = await fetch(url, { headers, signal: ctrl.signal, ...init });
+  const attemptFetch = async () => {
+    const target = url || path;
+    const res = await fetch(target, { headers, signal: ctrl.signal, ...init });
     const ms = Math.round(performance.now() - started);
 
     if (!res.ok) {
@@ -99,13 +104,38 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
       const fallback = `HTTP ${res.status}${rid ? ` [rid=${rid}]` : ''}`;
       const message = (detail && String(detail)) || (text ? `${fallback}: ${text.slice(0, 200)}` : fallback);
 
-      if (DEBUG) console.warn('HTTP ERR', res.status, url, `${ms}ms`, { detail, rid, text: text.slice(0, 200) });
+      if (DEBUG) console.warn('HTTP ERR', res.status, target, `${ms}ms`, { detail, rid, text: text.slice(0, 200) });
       throw new ApiError(message, { status: res.status, detail: detail ? String(detail) : undefined, requestId: rid, rawBody: text || undefined });
     }
 
     const data = (await res.json()) as T;
-    if (DEBUG) console.debug('HTTP OK', 200, url, `${ms}ms`, data);
+    if (DEBUG) console.debug('HTTP OK', 200, target, `${ms}ms`, data);
     return data;
+  };
+
+  const shouldMockFirst = USE_MOCKS && !BASE;
+  if (shouldMockFirst) {
+    const mock = mockHttp(path, init);
+    if (mock !== undefined) {
+      if (DEBUG) console.info('HTTP MOCK (sin BASE)', path, mock);
+      clearTimeout(timer);
+      return mock as T;
+    }
+  }
+
+  try {
+    const data = await attemptFetch();
+    return data;
+  } catch (error) {
+    if (USE_MOCKS) {
+      const mock = mockHttp(path, init);
+      if (mock !== undefined) {
+        if (DEBUG) console.info('HTTP MOCK fallback', path, error);
+        clearTimeout(timer);
+        return mock as T;
+      }
+    }
+    throw error;
   } finally {
     clearTimeout(timer);
   }

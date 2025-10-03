@@ -8,9 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { BookingLayout } from '@/components/BookingLayout';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { fmtEuro, fmtDateLong, fmtTime } from '@/lib/format';
-import { CheckCircle2, Calendar, Clock, User, Scissors, ArrowLeft } from '@/lib/icons';
+import { CheckCircle2, Calendar, User, Scissors, ArrowLeft } from '@/lib/icons';
 import { buildBookingState } from '@/lib/booking-route';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -292,22 +291,22 @@ const BookConfirm = () => {
       subtitle="Revisa los detalles antes de confirmar tu cita"
       summary={`Servicio seleccionado: ${serviceLabel}`}
     >
-      <div className="mx-auto w-full max-w-[920px]">
-        <div className="relative rounded-2xl border border-zinc-800 bg-zinc-900/80 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.8)]">
-          <div className="p-5 md:p-6">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-white md:text-xl">Revisa y confirma tu reserva</h3>
-              <p className="mt-1 text-xs text-zinc-400 md:text-sm">Verifica los datos y completa tus datos de contacto para finalizar.</p>
+      <div className="mx-auto w-full max-w-[960px]">
+        <div className="relative rounded-3xl border border-zinc-800/70 bg-zinc-900/85 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.8)]">
+          <div className="px-5 pb-8 pt-8 md:px-8 md:pb-10 md:pt-10">
+            <div className="space-y-2 text-center">
+              <h3 className="text-xl font-semibold text-white md:text-2xl">Revisa y confirma tu reserva</h3>
+              <p className="text-sm text-zinc-400">Comprueba los detalles y completa tus datos de contacto para finalizar.</p>
             </div>
 
-            <div className="mt-6 grid gap-6 md:grid-cols-[1.65fr,1fr] md:gap-8">
-              <section className="space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-                <div className="space-y-1">
-                  <h3 className="text-base font-semibold text-white md:text-lg">Datos de contacto</h3>
-                  <p className="text-sm text-zinc-400">Necesitamos un nombre y un teléfono por si tenemos que avisarte de cambios.</p>
-                </div>
+            <div className="mt-8 grid gap-8 lg:grid-cols-[1.65fr,1fr]">
+              <section className="space-y-6 rounded-2xl border border-zinc-800/80 bg-zinc-900/65 p-6">
+                <header className="space-y-1 text-left">
+                  <h3 className="text-lg font-semibold text-white md:text-xl">Datos de contacto</h3>
+                  <p className="text-sm text-zinc-400">Necesitamos un nombre y un teléfono por si debemos avisarte de cambios.</p>
+                </header>
 
-                <div className="grid gap-4 md:grid-cols-2 md:gap-5">
+                <div className="grid gap-5 md:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="customer-name" className="text-sm font-medium text-zinc-200">
                       Nombre completo <span className="text-red-400">*</span>
@@ -380,67 +379,57 @@ const BookConfirm = () => {
                 </div>
               </section>
 
-              <aside className="space-y-4 rounded-2xl border border-emerald-500/20 bg-zinc-900/70 p-5">
-                <div className="space-y-1">
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">Resumen</h4>
-                  <p className="text-xs text-emerald-100/70">Despliega cada bloque para revisar la información de tu cita.</p>
+              <aside className="flex flex-col gap-5 rounded-2xl border border-emerald-500/25 bg-zinc-900/70 p-6">
+                <div className="space-y-1 text-left">
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">Resumen de la cita</h4>
+                  <p className="text-xs text-emerald-100/70">Confirma que todos los detalles son correctos antes de enviar.</p>
                 </div>
 
                 {summaryLoading ? (
-                  <div className="space-y-3" role="status" aria-live="polite">
+                  <div className="space-y-4" role="status" aria-live="polite">
                     {Array.from({ length: 3 }).map((_, index) => (
-                      <div key={index} className="space-y-3 rounded-xl border border-zinc-800/60 bg-zinc-900/80 p-4">
-                        <Skeleton className="h-5 w-24 rounded" />
-                        <Skeleton className="h-4 w-32 rounded" />
-                        <Skeleton className="h-3 w-20 rounded" />
+                      <div key={index} className="flex items-center gap-4 rounded-xl border border-zinc-800/70 bg-zinc-900/80 p-4">
+                        <Skeleton className="h-10 w-10 rounded-xl" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-28 rounded" />
+                          <Skeleton className="h-3 w-24 rounded" />
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <Accordion type="multiple" defaultValue={['service', 'professional', 'schedule']} className="space-y-3">
-                    <AccordionItem
-                      value="service"
-                      className="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-900/70 px-0 text-white"
-                    >
-                      <AccordionTrigger className="flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold">
-                        <span className="flex items-center gap-2 text-sm font-medium text-white">
-                          <Scissors className="h-4 w-4 text-emerald-300" aria-hidden="true" /> Servicio
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-2 px-4 text-sm text-zinc-300">
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-4 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4">
+                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-500/15 text-emerald-200">
+                        <Scissors className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-emerald-200/80">Servicio</p>
                         <p className="text-base font-semibold text-white">{serviceLabel}</p>
-                        <p>{service?.duration_min} min · {fmtEuro(service?.price_eur)}</p>
-                      </AccordionContent>
-                    </AccordionItem>
+                        <p className="text-sm text-emerald-100/75">{service?.duration_min} min · {fmtEuro(service?.price_eur)}</p>
+                      </div>
+                    </div>
 
-                    <AccordionItem
-                      value="professional"
-                      className="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-900/70 px-0 text-white"
-                    >
-                      <AccordionTrigger className="flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold">
-                        <span className="flex items-center gap-2 text-sm font-medium text-white">
-                          <User className="h-4 w-4 text-emerald-300" aria-hidden="true" /> Profesional
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-2 px-4 text-sm text-zinc-300">
+                    <div className="flex items-start gap-4 rounded-xl border border-zinc-800/70 bg-zinc-900/80 p-4">
+                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-zinc-800/80 text-emerald-200">
+                        <User className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-white/50">Profesional</p>
                         <p className="text-base font-semibold text-white">{professionalLabel}</p>
-                      </AccordionContent>
-                    </AccordionItem>
+                      </div>
+                    </div>
 
-                    <AccordionItem
-                      value="schedule"
-                      className="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-900/70 px-0 text-white"
-                    >
-                      <AccordionTrigger className="flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold">
-                        <span className="flex items-center gap-2 text-sm font-medium text-white">
-                          <Calendar className="h-4 w-4 text-emerald-300" aria-hidden="true" /> Fecha y hora
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-2 px-4 text-sm text-zinc-300">
+                    <div className="flex items-start gap-4 rounded-xl border border-zinc-800/70 bg-zinc-900/80 p-4">
+                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-zinc-800/80 text-emerald-200">
+                        <Calendar className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-white/50">Fecha y hora</p>
                         <p className="text-base font-semibold text-white">{formatDateTime(slotStart)}</p>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {!summaryLoading && (
@@ -455,7 +444,7 @@ const BookConfirm = () => {
             </div>
 
             {error && (
-              <div className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4" role="alert">
+              <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4" role="alert">
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 text-red-300" aria-hidden="true" />
                   <div className="space-y-1">
@@ -467,7 +456,7 @@ const BookConfirm = () => {
             )}
 
             {ok && (
-              <div className="mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4" role="status" aria-live="polite">
+              <div className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4" role="status" aria-live="polite">
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 text-emerald-400" aria-hidden="true" />
                   <div className="space-y-1">
@@ -483,7 +472,7 @@ const BookConfirm = () => {
               </div>
             )}
 
-            <div className="sticky bottom-0 mt-6 -mx-5 flex flex-col gap-4 border-t border-zinc-800 bg-zinc-900/85 px-5 py-4 backdrop-blur-sm md:-mx-6 md:flex-row md:items-center md:justify-between md:px-6 rounded-b-2xl">
+            <div className="sticky bottom-0 mt-8 -mx-5 flex flex-col gap-4 border-t border-zinc-800/70 bg-zinc-900/85 px-5 py-5 backdrop-blur-sm md:-mx-8 md:flex-row md:items-center md:justify-between md:px-8 rounded-b-3xl">
               {contactHint && !ok && (
                 <p className="text-xs text-zinc-400 md:max-w-sm" role="status" aria-live="polite">
                   {contactHint}

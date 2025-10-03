@@ -210,7 +210,6 @@ const BookDate = () => {
   }, [selected, today, maxDate, availableDays]);
 
   const selectedYmd = selected ? toYmd(selected) : undefined;
-  const selectedHuman = selected ? format(selected, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es }) : undefined;
 
   useEffect(() => {
     if (selected && !availableDays.has(toYmd(selected))) {
@@ -419,11 +418,11 @@ const BookDate = () => {
       title="Selecciona fecha y hora"
       summary={resolvedServiceLabel || undefined}
     >
-  <div className="mx-auto w-full max-w-[920px]">
-        <div className="relative rounded-2xl border border-zinc-800 bg-zinc-900/80 shadow-[0_20px_80px_-60px_rgba(0,0,0,0.75)]">
-          <div className="p-4 md:p-5">
+      <div className="mx-auto w-full max-w-[1160px] px-4 sm:px-6">
+        <div className="relative rounded-3xl border border-zinc-800/70 bg-zinc-900/85 shadow-[0_24px_90px_-55px_rgba(0,0,0,0.78)]">
+          <div className="p-5 md:p-7 lg:p-8">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="text-center md:text-left">
+              <div className="text-center">
                 <h3 className="text-lg font-semibold text-white md:text-xl">Selecciona fecha y hora</h3>
                 <p className="mt-1 text-xs text-zinc-400 md:text-sm">Elige un día y después un horario disponible.</p>
               </div>
@@ -474,13 +473,15 @@ const BookDate = () => {
               </div>
             )}
 
-            <div className="mt-5 grid gap-5 md:grid-cols-[2fr,1fr] md:gap-6">
-              <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 md:p-5">
+            <div className="mt-8 flex flex-col items-center gap-8 lg:flex-row lg:items-start lg:justify-center lg:gap-12">
+              <section className="w-full max-w-[540px] rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 md:p-6 lg:p-7">
                 <CalendarNav month={month} onPrev={onPrevMonth} onNext={onNextMonth} />
 
-                <div className="mt-3 grid grid-cols-7 gap-1.5 text-center text-[11px] uppercase tracking-wide text-white/50">
+                <div className="mt-4 grid grid-cols-7 gap-1.5 text-center text-[11px] uppercase tracking-wide text-white/50 md:gap-2">
                   {['lu','ma','mi','ju','vi','sá','do'].map((w) => (
-                    <div key={w} className="grid h-7 place-items-center text-xs font-medium md:h-8">{w}</div>
+                    <div key={w} className="grid h-7 place-items-center rounded-lg bg-zinc-900/70 text-xs font-semibold text-white/60 md:h-8">
+                      {w}
+                    </div>
                   ))}
                 </div>
 
@@ -488,7 +489,7 @@ const BookDate = () => {
                   key={`${month.getFullYear()}-${month.getMonth()}`}
                   role="grid"
                   aria-label={format(month, 'LLLL yyyy', { locale: es })}
-                  className="mt-2.5 grid grid-cols-7 gap-1.5"
+                  className="mt-4 grid grid-cols-7 gap-2 md:gap-2.5 lg:gap-3"
                   tabIndex={0}
                   onKeyDown={onGridKeyDown}
                 >
@@ -500,17 +501,15 @@ const BookDate = () => {
                     const selectedDay = selected ? isSameDay(d, selected) : false;
                     const isFocused = isSameDay(d, focusedDate);
                     const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                    const showDot = (enabled || selectedDay) && inMonth;
-
                     const dayClasses = cn(
-                      'flex h-9 w-9 flex-col items-center justify-center gap-1 rounded-lg text-[13px] font-medium leading-none transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-100 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 md:h-10 md:w-10',
+                      'group relative grid h-11 w-11 place-items-center rounded-2xl text-sm font-semibold leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 md:h-12 md:w-12 md:text-base lg:h-[3.25rem] lg:w-[3.25rem]',
                       '[font-variant-numeric:tabular-nums] shadow-none',
-                      isWeekend ? 'text-white/70' : 'text-white/80',
-                      !inMonth && 'cursor-not-allowed text-white/25 opacity-80 hover:bg-transparent',
-                      inMonth && !enabled && 'cursor-not-allowed text-white/40 opacity-70 hover:bg-transparent',
-                      enabled && inMonth && !selectedDay && 'hover:bg-white/5',
-                      selectedDay && 'border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 shadow-[0_0_0_2px_rgba(16,185,129,0.25)]',
-                      isToday(d) && !selectedDay && 'outline outline-1 outline-white/15'
+                      isWeekend ? 'text-white/75' : 'text-white/85',
+                      !inMonth && 'cursor-not-allowed text-white/20 opacity-80 hover:bg-transparent',
+                      inMonth && !enabled && 'cursor-not-allowed text-white/35 opacity-70 hover:bg-transparent',
+                      enabled && inMonth && !selectedDay && 'border border-transparent hover:border-white/15 hover:bg-white/5',
+                      selectedDay && 'border border-emerald-500/50 bg-emerald-500/10 text-emerald-200 shadow-[0_0_0_2px_rgba(16,185,129,0.3)]',
+                      isToday(d) && !selectedDay && 'border border-white/15 text-white'
                     );
 
                     return (
@@ -535,43 +534,28 @@ const BookDate = () => {
                           className={dayClasses}
                         >
                           <span>{String(d.getDate())}</span>
-                          <span
-                            aria-hidden="true"
-                            className={cn(
-                              'h-1.5 w-1.5 rounded-full transition-opacity',
-                              selectedDay ? 'bg-white opacity-100' : 'bg-emerald-400',
-                              showDot ? 'opacity-100' : 'opacity-0'
-                            )}
-                          />
                         </button>
                       </div>
                     );
                   })}
                 </div>
 
-                <p className="mt-2 text-[11px] text-zinc-400">Selecciona un día para ver horarios disponibles.</p>
+                <p className="mt-5 text-left text-xs text-zinc-400 md:text-sm">Selecciona un día para ver horarios disponibles.</p>
               </section>
 
-              <aside className="space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 md:p-5">
-                <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-white">Selecciona un horario</h4>
-                  <p className="text-xs text-zinc-400">Elige un día y después una hora disponible.</p>
-                  {selectedHuman && (
-                    <p className="text-xs text-zinc-500">{selectedHuman}</p>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 p-1.5">
+              <aside className="w-full max-w-[380px] space-y-6 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5 md:p-6">
+                <div className="flex flex-col items-center gap-5 text-center">
+                  <h4 className="text-base font-semibold text-white md:text-lg">Selecciona un horario</h4>
+                  <div className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-2">
                     <button
                       type="button"
                       aria-pressed={range === 'morning'}
                       disabled={!selectedValid || morningSlots.length === 0}
                       onClick={() => handleRangeChange('morning')}
                       className={cn(
-                        'inline-flex h-10 w-full items-center justify-center rounded-md border border-transparent px-3 text-sm font-medium text-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
+                        'inline-flex h-12 items-center justify-center rounded-xl border border-transparent px-4 text-sm font-semibold uppercase tracking-wide text-zinc-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
                         'hover:bg-zinc-800/60',
-                        range === 'morning' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_0_1px] shadow-emerald-500/20',
+                        range === 'morning' && 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]',
                         (!selectedValid || morningSlots.length === 0) && 'cursor-not-allowed opacity-40'
                       )}
                     >
@@ -583,80 +567,77 @@ const BookDate = () => {
                       disabled={!selectedValid || afternoonSlots.length === 0}
                       onClick={() => handleRangeChange('afternoon')}
                       className={cn(
-                        'inline-flex h-10 w-full items-center justify-center rounded-md border border-transparent px-3 text-sm font-medium text-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
+                        'inline-flex h-12 items-center justify-center rounded-xl border border-transparent px-4 text-sm font-semibold uppercase tracking-wide text-zinc-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
                         'hover:bg-zinc-800/60',
-                        range === 'afternoon' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_0_1px] shadow-emerald-500/20',
+                        range === 'afternoon' && 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]',
                         (!selectedValid || afternoonSlots.length === 0) && 'cursor-not-allowed opacity-40'
                       )}
                     >
                       Tarde
                     </button>
                   </div>
-
-                  {slotsLoading && (
-                    <div className="grid grid-cols-3 gap-3">
-                      {Array.from({ length: 6 }).map((_, i) => (
-                        <Skeleton key={i} className="h-11 rounded-xl" />
-                      ))}
-                    </div>
-                  )}
-
-                  {!slotsLoading && (
-                    <>
-                      {selectedValid ? (
-                        displayedSlots.length > 0 ? (
-                          <div className="grid grid-cols-3 gap-3">
-                            {displayedSlots.map((iso, index) => {
-                              const selectedSlot = slotStart === iso;
-                              const slotDate = new Date(iso);
-                              const label = Number.isNaN(slotDate.getTime())
-                                ? iso.slice(11, 16)
-                                : format(slotDate, 'HH:mm', { locale: es });
-                              const animationDelay = `${Math.min(index, 6) * 40}ms`;
-                              return (
-                                <button
-                                  key={iso}
-                                  type="button"
-                                  aria-pressed={selectedSlot}
-                                  data-selected={selectedSlot}
-                                  className={cn(
-                                    'group relative grid h-11 w-full place-items-center rounded-xl border border-zinc-700/70 bg-transparent px-4 text-sm font-medium leading-none text-zinc-200 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
-                                    'hover:bg-zinc-800/40',
-                                    'transform-gpu animate-in fade-in-50 slide-in-from-bottom-1',
-                                    selectedSlot && 'scale-[1.05] border-emerald-500/45 bg-emerald-500/15 text-emerald-200 shadow-[0_0_0_2px_rgba(16,185,129,0.25)]',
-                                    !selectedSlot && 'scale-[1] opacity-95',
-                                    'disabled:cursor-not-allowed disabled:border-zinc-800/70 disabled:text-zinc-500 disabled:hover:bg-transparent disabled:opacity-40'
-                                  )}
-                                  style={{ animationDelay }}
-                                  onClick={() => onSelectSlot(iso)}
-                                >
-                                  <span className="w-full text-center [font-variant-numeric:tabular-nums] tracking-tight">{label}</span>
-                                  <Check
-                                    aria-hidden="true"
-                                    className={cn(
-                                      'pointer-events-none absolute right-2 h-3.5 w-3.5 text-emerald-300 opacity-0 transition-all duration-200 ease-out',
-                                      selectedSlot ? 'translate-y-0 opacity-100' : '-translate-y-1'
-                                    )}
-                                  />
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-zinc-400">No hay horarios disponibles en este tramo.</p>
-                        )
-                      ) : (
-                        <p className="text-xs text-zinc-400">Selecciona un día en el calendario para ver horarios disponibles.</p>
-                      )}
-                    </>
-                  )}
-
-                  {slotStart && (
-                    <p className="animate-in fade-in-50 slide-in-from-bottom-1 text-xs text-zinc-400">
-                      Has elegido {format(new Date(slotStart), 'HH:mm', { locale: es })}
-                    </p>
-                  )}
                 </div>
+
+                {slotsLoading && (
+                  <div className="mx-auto grid w-full max-w-[520px] grid-cols-[repeat(auto-fit,minmax(132px,1fr))] justify-center justify-items-center gap-3 md:gap-4">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                    ))}
+                  </div>
+                )}
+
+                {!slotsLoading && (
+                  <>
+                    {selectedValid ? (
+                      displayedSlots.length > 0 ? (
+                        <div
+                          data-testid="slots-grid"
+                          className="mx-auto grid w-full max-w-[520px] grid-cols-[repeat(auto-fit,minmax(132px,1fr))] justify-center justify-items-center gap-3 md:gap-4"
+                        >
+                          {displayedSlots.map((iso, index) => {
+                            const selectedSlot = slotStart === iso;
+                            const slotDate = new Date(iso);
+                            const label = Number.isNaN(slotDate.getTime())
+                              ? iso.slice(11, 16)
+                              : format(slotDate, 'HH:mm', { locale: es });
+                            const animationDelay = `${Math.min(index, 6) * 40}ms`;
+                            return (
+                              <button
+                                key={iso}
+                                type="button"
+                                aria-pressed={selectedSlot}
+                                data-selected={selectedSlot}
+                                className={cn(
+                                  'group relative grid h-12 w-full min-w-[132px] place-items-center rounded-xl border border-zinc-700/70 bg-transparent px-5 text-base font-semibold leading-none text-zinc-100 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
+                                  'hover:bg-zinc-800/50',
+                                  'transform-gpu animate-in fade-in-50 slide-in-from-bottom-1',
+                                  selectedSlot && 'scale-[1.03] border-emerald-500/50 bg-emerald-500/15 text-emerald-200 shadow-[0_0_0_2px_rgba(16,185,129,0.3)]',
+                                  !selectedSlot && 'scale-[1] opacity-95',
+                                  'disabled:cursor-not-allowed disabled:border-zinc-800/70 disabled:text-zinc-500 disabled:hover:bg-transparent disabled:opacity-40'
+                                )}
+                                style={{ animationDelay }}
+                                onClick={() => onSelectSlot(iso)}
+                              >
+                                <span className="w-full text-center [font-variant-numeric:tabular-nums] tracking-tight">{label}</span>
+                                <Check
+                                  aria-hidden="true"
+                                  className={cn(
+                                    'pointer-events-none absolute right-2 h-3.5 w-3.5 text-emerald-300 opacity-0 transition-all duration-200 ease-out',
+                                    selectedSlot ? 'translate-y-0 opacity-100' : '-translate-y-1'
+                                  )}
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-zinc-400">No hay horarios disponibles en este tramo.</p>
+                      )
+                    ) : (
+                      <p className="text-xs text-zinc-400">Selecciona un día en el calendario para ver horarios disponibles.</p>
+                    )}
+                  </>
+                )}
 
                 {slotsError && !slotsLoading && (
                   <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-center">
@@ -665,16 +646,6 @@ const BookDate = () => {
                   </div>
                 )}
               </aside>
-            </div>
-
-            <div className="sticky bottom-0 mt-5 -mx-5 flex flex-col gap-3 border-t border-zinc-800 bg-zinc-900/85 px-5 py-3 backdrop-blur-sm md:-mx-6 md:flex-row md:justify-end md:px-6 rounded-b-2xl">
-              <Button
-                variant="outline"
-                onClick={goBackToBackground}
-                className="h-10 rounded-xl border-zinc-700 bg-transparent px-4 text-zinc-100 transition hover:border-zinc-500 hover:bg-zinc-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
-              >
-                Cambiar servicio
-              </Button>
               <Button
                 disabled={!canContinue}
                 data-ready={canContinue}

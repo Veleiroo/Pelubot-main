@@ -16,6 +16,15 @@
     --brand-foreground: 160 100% 10%;
     --accent: 160 84% 39%;
     --accent-foreground: 160 100% 10%;
+    --brand-green: #059669;
+    --brand-green-dark: #047857;
+    --accent-gold: #FACC15;
+    --text-primary: #FFFFFF;
+    --text-secondary: #9CA3AF;
+    --text-accent-muted: #6B7280;
+    --icon-muted: #CBD5E1;
+    --card-bg: #23272F;
+    --divider: #2E333C;
   }
 
   .dark {

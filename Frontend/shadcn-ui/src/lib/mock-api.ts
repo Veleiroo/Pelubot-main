@@ -1,0 +1,85 @@
+const BASE_SERVICES = [
+  { id: 'corte', name: 'Corte de pelo', duration_min: 30, price_eur: 15 },
+  { id: 'barba', name: 'Arreglo de barba', duration_min: 25, price_eur: 12 },
+];
+
+const BASE_PROFESSIONALS = [
+  { id: 'ana', name: 'Ana Fernández', services: ['corte', 'barba'] },
+  { id: 'luis', name: 'Luis Ortega', services: ['corte'] },
+];
+
+const toYmd = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const today = new Date();
+const baseDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2);
+const availableDay = toYmd(baseDate);
+const slotIso = `${availableDay}T10:00:00+02:00`;
+
+const clone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj)) as T;
+
+export function mockHttp(path: string, init?: RequestInit) {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const body = init?.body ? tryParseBody(init.body) : undefined;
+
+  switch (path) {
+    case '/services':
+      if (method === 'GET') return clone(BASE_SERVICES);
+      break;
+    case '/professionals':
+      if (method === 'GET') return clone(BASE_PROFESSIONALS);
+      break;
+    case '/slots/days':
+      if (method === 'POST')
+        return {
+          service_id: pickString(body, 'service_id') ?? BASE_SERVICES[0].id,
+          start: pickString(body, 'start') ?? availableDay,
+          end: pickString(body, 'end') ?? availableDay,
+          professional_id: pickString(body, 'professional_id') ?? null,
+          available_days: [availableDay],
+        };
+      break;
+    case '/slots':
+      if (method === 'POST')
+        return {
+          service_id: pickString(body, 'service_id') ?? BASE_SERVICES[0].id,
+          date: pickString(body, 'date_str') ?? availableDay,
+          professional_id: pickString(body, 'professional_id') ?? BASE_PROFESSIONALS[0].id,
+          slots: [slotIso],
+        };
+      break;
+    case '/reservations':
+      if (method === 'POST') {
+        const reservationId = `mock-${Date.now()}`;
+        return {
+          ok: true,
+          message: `Reserva creada en modo mock. ID: ${reservationId}`,
+          reservation_id: reservationId,
+          google_event_id: null,
+        };
+      }
+      break;
+    default:
+      break;
+  }
+
+  return undefined;
+}
+
+type MockBody = Record<string, unknown> | undefined;
+
+function tryParseBody(body: BodyInit): MockBody {
+  if (typeof body === 'string') {
+    try {
+      return JSON.parse(body) as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+function pickString(body: MockBody, key: string): string | undefined {
+  if (body && typeof body[key] === 'string') {
+    return String(body[key]);
+  }
+  return undefined;
+}
