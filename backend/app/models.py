@@ -3,7 +3,7 @@ Modelos principales de datos para la API de reservas.
 Incluye servicios, profesionales, reservas y estructuras de consulta.
 """
 from pydantic import BaseModel, Field, field_validator, EmailStr, model_validator
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import datetime, date, timezone
 from sqlmodel import SQLModel, Field as SQLField
 from sqlalchemy.types import DateTime
@@ -121,6 +121,34 @@ class StylistReservationOut(BaseModel):
 
 class StylistReservationsOut(BaseModel):
     reservations: List[StylistReservationOut]
+
+
+class StylistOverviewSummary(BaseModel):
+    total: int
+    confirmadas: int
+    pendientes: int
+    canceladas: int
+
+
+class StylistOverviewAppointment(BaseModel):
+    id: str
+    start: datetime
+    end: Optional[datetime] = None
+    service_id: Optional[str] = None
+    service_name: Optional[str] = None
+    status: Literal["confirmada", "pendiente", "cancelada"] = "confirmada"
+    client_name: Optional[str] = None
+    client_email: Optional[EmailStr] = None
+    client_phone: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class StylistOverviewOut(BaseModel):
+    date: date
+    timezone: str
+    summary: StylistOverviewSummary
+    upcoming: Optional[StylistOverviewAppointment] = None
+    appointments: List[StylistOverviewAppointment] = Field(default_factory=list)
 
 
 class StylistRescheduleIn(BaseModel):

@@ -22,6 +22,19 @@ _PROS_DEFAULT: List[Professional] = [
     Professional(id="deinis", name="Deinis Barber", services=["corte_cabello", "corte_barba", "arreglo_barba", "corte_jubilado"]),
 ]
 
+_DEFAULT_SERVICES_BY_PRO = {
+    pro.id: tuple(pro.services or [])
+    for pro in _PROS_DEFAULT
+}
+_ALL_SERVICE_IDS: List[str] = [service.id for service in SERVICES]
+
+
+def _resolve_services_for_row(row: object) -> List[str]:
+    defaults = list(_DEFAULT_SERVICES_BY_PRO.get(getattr(row, "id", ""), _ALL_SERVICE_IDS))
+    raw = list(getattr(row, "services", None) or [])
+    merged = list(dict.fromkeys(raw + defaults))
+    return merged or _ALL_SERVICE_IDS
+
 
 def _load_stylist_rows() -> Optional[List[object]]:
     """Intenta leer estilistas activos desde la base de datos."""
@@ -49,7 +62,7 @@ PROS: List[Professional] = (
         Professional(
             id=row.id,
             name=row.display_name or row.name,
-            services=row.services or [],
+            services=_resolve_services_for_row(row),
         )
         for row in _STYLIST_ROWS
     ]

@@ -5,12 +5,27 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, type Location as RouterLocation } from 'react-router-dom';
 import Index from '@/pages/Index';
 import NotFound from '@/pages/NotFound';
-import { loadBookDate, loadBookConfirm, loadDebugPage, loadBookService, loadProsLogin, loadProsOverview } from '@/lib/route-imports';
+import {
+    loadBookDate,
+    loadBookConfirm,
+    loadDebugPage,
+    loadBookService,
+    loadProsLogin,
+    loadProsOverview,
+    loadProsShell,
+    loadProsAgenda,
+    loadProsClients,
+    loadProsStats,
+} from '@/lib/route-imports';
 const BookDate = lazy(loadBookDate);
 const BookConfirm = lazy(loadBookConfirm);
 const BookService = lazy(loadBookService);
 const ProsLogin = lazy(loadProsLogin);
 const ProsOverview = lazy(loadProsOverview);
+const ProsShell = lazy(loadProsShell);
+const ProsAgenda = lazy(loadProsAgenda);
+const ProsClients = lazy(loadProsClients);
+const ProsStats = lazy(loadProsStats);
 import Loading from '@/components/Loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import BookingDialog from '@/components/BookingDialog';
@@ -40,7 +55,12 @@ const AppRoutes = () => {
                 <Route path="/book/date" element={renderWithSuspense(BookDate)} />
                 <Route path="/book/confirm" element={renderWithSuspense(BookConfirm)} />
                 <Route path="/pros/login" element={renderWithSuspense(ProsLogin)} />
-                <Route path="/pros" element={renderWithSuspense(ProsOverview)} />
+                <Route path="/pros" element={renderWithSuspense(ProsShell)}>
+                    <Route index element={renderWithSuspense(ProsOverview)} />
+                    <Route path="agenda" element={renderWithSuspense(ProsAgenda)} />
+                    <Route path="clientes" element={renderWithSuspense(ProsClients)} />
+                    <Route path="estadisticas" element={renderWithSuspense(ProsStats)} />
+                </Route>
                 {DEBUG && <Route path="/debug" element={renderWithSuspense(DebugPage)} />}
                 <Route path="*" element={<NotFound />} />
             </Routes>

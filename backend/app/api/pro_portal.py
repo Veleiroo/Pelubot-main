@@ -26,11 +26,15 @@ from app.models import (
     RescheduleIn,
     RescheduleOut,
     StylistRescheduleIn,
+    StylistOverviewOut,
+    StylistOverviewAppointment,
+    StylistOverviewSummary,
 )
 from app.services.logic import find_reservation, cancel_reservation, apply_reschedule
 from app.utils.date import now_tz, TZ, validate_target_dt
 from app.utils.security import needs_rehash, verify_password, hash_password
 from app.core.metrics import RESERVATIONS_CANCELLED, RESERVATIONS_RESCHEDULED
+from app.data import SERVICE_BY_ID
 
 router = APIRouter(prefix="/pros", tags=["pros"])
 
@@ -143,6 +147,84 @@ def stylist_reservations(
         for row in rows
     ]
     return StylistReservationsOut(reservations=reservations)
+
+
+@router.get("/overview", response_model=StylistOverviewOut)
+def stylist_overview(
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+) -> StylistOverviewOut:
+    now = now_tz()
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = start_of_day + timedelta(days=1)
+
+    rows = (
+        session.exec(
+            select(ReservationDB)
+            .where(ReservationDB.professional_id == stylist.id)
+            .where(ReservationDB.start >= start_of_day)
+            .where(ReservationDB.start < end_of_day)
+            .order_by(ReservationDB.start)
+        ).all()
+        if session is not None
+        else []
+    )
+
+    def _to_local(dt: datetime | None) -> datetime | None:
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            try:
+                return dt.replace(tzinfo=TZ)
+            except Exception:
+                return dt
+        return dt.astimezone(TZ)
+
+    appointments: list[StylistOverviewAppointment] = []
+    counts = {"confirmada": 0, "pendiente": 0, "cancelada": 0}
+    upcoming: StylistOverviewAppointment | None = None
+
+    for row in rows:
+        start_local = _to_local(row.start)
+        if start_local is None:
+            continue
+        end_local = _to_local(row.end)
+        status = "confirmada" if start_local <= now else "pendiente"
+        counts[status] += 1
+        service = SERVICE_BY_ID.get(row.service_id)
+        appointment = StylistOverviewAppointment(
+            id=row.id,
+            start=start_local,
+            end=end_local,
+            service_id=row.service_id,
+            service_name=service.name if service else row.service_id,
+            status=status,
+            client_name=getattr(row, "customer_name", None),
+            client_email=getattr(row, "customer_email", None),
+            client_phone=getattr(row, "customer_phone", None),
+            notes=getattr(row, "notes", None),
+        )
+        appointments.append(appointment)
+        if status != "cancelada" and start_local >= now:
+            if upcoming is None or start_local < upcoming.start:
+                upcoming = appointment
+
+    summary = StylistOverviewSummary(
+        total=len(appointments),
+        confirmadas=counts["confirmada"],
+        pendientes=counts["pendiente"],
+        canceladas=counts["cancelada"],
+    )
+
+    tz_label = getattr(TZ, "key", None) or TZ.tzname(now) or "UTC"
+
+    return StylistOverviewOut(
+        date=start_of_day.date(),
+        timezone=str(tz_label),
+        summary=summary,
+        upcoming=upcoming,
+        appointments=appointments,
+    )
 
 
 @router.post("/reservations/{reservation_id}/cancel", response_model=ActionResult)

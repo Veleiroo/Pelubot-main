@@ -34,6 +34,33 @@ const API_KEY = String(import.meta.env?.VITE_API_KEY ?? '').trim();
 
 export type Service = { id: string; name: string; duration_min: number; price_eur: number };
 export type Professional = { id: string; name: string; services?: string[] };
+export type ProAppointmentStatus = 'confirmada' | 'pendiente' | 'cancelada';
+export type ProOverviewAppointment = {
+  id: string;
+  start: string;
+  end?: string | null;
+  service_id?: string | null;
+  service_name?: string | null;
+  status: ProAppointmentStatus;
+  client_name?: string | null;
+  client_email?: string | null;
+  client_phone?: string | null;
+  last_visit?: string | null;
+  notes?: string | null;
+};
+export type ProOverviewSummary = {
+  total: number;
+  confirmadas: number;
+  pendientes: number;
+  canceladas: number;
+};
+export type ProOverview = {
+  date: string;
+  timezone: string;
+  summary: ProOverviewSummary;
+  upcoming?: ProOverviewAppointment | null;
+  appointments: ProOverviewAppointment[];
+};
 
 type SlotsOut = { service_id: string; date: string; professional_id?: string | null; slots: string[] };
 type ActionResult = { ok: boolean; message: string };
@@ -220,6 +247,8 @@ export const api = {
     }),
 
   prosMe: () => http<{ stylist: StylistPublic; session_expires_at: string }>("/pros/me"),
+
+  prosOverview: () => http<ProOverview>("/pros/overview"),
 };
 
 export type StylistPublic = {
