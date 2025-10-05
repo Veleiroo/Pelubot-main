@@ -108,6 +108,7 @@ class StylistAuthOut(BaseModel):
 class StylistReservationOut(BaseModel):
     id: str
     service_id: str
+    service_name: Optional[str] = None
     professional_id: str
     start: datetime
     end: datetime
@@ -141,6 +142,7 @@ class StylistOverviewAppointment(BaseModel):
     client_email: Optional[EmailStr] = None
     client_phone: Optional[str] = None
     notes: Optional[str] = None
+    last_visit: Optional[date] = None
 
 
 class StylistOverviewOut(BaseModel):
@@ -161,6 +163,57 @@ class StylistRescheduleIn(BaseModel):
         if not any((self.new_start, self.new_date, self.new_time)):
             raise ValueError("Se requiere new_start o new_date/new_time para reprogramar.")
         return self
+
+
+class StylistStatsSummary(BaseModel):
+    total_revenue_eur: float
+    revenue_change_pct: float
+    avg_ticket_eur: float
+    avg_ticket_change_pct: float
+    repeat_rate_pct: float
+    repeat_rate_change_pct: float
+    new_clients: int
+    new_clients_change_pct: float
+
+
+class StylistStatsTrendPoint(BaseModel):
+    period: str
+    label: str
+    revenue_eur: float
+    appointments: int
+
+
+class StylistStatsServicePerformance(BaseModel):
+    service_id: str
+    service_name: str
+    total_appointments: int
+    total_revenue_eur: float
+    growth_pct: float
+
+
+class StylistStatsRetentionBucket(BaseModel):
+    id: str
+    label: str
+    count: int
+    share_pct: float
+    trend: Literal["up", "down", "steady"]
+    description: Optional[str] = None
+
+
+class StylistStatsInsight(BaseModel):
+    id: str
+    title: str
+    description: str
+    priority: Literal["high", "medium", "low"] = "medium"
+
+
+class StylistStatsOut(BaseModel):
+    generated_at: datetime
+    summary: StylistStatsSummary
+    revenue_series: List[StylistStatsTrendPoint]
+    top_services: List[StylistStatsServicePerformance]
+    retention: List[StylistStatsRetentionBucket]
+    insights: List[StylistStatsInsight]
 
 class Reservation(BaseModel):
     """Reserva realizada por un cliente."""

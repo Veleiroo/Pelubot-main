@@ -54,11 +54,30 @@
 }
 
 /* Calendario (DayPicker) — estilo consistente y alineado */
+.pelu-cal {
+  /* Forzamos que el ancho/alto de las celdas coincida con los botones custom */
+  --rdp-day-width: 3rem;
+  --rdp-day-height: 3rem;
+  --rdp-day_button-width: 3rem;
+  --rdp-day_button-height: 3rem;
+  --rdp-weekday-padding: 0.25rem 0;
+  --rdp-selected-border: none;
+}
+
+@media (min-width: 768px) {
+  .pelu-cal {
+    --rdp-day-width: 3.25rem;
+    --rdp-day-height: 3.25rem;
+    --rdp-day_button-width: 3.25rem;
+    --rdp-day_button-height: 3.25rem;
+  }
+}
+
 /* Mostrar celdas fuera de mes como huecos en blanco, sin romper el grid */
 .pelu-cal .rdp-outside,
 .pelu-cal [data-outside="true"] {
-  visibility: hidden;
-  pointer-events: none;
+  opacity: 0.45;
+  color: rgba(226, 232, 240, 0.55);
 }
 
 /* Días de la semana */
@@ -73,17 +92,16 @@
   width: 40px;
   border-radius: 8px;
 }
+.pelu-cal .rdp-day_button {
+  border-radius: 1.05rem;
+}
 .pelu-cal .rdp-day:where([aria-disabled="true"]) {
   opacity: .4;
 }
 
 /* Día seleccionado (marca) */
 .pelu-cal .rdp-day_selected:not([data-outside]) {
-  background: #00D4AA;
-  color: #0a0a0a;
-}
-.pelu-cal .rdp-day_selected:not([data-outside]):hover {
-  background: #00b894; /* hover */
+  background: transparent;
 }
 
 /* Navegación de meses */
@@ -109,4 +127,43 @@
 .pelu-cal .rdp-nav_button[disabled] {
   opacity: .35;
   cursor: not-allowed;
+}
+
+/* Agenda calendar custom modifiers */
+
+.pelu-cal .rdp-day_button.calendar-day--today,
+.pelu-cal .rdp-day_button.calendar-day--selected {
+  border-radius: 9999px;
+}
+
+.pelu-cal .rdp-day_button.calendar-day--today {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.pelu-cal .rdp-day_button.calendar-day--selected {
+  background-color: rgba(148, 163, 184, 0.18);
+  color: rgba(255, 255, 255, 0.97);
+}
+
+.pelu-cal .rdp-day_button.calendar-day--selected:hover {
+  background-color: rgba(160, 177, 195, 0.22);
+}
+
+.pelu-cal .rdp-day_button.calendar-day--past {
+  color: rgba(226, 232, 240, 0.35);
+  background-color: transparent;
+}
+
+.pelu-cal .rdp-day_selected,
+.pelu-cal .rdp-selected,
+.pelu-cal .rdp-day_selected .rdp-day_button,
+.pelu-cal .rdp-selected .rdp-day_button,
+.pelu-cal .rdp-day_button[aria-selected="true"] {
+  border-radius: 9999px;
+}
+
+.pelu-cal .rdp-day_selected .rdp-day_button,
+.pelu-cal .rdp-selected .rdp-day_button {
+  border: none;
 }

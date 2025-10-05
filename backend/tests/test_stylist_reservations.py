@@ -19,7 +19,7 @@ def _seed_stylist(engine, **overrides) -> StylistDB:
         "display_name": "Deinis",
         "email": "deinis@example.com",
         "services": ["corte_cabello"],
-        "password_hash": hash_password("pelu12345"),
+    "password_hash": hash_password("1234"),
         "is_active": True,
     }
     data.update(overrides)
@@ -66,7 +66,7 @@ def test_stylist_cancel_reservation_removes_booking(app_client: TestClient):
     start = datetime(2050, 1, 5, 10, 0, tzinfo=TZ)
     reservation = _seed_reservation(engine, reservation_id="res-can-1", professional_id="deinis", start=start)
 
-    _login(app_client, "deinis", "pelu12345")
+    _login(app_client, "deinis", "1234")
     resp = app_client.post(f"/pros/reservations/{reservation.id}/cancel")
     assert resp.status_code == 200
     body = resp.json()
@@ -84,7 +84,7 @@ def test_stylist_cannot_cancel_other_professional_reservation(app_client: TestCl
     start = datetime(2050, 1, 7, 11, 0, tzinfo=TZ)
     reservation = _seed_reservation(engine, reservation_id="res-can-2", professional_id="alex", start=start)
 
-    _login(app_client, "deinis", "pelu12345")
+    _login(app_client, "deinis", "1234")
     resp = app_client.post(f"/pros/reservations/{reservation.id}/cancel")
     assert resp.status_code == 404
 
@@ -105,7 +105,7 @@ def test_stylist_reschedule_updates_reservation(app_client: TestClient):
         google_calendar_id="primary",
     )
 
-    _login(app_client, "deinis", "pelu12345")
+    _login(app_client, "deinis", "1234")
     resp = app_client.post(
         f"/pros/reservations/{reservation.id}/reschedule",
         json={"new_time": "12:00"},
@@ -135,7 +135,7 @@ def test_stylist_reschedule_forbidden_for_other_professional(app_client: TestCli
     start = datetime(2050, 3, 15, 10, 30, tzinfo=TZ)
     reservation = _seed_reservation(engine, reservation_id="res-resch-2", professional_id="alex", start=start)
 
-    _login(app_client, "deinis", "pelu12345")
+    _login(app_client, "deinis", "1234")
     resp = app_client.post(
         f"/pros/reservations/{reservation.id}/reschedule",
         json={"new_time": "13:00"},

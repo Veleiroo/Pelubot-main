@@ -13,26 +13,3 @@
   animation: cal-fade-keyframes 0.12s ease both;
 }
 
-.pelu-cal .pelu-day-has-appointments {
-  position: relative;
-}
-
-.pelu-cal .pelu-day-has-appointments::after {
-  content: '';
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.85), rgba(56, 189, 248, 0.85));
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.45);
-  pointer-events: none;
-}
-
-.pelu-cal .pelu-day-has-appointments[aria-selected='true']::after {
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
-}
-

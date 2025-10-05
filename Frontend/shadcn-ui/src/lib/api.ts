@@ -28,8 +28,9 @@ const MOCK_MODE = (() => {
   if (['force', 'always', 'mock'].includes(MOCK_MODE_RAW)) return 'force';
   return 'auto';
 })();
-const USE_MOCKS = import.meta.env.DEV && MOCK_MODE !== 'off';
-const MOCK_FORCE = import.meta.env.DEV && MOCK_MODE === 'force';
+const IS_DEV_RUNTIME = import.meta.env.DEV;
+const MOCK_FORCE = MOCK_MODE === 'force';
+const USE_MOCKS = MOCK_FORCE || (IS_DEV_RUNTIME && MOCK_MODE !== 'off');
 const API_KEY = String(import.meta.env?.VITE_API_KEY ?? '').trim();
 
 export type Service = { id: string; name: string; duration_min: number; price_eur: number };
@@ -60,6 +61,123 @@ export type ProOverview = {
   summary: ProOverviewSummary;
   upcoming?: ProOverviewAppointment | null;
   appointments: ProOverviewAppointment[];
+};
+
+export type ProReservation = {
+  id: string;
+  service_id: string;
+  service_name?: string | null;
+  professional_id: string;
+  start: string;
+  end: string;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type ProReservationsResponse = {
+  reservations: ProReservation[];
+};
+
+export type ProClientStatus = 'activo' | 'nuevo' | 'riesgo' | 'inactivo';
+
+export type ProClientUpcoming = {
+  appointment_id: string;
+  start: string;
+  service_name?: string | null;
+};
+
+export type ProClient = {
+  id: string;
+  full_name: string;
+  first_visit?: string | null;
+  last_visit?: string | null;
+  upcoming_visit?: ProClientUpcoming | null;
+  total_visits: number;
+  total_spent_eur: number;
+  phone?: string | null;
+  email?: string | null;
+  favorite_services?: string[];
+  tags?: string[];
+  notes?: string | null;
+  status: ProClientStatus;
+  loyalty_score?: number | null;
+};
+
+export type ProClientsSummary = {
+  total: number;
+  nuevos: number;
+  recurrentes: number;
+  riesgo: number;
+  inactivos: number;
+};
+
+export type ProClientsSegment = {
+  id: string;
+  label: string;
+  count: number;
+  trend: 'up' | 'down' | 'steady';
+  description?: string;
+};
+
+export type ProClientsResponse = {
+  summary: ProClientsSummary;
+  segments: ProClientsSegment[];
+  clients: ProClient[];
+};
+
+export type ProStatsSummary = {
+  total_revenue_eur: number;
+  revenue_change_pct: number;
+  avg_ticket_eur: number;
+  avg_ticket_change_pct: number;
+  repeat_rate_pct: number;
+  repeat_rate_change_pct: number;
+  new_clients: number;
+  new_clients_change_pct: number;
+};
+
+export type ProStatsTrendPoint = {
+  period: string;
+  label: string;
+  revenue_eur: number;
+  appointments: number;
+};
+
+export type ProStatsServicePerformance = {
+  service_id: string;
+  service_name: string;
+  total_appointments: number;
+  total_revenue_eur: number;
+  growth_pct: number;
+};
+
+export type ProStatsRetentionBucket = {
+  id: string;
+  label: string;
+  count: number;
+  share_pct: number;
+  trend: 'up' | 'down' | 'steady';
+  description?: string;
+};
+
+export type ProStatsInsight = {
+  id: string;
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+};
+
+export type ProStatsResponse = {
+  generated_at: string;
+  summary: ProStatsSummary;
+  revenue_series: ProStatsTrendPoint[];
+  top_services: ProStatsServicePerformance[];
+  retention: ProStatsRetentionBucket[];
+  insights: ProStatsInsight[];
 };
 
 type SlotsOut = { service_id: string; date: string; professional_id?: string | null; slots: string[] };
@@ -249,6 +367,22 @@ export const api = {
   prosMe: () => http<{ stylist: StylistPublic; session_expires_at: string }>("/pros/me"),
 
   prosOverview: () => http<ProOverview>("/pros/overview"),
+  prosReservations: (params?: { daysAhead?: number; includePastMinutes?: number }) => {
+    const search = new URLSearchParams();
+    if (typeof params?.daysAhead === 'number') {
+      search.set('days_ahead', String(Math.max(1, Math.round(params.daysAhead))));
+    }
+    if (typeof params?.includePastMinutes === 'number') {
+      search.set('include_past_minutes', String(Math.max(0, Math.round(params.includePastMinutes))));
+    }
+    const qs = search.toString();
+    const path = qs ? `/pros/reservations?${qs}` : "/pros/reservations";
+    return http<ProReservationsResponse>(path);
+  },
+
+  prosClients: () => http<ProClientsResponse>("/pros/clients"),
+
+  prosStats: () => http<ProStatsResponse>("/pros/stats"),
 };
 
 export type StylistPublic = {

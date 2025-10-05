@@ -32,7 +32,7 @@ function Calendar({ className, classNames, showOutsideDays = true, locale, ...pr
       locale={loc}
       fromMonth={fromMonth}
       toMonth={toMonth}
-      className={cn('pelu-cal p-2', className)}
+  className={cn('pelu-cal px-1.5 py-2', className)}
       classNames={{
         months: 'flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0',
         month: 'space-y-3',
@@ -52,10 +52,13 @@ function Calendar({ className, classNames, showOutsideDays = true, locale, ...pr
         cell: 'p-0 text-center align-middle',
         // Celda ligera y botón de día centrado para no romper columnas.
         day: 'p-0 text-center align-middle',
-        day_button: cn(buttonVariants({ variant: 'ghost' }), 'h-9 w-9 p-0 font-normal aria-selected:opacity-100 inline-flex items-center justify-center mx-auto'),
+        day_button: cn(
+          buttonVariants({ variant: 'ghost' }),
+          'h-9 w-9 p-0 font-normal aria-selected:opacity-100 inline-flex items-center justify-center mx-auto rounded-full'
+        ),
         day_range_end: 'day-range-end',
         day_selected:
-          'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
+          'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-full',
         day_today: 'bg-accent text-accent-foreground',
         day_outside:
           'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',

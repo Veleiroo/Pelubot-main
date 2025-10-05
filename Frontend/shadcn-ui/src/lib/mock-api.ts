@@ -121,6 +121,252 @@ const makeOverviewMock = () => {
   };
 };
 
+const makeReservationsMock = () => {
+  const now = new Date();
+  const reservations = Array.from({ length: 14 }).flatMap((_, index) => {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2 + index);
+    const slots = [9, 11, 14, 17].slice(0, (index % 3) + 2);
+    return slots.map((hourOffset, slotIdx) => {
+      const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hourOffset, slotIdx % 2 === 0 ? 0 : 30, 0);
+      const end = new Date(start.getTime() + 45 * 60_000);
+      const service = BASE_SERVICES[(index + slotIdx) % BASE_SERVICES.length];
+      return {
+        id: `res-${day.getMonth() + 1}-${day.getDate()}-${slotIdx}`,
+        service_id: service.id,
+        service_name: service.name,
+        professional_id: MOCK_STYLIST.id,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        customer_name: `Cliente ${index + slotIdx + 1}`,
+        customer_phone: '+34 600 000 000',
+        notes: slotIdx % 3 === 0 ? 'Confirmar preferencia de estilo.' : undefined,
+        created_at: new Date(start.getTime() - 5 * 60_000).toISOString(),
+        updated_at: new Date(start.getTime() - 2 * 60_000).toISOString(),
+      };
+    });
+  });
+
+  return { reservations };
+};
+
+const makeClientsMock = () => {
+  const future = new Date();
+  future.setDate(future.getDate() + 5);
+  future.setHours(11, 30, 0, 0);
+
+  const clients = [
+    {
+      id: 'cli-201',
+      full_name: 'Laura Pérez',
+      first_visit: '2023-06-18',
+      last_visit: '2025-09-12',
+      upcoming_visit: {
+        appointment_id: 'apt-302',
+        start: future.toISOString(),
+        service_name: 'Coloración completa',
+      },
+      total_visits: 18,
+      total_spent_eur: 845,
+      phone: '+34 612 345 678',
+      email: 'laura@example.com',
+      favorite_services: ['Coloración', 'Tratamiento hidratante'],
+      tags: ['VIP', 'Color'],
+      status: 'activo' as const,
+      loyalty_score: 92,
+    },
+    {
+      id: 'cli-202',
+      full_name: 'Marta López',
+      first_visit: '2024-01-09',
+      last_visit: '2025-08-28',
+      total_visits: 6,
+      total_spent_eur: 210,
+      phone: '+34 698 221 430',
+      favorite_services: ['Peinado evento'],
+      tags: ['Eventos'],
+      status: 'activo' as const,
+      loyalty_score: 74,
+    },
+    {
+      id: 'cli-203',
+      full_name: 'Andrea Vidal',
+      first_visit: '2023-11-14',
+      last_visit: '2025-09-01',
+      total_visits: 9,
+      total_spent_eur: 325,
+      favorite_services: ['Tratamiento hidratante'],
+      status: 'nuevo' as const,
+      loyalty_score: 61,
+    },
+    {
+      id: 'cli-204',
+      full_name: 'Sara Núñez',
+      first_visit: '2022-04-02',
+      last_visit: '2024-12-10',
+      total_visits: 3,
+      total_spent_eur: 120,
+      phone: '+34 677 550 102',
+      tags: ['Decoloración'],
+      status: 'riesgo' as const,
+      loyalty_score: 35,
+    },
+    {
+      id: 'cli-205',
+      full_name: 'Daniela Gómez',
+      first_visit: '2021-09-23',
+      last_visit: '2023-11-18',
+      total_visits: 5,
+      total_spent_eur: 165,
+      status: 'inactivo' as const,
+      loyalty_score: 20,
+      notes: 'Mudanza reciente, revisar si sigue en la ciudad.',
+    },
+  ];
+
+  const summary = {
+    total: clients.length,
+    nuevos: clients.filter((client) => client.status === 'nuevo').length,
+    recurrentes: clients.filter((client) => client.status === 'activo').length,
+    riesgo: clients.filter((client) => client.status === 'riesgo').length,
+    inactivos: clients.filter((client) => client.status === 'inactivo').length,
+  };
+
+  const segments = [
+    {
+      id: 'vip',
+      label: 'VIP',
+      count: clients.filter((client) => (client.loyalty_score ?? 0) >= 80).length,
+      trend: 'up' as const,
+      description: 'Ticket medio superior a 60€ y visitas frecuentes.',
+    },
+    {
+      id: 'eventos',
+      label: 'Eventos',
+      count: clients.filter((client) => client.tags?.includes('Eventos')).length,
+      trend: 'steady' as const,
+      description: 'Visitan principalmente para peinados y recogidos especiales.',
+    },
+    {
+      id: 'recuperar',
+      label: 'Recuperar',
+      count: clients.filter((client) => client.status === 'riesgo' || client.status === 'inactivo').length,
+      trend: 'down' as const,
+      description: 'Más de 90 días sin visita. Acciones de reactivación sugeridas.',
+    },
+  ];
+
+  return {
+    summary,
+    segments,
+    clients,
+  };
+};
+
+const makeStatsMock = () => {
+  const now = new Date();
+  const revenue_series = Array.from({ length: 6 }).map((_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
+    const label = date.toLocaleDateString('es-ES', { month: 'short' });
+    const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const base = 3200 + index * 180;
+    const revenue_eur = base + Math.sin(index / 2.5) * 240;
+    const appointments = Math.max(10, Math.round(45 + Math.cos(index / 1.6) * 5));
+    return { period, label: label.charAt(0).toUpperCase() + label.slice(1), revenue_eur: Math.round(revenue_eur), appointments };
+  });
+
+  const summary = {
+    total_revenue_eur: revenue_series[5]?.revenue_eur ?? 0,
+    revenue_change_pct: 12.5,
+    avg_ticket_eur: 68.4,
+    avg_ticket_change_pct: 4.2,
+    repeat_rate_pct: 62.0,
+    repeat_rate_change_pct: 3.5,
+    new_clients: 14,
+    new_clients_change_pct: -8.4,
+  };
+
+  const top_services = [
+    {
+      service_id: 'corte_cabello',
+      service_name: 'Corte de cabello',
+      total_appointments: 38,
+      total_revenue_eur: 1230,
+      growth_pct: 9.8,
+    },
+    {
+      service_id: 'coloracion',
+      service_name: 'Coloración completa',
+      total_appointments: 21,
+      total_revenue_eur: 1520,
+      growth_pct: 4.3,
+    },
+    {
+      service_id: 'tratamiento',
+      service_name: 'Tratamiento hidratante',
+      total_appointments: 17,
+      total_revenue_eur: 890,
+      growth_pct: -3.1,
+    },
+  ];
+
+  const retention = [
+    {
+      id: 'active-30',
+      label: 'Activas (<30 días)',
+      count: 42,
+      share_pct: 54.3,
+      trend: 'up' as const,
+      description: 'Clientas que visitaron el salón en el último mes.',
+    },
+    {
+      id: 'risk-90',
+      label: 'En seguimiento (30-90 días)',
+      count: 18,
+      share_pct: 23.1,
+      trend: 'steady' as const,
+      description: 'Recomendada una campaña de recordatorio.',
+    },
+    {
+      id: 'recover-90+',
+      label: 'Recuperar (>90 días)',
+      count: 17,
+      share_pct: 22.6,
+      trend: 'down' as const,
+      description: 'Contacta con beneficios especiales para su retorno.',
+    },
+  ];
+
+  const insights = [
+    {
+      id: 'upsell-color',
+      title: 'Activa un pack de coloración para clientas frecuentes',
+      description: 'Las reservas de coloración crecieron 4,3% este mes. Ofrece un paquete de mantenimiento para subir el ticket medio.',
+      priority: 'medium' as const,
+    },
+    {
+      id: 'recover-vip',
+      title: 'Recupera clientas VIP con bono de cortes',
+      description: '17 clientas llevan más de 90 días sin visitarte. Un bono con descuento limitado puede acelerar su regreso.',
+      priority: 'high' as const,
+    },
+    {
+      id: 'nps-survey',
+      title: 'Lanza encuesta NPS post servicio',
+      description: 'Con una repetición del 62%, medir satisfacción te ayudará a identificar mejoras rápidas.',
+      priority: 'low' as const,
+    },
+  ];
+
+  return {
+    generated_at: new Date().toISOString(),
+    summary,
+    revenue_series,
+    top_services,
+    retention,
+    insights,
+  };
+};
+
 export function mockHttp(path: string, init?: RequestInit) {
   const method = (init?.method ?? 'GET').toUpperCase();
   const body = init?.body ? tryParseBody(init.body) : undefined;
@@ -190,6 +436,30 @@ export function mockHttp(path: string, init?: RequestInit) {
           throw new MockHttpError(401, 'No active session', 'No active session (mock)');
         }
         return makeOverviewMock();
+      }
+      break;
+    case '/pros/reservations':
+      if (method === 'GET') {
+        if (!hasProsSession) {
+          throw new MockHttpError(401, 'No active session', 'No active session (mock)');
+        }
+        return makeReservationsMock();
+      }
+      break;
+    case '/pros/clients':
+      if (method === 'GET') {
+        if (!hasProsSession) {
+          throw new MockHttpError(401, 'No active session', 'No active session (mock)');
+        }
+        return makeClientsMock();
+      }
+      break;
+    case '/pros/stats':
+      if (method === 'GET') {
+        if (!hasProsSession) {
+          throw new MockHttpError(401, 'No active session', 'No active session (mock)');
+        }
+        return makeStatsMock();
       }
       break;
     default:

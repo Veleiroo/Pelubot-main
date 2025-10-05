@@ -336,6 +336,27 @@ def _build_customer_description(reservation: Reservation) -> tuple[str | None, d
     return description, private
 
 
+def _normalize_private_value(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    return value or None
+
+
+def _apply_private_customer_metadata(row: ReservationDB, private_props: dict[str, str]) -> bool:
+    changed = False
+    if not private_props:
+        return changed
+    for field in ("customer_name", "customer_email", "customer_phone", "notes"):
+        if field not in private_props:
+            continue
+        new_value = _normalize_private_value(private_props.get(field))
+        if getattr(row, field, None) != new_value:
+            setattr(row, field, new_value)
+            changed = True
+    return changed
+
+
 def create_gcal_reservation(reservation: Reservation, calendar_id: str = None, tz: str = "Europe/Madrid") -> dict:
     """Crea el evento correspondiente en Google Calendar con metadata del cliente."""
     service = build_calendar()
@@ -423,7 +444,16 @@ def sync_from_gcal_range(session: Session, start_date: date, end_date: date, def
                 r = session.get(ReservationDB, rid)
                 if r is None:
                     # NOTA: se crea la reserva local para reflejar eventos creados directamente en GCal.
-                    r = ReservationDB(id=rid, service_id=srv_id, professional_id=str(pro), start=start_dt, end=end_dt, google_event_id=it.get("id"), google_calendar_id=cal_id)
+                    r = ReservationDB(
+                        id=rid,
+                        service_id=srv_id,
+                        professional_id=str(pro),
+                        start=start_dt,
+                        end=end_dt,
+                        google_event_id=it.get("id"),
+                        google_calendar_id=cal_id,
+                    )
+                    _apply_private_customer_metadata(r, priv)
                     session.add(r); total_ins += 1
                 else:
                     changed = False
@@ -433,6 +463,7 @@ def sync_from_gcal_range(session: Session, start_date: date, end_date: date, def
                     if r.service_id != srv_id: r.service_id = srv_id; changed = True
                     if r.google_event_id != it.get("id"): r.google_event_id = it.get("id"); changed = True
                     if r.google_calendar_id != cal_id: r.google_calendar_id = cal_id; changed = True
+                    if _apply_private_customer_metadata(r, priv): changed = True
                     if changed: session.add(r); total_upd += 1
             d += timedelta(days=1)
         session.commit()

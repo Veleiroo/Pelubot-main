@@ -1,7 +1,7 @@
 """Endpoints de autenticación y sesión para el portal de estilistas."""
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Body
 from sqlalchemy import or_, text as _sql_text
@@ -29,6 +29,12 @@ from app.models import (
     StylistOverviewOut,
     StylistOverviewAppointment,
     StylistOverviewSummary,
+    StylistStatsOut,
+    StylistStatsSummary,
+    StylistStatsTrendPoint,
+    StylistStatsServicePerformance,
+    StylistStatsRetentionBucket,
+    StylistStatsInsight,
 )
 from app.services.logic import find_reservation, cancel_reservation, apply_reschedule
 from app.utils.date import now_tz, TZ, validate_target_dt
@@ -50,6 +56,51 @@ def _to_public(stylist: StylistDB) -> StylistPublic:
         calendar_id=stylist.calendar_id,
         use_gcal_busy=bool(stylist.use_gcal_busy),
     )
+
+
+def _to_local(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        try:
+            return dt.replace(tzinfo=TZ)
+        except Exception:
+            return dt
+    return dt.astimezone(TZ)
+
+
+def _month_start(dt: datetime) -> datetime:
+    localized = _to_local(dt) or now_tz()
+    return localized.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _add_months(dt: datetime, months: int) -> datetime:
+    year = dt.year + (dt.month - 1 + months) // 12
+    month = (dt.month - 1 + months) % 12 + 1
+    return dt.replace(year=year, month=month, day=1)
+
+
+def _pct_change(current: float, previous: float) -> float:
+    if previous == 0:
+        if current == 0:
+            return 0.0
+        return 100.0 if current > 0 else -100.0
+    try:
+        return ((current - previous) / previous) * 100
+    except Exception:
+        return 0.0
+
+
+def _service_price(service_id: str | None) -> float:
+    if not service_id:
+        return 0.0
+    service = SERVICE_BY_ID.get(service_id)
+    if not service:
+        return 0.0
+    try:
+        return float(service.price_eur)
+    except Exception:
+        return 0.0
 
 
 @router.post("/login", response_model=StylistAuthOut)
@@ -130,22 +181,25 @@ def stylist_reservations(
         .order_by(ReservationDB.start)
     )
     rows = session.exec(stmt).all()
-    reservations = [
-        StylistReservationOut(
-            id=row.id,
-            service_id=row.service_id,
-            professional_id=row.professional_id,
-            start=row.start,
-            end=row.end,
-            customer_name=row.customer_name,
-            customer_email=row.customer_email,
-            customer_phone=row.customer_phone,
-            notes=row.notes,
-            created_at=row.created_at,
-            updated_at=getattr(row, "updated_at", None),
+    reservations: list[StylistReservationOut] = []
+    for row in rows:
+        service = SERVICE_BY_ID.get(row.service_id)
+        reservations.append(
+            StylistReservationOut(
+                id=row.id,
+                service_id=row.service_id,
+                service_name=service.name if service else row.service_id,
+                professional_id=row.professional_id,
+                start=row.start,
+                end=row.end,
+                customer_name=row.customer_name,
+                customer_email=row.customer_email,
+                customer_phone=row.customer_phone,
+                notes=row.notes,
+                created_at=row.created_at,
+                updated_at=getattr(row, "updated_at", None),
+            )
         )
-        for row in rows
-    ]
     return StylistReservationsOut(reservations=reservations)
 
 
@@ -184,6 +238,35 @@ def stylist_overview(
     counts = {"confirmada": 0, "pendiente": 0, "cancelada": 0}
     upcoming: StylistOverviewAppointment | None = None
 
+    last_visits: dict[str, date] = {}
+    if session is not None:
+        customer_names = {
+            getattr(row, "customer_name", None)
+            for row in rows
+            if getattr(row, "customer_name", None)
+        }
+        if customer_names:
+            try:
+                stmt_last = (
+                    select(ReservationDB)
+                    .where(ReservationDB.professional_id == stylist.id)
+                    .where(ReservationDB.start < start_of_day)
+                    .where(ReservationDB.customer_name.in_(customer_names))
+                    .order_by(ReservationDB.customer_name, ReservationDB.start.desc())
+                )
+                previous_reservations = session.exec(stmt_last).all()
+            except Exception:
+                previous_reservations = []
+
+            for previous in previous_reservations:
+                name = getattr(previous, "customer_name", None)
+                if not name or name in last_visits:
+                    continue
+                last_start_local = _to_local(previous.start)
+                if last_start_local is None:
+                    continue
+                last_visits[name] = last_start_local.date()
+
     for row in rows:
         start_local = _to_local(row.start)
         if start_local is None:
@@ -203,6 +286,7 @@ def stylist_overview(
             client_email=getattr(row, "customer_email", None),
             client_phone=getattr(row, "customer_phone", None),
             notes=getattr(row, "notes", None),
+            last_visit=last_visits.get(getattr(row, "customer_name", None)),
         )
         appointments.append(appointment)
         if status != "cancelada" and start_local >= now:
@@ -224,6 +308,279 @@ def stylist_overview(
         summary=summary,
         upcoming=upcoming,
         appointments=appointments,
+    )
+
+
+@router.get("/stats", response_model=StylistStatsOut)
+def stylist_stats(
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+) -> StylistStatsOut:
+    now = now_tz()
+    current_month_start = _month_start(now)
+    previous_month_start = _add_months(current_month_start, -1)
+    next_month_start = _add_months(current_month_start, 1)
+    series_months = [_add_months(current_month_start, offset) for offset in range(-5, 1)]
+    series_start = series_months[0]
+
+    reservations_raw = (
+        session.exec(
+            select(ReservationDB)
+            .where(ReservationDB.professional_id == stylist.id)
+            .order_by(ReservationDB.start)
+        ).all()
+        if session is not None
+        else []
+    )
+
+    reservations_local: list[tuple[ReservationDB, datetime, float]] = []
+    client_first_visit: dict[str, datetime] = {}
+    client_last_visit: dict[str, datetime] = {}
+
+    for row in reservations_raw:
+        start_local = _to_local(getattr(row, "start", None))
+        if start_local is None:
+            continue
+        price = _service_price(getattr(row, "service_id", None))
+        reservations_local.append((row, start_local, price))
+
+        customer_name = getattr(row, "customer_name", None)
+        if customer_name:
+            recorded_first = client_first_visit.get(customer_name)
+            if recorded_first is None or start_local < recorded_first:
+                client_first_visit[customer_name] = start_local
+            recorded_last = client_last_visit.get(customer_name)
+            if recorded_last is None or start_local > recorded_last:
+                client_last_visit[customer_name] = start_local
+
+    def _filter_period(start: datetime, end: datetime) -> list[tuple[ReservationDB, datetime, float]]:
+        return [item for item in reservations_local if start <= item[1] < end]
+
+    current_rows = _filter_period(current_month_start, next_month_start)
+    previous_rows = _filter_period(previous_month_start, current_month_start)
+
+    revenue_current = sum(price for _, _, price in current_rows)
+    revenue_previous = sum(price for _, _, price in previous_rows)
+
+    avg_ticket_current = revenue_current / len(current_rows) if current_rows else 0.0
+    avg_ticket_previous = revenue_previous / len(previous_rows) if previous_rows else 0.0
+
+    def _clients_for(rows: list[tuple[ReservationDB, datetime, float]]) -> set[str]:
+        clients: set[str] = set()
+        for reservation, _, _ in rows:
+            name = getattr(reservation, "customer_name", None)
+            if name:
+                clients.add(name)
+        return clients
+
+    current_clients = _clients_for(current_rows)
+    previous_clients = _clients_for(previous_rows)
+
+    repeat_current = {
+        name
+        for name in current_clients
+        if client_first_visit.get(name) and client_first_visit[name] < current_month_start
+    }
+    repeat_previous = {
+        name
+        for name in previous_clients
+        if client_first_visit.get(name) and client_first_visit[name] < previous_month_start
+    }
+
+    repeat_rate_current = (len(repeat_current) / len(current_clients) * 100) if current_clients else 0.0
+    repeat_rate_previous = (len(repeat_previous) / len(previous_clients) * 100) if previous_clients else 0.0
+
+    new_clients_current = {
+        name
+        for name in current_clients
+        if client_first_visit.get(name) and client_first_visit[name] >= current_month_start
+    }
+    new_clients_previous = {
+        name
+        for name in previous_clients
+        if client_first_visit.get(name)
+        and previous_month_start <= client_first_visit[name] < current_month_start
+    }
+
+    summary = StylistStatsSummary(
+        total_revenue_eur=round(revenue_current, 2),
+        revenue_change_pct=round(_pct_change(revenue_current, revenue_previous), 2),
+        avg_ticket_eur=round(avg_ticket_current, 2),
+        avg_ticket_change_pct=round(_pct_change(avg_ticket_current, avg_ticket_previous), 2),
+        repeat_rate_pct=round(repeat_rate_current, 2),
+        repeat_rate_change_pct=round(repeat_rate_current - repeat_rate_previous, 2),
+        new_clients=len(new_clients_current),
+        new_clients_change_pct=round(_pct_change(len(new_clients_current), len(new_clients_previous)), 2),
+    )
+
+    # Revenue series (last 6 months including current)
+    monthly_revenue: dict[str, float] = {f"{month.year}-{month.month:02d}": 0.0 for month in series_months}
+    monthly_appointments: dict[str, int] = {f"{month.year}-{month.month:02d}": 0 for month in series_months}
+
+    for _, start_local, price in reservations_local:
+        if start_local < series_start or start_local >= next_month_start:
+            continue
+        key = f"{start_local.year}-{start_local.month:02d}"
+        if key in monthly_revenue:
+            monthly_revenue[key] += price
+            monthly_appointments[key] += 1
+
+    revenue_series = []
+    for month in series_months:
+        key = f"{month.year}-{month.month:02d}"
+        label = month.strftime("%b").capitalize()
+        revenue_series.append(
+            StylistStatsTrendPoint(
+                period=key,
+                label=label,
+                revenue_eur=round(monthly_revenue.get(key, 0.0), 2),
+                appointments=monthly_appointments.get(key, 0),
+            )
+        )
+
+    # Services performance
+    service_current: dict[str, dict[str, float | int | str]] = {}
+    service_previous: dict[str, dict[str, float | int | str]] = {}
+
+    def _register_service(
+        container: dict[str, dict[str, float | int | str]],
+        reservation: ReservationDB,
+        price: float,
+    ) -> None:
+        service_id = getattr(reservation, "service_id", None) or "otros"
+        service = SERVICE_BY_ID.get(service_id)
+        bucket = container.setdefault(
+            service_id,
+            {
+                "service_name": service.name if service else service_id,
+                "total_revenue_eur": 0.0,
+                "total_appointments": 0,
+            },
+        )
+        bucket["total_revenue_eur"] = float(bucket["total_revenue_eur"]) + price
+        bucket["total_appointments"] = int(bucket["total_appointments"]) + 1
+
+    for reservation, _, price in current_rows:
+        _register_service(service_current, reservation, price)
+    for reservation, _, price in previous_rows:
+        _register_service(service_previous, reservation, price)
+
+    top_services = []
+    for service_id, payload in service_current.items():
+        revenue_value = float(payload["total_revenue_eur"])
+        prev_revenue = float(service_previous.get(service_id, {}).get("total_revenue_eur", 0.0))
+        top_services.append(
+            StylistStatsServicePerformance(
+                service_id=service_id,
+                service_name=str(payload["service_name"]),
+                total_appointments=int(payload["total_appointments"]),
+                total_revenue_eur=round(revenue_value, 2),
+                growth_pct=round(_pct_change(revenue_value, prev_revenue), 2),
+            )
+        )
+
+    top_services.sort(key=lambda item: item.total_revenue_eur, reverse=True)
+    top_services = top_services[:5]
+
+    # Retention buckets
+    segments_meta = {
+        "active-30": {
+            "label": "Activas (<30 días)",
+            "description": "Clientas que han vuelto en las últimas 4 semanas.",
+        },
+        "risk-90": {
+            "label": "En seguimiento (30-90 días)",
+            "description": "Planifica recordatorios o beneficios ligeros.",
+        },
+        "recover-90+": {
+            "label": "Recuperar (>90 días)",
+            "description": "Considera acciones de reactivación específicas.",
+        },
+    }
+
+    def _segment_counts(reference: datetime) -> dict[str, int]:
+        counts = {key: 0 for key in segments_meta.keys()}
+        for last_visit in client_last_visit.values():
+            delta_days = (reference - last_visit).days if reference >= last_visit else 0
+            if delta_days <= 30:
+                counts["active-30"] += 1
+            elif delta_days <= 90:
+                counts["risk-90"] += 1
+            else:
+                counts["recover-90+"] += 1
+        return counts
+
+    counts_current = _segment_counts(now)
+    counts_previous = _segment_counts(current_month_start - timedelta(days=1))
+    total_clients = sum(counts_current.values()) or 1
+
+    retention = []
+    for segment_id, meta in segments_meta.items():
+        current_count = counts_current.get(segment_id, 0)
+        previous_count = counts_previous.get(segment_id, 0)
+        if current_count > previous_count:
+            trend = "up"
+        elif current_count < previous_count:
+            trend = "down"
+        else:
+            trend = "steady"
+        retention.append(
+            StylistStatsRetentionBucket(
+                id=segment_id,
+                label=meta["label"],
+                count=current_count,
+                share_pct=round((current_count / total_clients) * 100, 1),
+                trend=trend,
+                description=meta["description"],
+            )
+        )
+
+    # Insights
+    insights: list[StylistStatsInsight] = []
+    if summary.revenue_change_pct < 0:
+        insights.append(
+            StylistStatsInsight(
+                id="revenue-decline",
+                title="Revisa promociones para recuperar ingresos",
+                description="Los ingresos han caído frente al mes anterior. Considera un paquete especial o recordar reservas recurrentes.",
+                priority="high",
+            )
+        )
+    if summary.new_clients_change_pct < 0:
+        insights.append(
+            StylistStatsInsight(
+                id="new-clients",
+                title="Activa campañas de captación",
+                description="Llegan menos clientas nuevas que el mes pasado. Comparte contenido en redes o impulsa recomendaciones.",
+                priority="medium",
+            )
+        )
+    if summary.repeat_rate_pct < 55:
+        insights.append(
+            StylistStatsInsight(
+                id="repeat-rate",
+                title="Lanza beneficios de fidelización",
+                description="La repetición está por debajo del objetivo. Un programa de puntos o recordatorios personalizados puede ayudar.",
+                priority="medium",
+            )
+        )
+    if not insights:
+        insights.append(
+            StylistStatsInsight(
+                id="healthy-trend",
+                title="¡Buen ritmo!",
+                description="Tus métricas crecen de forma saludable. Mantén la comunicación con clientas y evalúa subir precios gradualmente.",
+                priority="low",
+            )
+        )
+
+    return StylistStatsOut(
+        generated_at=now,
+        summary=summary,
+        revenue_series=revenue_series,
+        top_services=top_services,
+        retention=retention,
+        insights=insights,
     )
 
 

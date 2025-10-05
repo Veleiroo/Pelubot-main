@@ -50,7 +50,7 @@ test.describe('Portal profesionales', () => {
         return;
       }
       const payload = route.request().postDataJSON();
-  expect(payload).toMatchObject({ identifier: 'deinis', password: 'pelu12345' });
+  expect(payload).toMatchObject({ identifier: 'deinis', password: '1234' });
 
       hasSession = true;
       await route.fulfill({
@@ -67,7 +67,7 @@ test.describe('Portal profesionales', () => {
   await expect(page.getByRole('heading', { name: /Accede al portal profesional/i })).toBeVisible();
 
   await page.getByLabel('Usuario o email').fill('deinis');
-  await page.getByLabel('Contraseña').fill('pelu12345');
+  await page.getByLabel('Contraseña').fill('1234');
 
     await Promise.all([
       page.waitForURL(/\/pros$/),
