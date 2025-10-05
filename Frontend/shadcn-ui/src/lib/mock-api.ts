@@ -121,17 +121,27 @@ const makeOverviewMock = () => {
   };
 };
 
-const makeReservationsMock = () => {
+const clampNumber = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const makeReservationsMock = (options?: { daysAhead?: number; includePastMinutes?: number }) => {
   const now = new Date();
-  const reservations = Array.from({ length: 14 }).flatMap((_, index) => {
-    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2 + index);
+  const normalizedDaysAhead = clampNumber(Math.round(options?.daysAhead ?? 30), 7, 90);
+  const normalizedPastMinutes = clampNumber(Math.round(options?.includePastMinutes ?? 60 * 24 * 30), 0, 60 * 24 * 90);
+  const pastDays = clampNumber(Math.ceil(normalizedPastMinutes / (60 * 24)), 1, 30);
+  const futureDays = normalizedDaysAhead;
+  const totalDays = pastDays + futureDays + 1;
+  const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - pastDays);
+
+  const reservations = Array.from({ length: totalDays }).flatMap((_, index) => {
+    const day = new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate() + index);
     const slots = [9, 11, 14, 17].slice(0, (index % 3) + 2);
     return slots.map((hourOffset, slotIdx) => {
       const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hourOffset, slotIdx % 2 === 0 ? 0 : 30, 0);
       const end = new Date(start.getTime() + 45 * 60_000);
       const service = BASE_SERVICES[(index + slotIdx) % BASE_SERVICES.length];
+      const idSuffix = `${day.getMonth() + 1}-${day.getDate()}-${slotIdx}`;
       return {
-        id: `res-${day.getMonth() + 1}-${day.getDate()}-${slotIdx}`,
+        id: `res-${idSuffix}`,
         service_id: service.id,
         service_name: service.name,
         professional_id: MOCK_STYLIST.id,
@@ -367,11 +377,19 @@ const makeStatsMock = () => {
   };
 };
 
+const parseNumberParam = (value: string | null | undefined) => {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 export function mockHttp(path: string, init?: RequestInit) {
   const method = (init?.method ?? 'GET').toUpperCase();
   const body = init?.body ? tryParseBody(init.body) : undefined;
+  const url = new URL(path, 'https://mock.pelubot');
+  const pathname = url.pathname;
 
-  switch (path) {
+  switch (pathname) {
     case '/services':
       if (method === 'GET') return clone(BASE_SERVICES);
       break;
@@ -443,7 +461,9 @@ export function mockHttp(path: string, init?: RequestInit) {
         if (!hasProsSession) {
           throw new MockHttpError(401, 'No active session', 'No active session (mock)');
         }
-        return makeReservationsMock();
+        const daysAhead = parseNumberParam(url.searchParams.get('days_ahead'));
+        const includePastMinutes = parseNumberParam(url.searchParams.get('include_past_minutes'));
+        return makeReservationsMock({ daysAhead, includePastMinutes });
       }
       break;
     case '/pros/clients':
