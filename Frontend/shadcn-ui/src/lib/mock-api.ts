@@ -518,12 +518,7 @@ export function mockHttp(path: string, init?: RequestInit) {
         }
         const daysAhead = parseNumberParam(url.searchParams.get('days_ahead'));
         const includePastMinutes = parseNumberParam(url.searchParams.get('include_past_minutes'));
-        const store = ensureReservationsStore();
-        const reservations = filterReservationsForRange(store, {
-          daysAhead: daysAhead ?? undefined,
-          includePastMinutes: includePastMinutes ?? undefined,
-        });
-        return { reservations };
+        return makeReservationsMock({ daysAhead, includePastMinutes });
       }
       break;
     case '/pros/clients':
