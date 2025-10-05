@@ -82,6 +82,18 @@ export type ProReservationsResponse = {
   reservations: ProReservation[];
 };
 
+export type ProsReschedulePayload = {
+  new_date?: string;
+  new_time?: string;
+  new_start?: string;
+};
+
+export type ProsRescheduleResponse = ActionResult & {
+  reservation_id?: string;
+  start?: string | null;
+  end?: string | null;
+};
+
 export type ProClientStatus = 'activo' | 'nuevo' | 'riesgo' | 'inactivo';
 
 export type ProClientUpcoming = {
@@ -379,6 +391,17 @@ export const api = {
     const path = qs ? `/pros/reservations?${qs}` : "/pros/reservations";
     return http<ProReservationsResponse>(path);
   },
+
+  prosCancelReservation: (reservationId: string) =>
+    http<ActionResult>(`/pros/reservations/${reservationId}/cancel`, {
+      method: "POST",
+    }),
+
+  prosRescheduleReservation: (reservationId: string, payload: ProsReschedulePayload) =>
+    http<ProsRescheduleResponse>(`/pros/reservations/${reservationId}/reschedule`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   prosClients: () => http<ProClientsResponse>("/pros/clients"),
 

@@ -159,6 +159,36 @@ const makeReservationsMock = (options?: { daysAhead?: number; includePastMinutes
   return { reservations };
 };
 
+let reservationsStore: ReturnType<typeof makeReservationsMock>['reservations'] | null = null;
+
+const ensureReservationsStore = () => {
+  if (!reservationsStore) {
+    reservationsStore = makeReservationsMock({ daysAhead: 120, includePastMinutes: 60 * 24 * 60 }).reservations;
+  }
+  return reservationsStore;
+};
+
+const findService = (serviceId?: string | null) => BASE_SERVICES.find((service) => service.id === serviceId);
+
+const filterReservationsForRange = (
+  reservations: ReturnType<typeof makeReservationsMock>['reservations'],
+  options: { daysAhead?: number; includePastMinutes?: number }
+) => {
+  const now = new Date();
+  const normalizedDaysAhead = clampNumber(Math.round(options.daysAhead ?? 30), 1, 180);
+  const normalizedPastMinutes = clampNumber(Math.round(options.includePastMinutes ?? 60 * 24 * 30), 0, 60 * 24 * 90);
+  const startBoundary = new Date(now.getTime() - normalizedPastMinutes * 60_000);
+  const endBoundary = new Date(now.getTime() + normalizedDaysAhead * 24 * 60 * 60_000);
+
+  const filtered = reservations.filter((reservation) => {
+    const start = new Date(reservation.start);
+    const end = reservation.end ? new Date(reservation.end) : start;
+    return start <= endBoundary && end >= startBoundary;
+  });
+
+  return filtered.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+};
+
 const makeClientsMock = () => {
   const future = new Date();
   future.setDate(future.getDate() + 5);
@@ -420,6 +450,31 @@ export function mockHttp(path: string, init?: RequestInit) {
     case '/reservations':
       if (method === 'POST') {
         const reservationId = `mock-${Date.now()}`;
+        const serviceId = pickString(body, 'service_id') ?? BASE_SERVICES[0].id;
+        const service = findService(serviceId) ?? BASE_SERVICES[0];
+        const professionalId = pickString(body, 'professional_id') ?? MOCK_STYLIST.id;
+        const startIso = pickString(body, 'start') ?? new Date().toISOString();
+        const startDate = new Date(startIso);
+        const durationMs = (service?.duration_min ?? 45) * 60_000;
+        const endIso = new Date(startDate.getTime() + durationMs).toISOString();
+
+        const store = ensureReservationsStore();
+        store.push({
+          id: reservationId,
+          service_id: serviceId,
+          service_name: service?.name ?? serviceId,
+          professional_id: professionalId,
+          start: startIso,
+          end: endIso,
+          customer_name: pickString(body, 'customer_name') ?? 'Cliente mock',
+          customer_email: pickString(body, 'customer_email'),
+          customer_phone: pickString(body, 'customer_phone'),
+          notes: pickString(body, 'notes'),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+        store.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
         return {
           ok: true,
           message: `Reserva creada en modo mock. ID: ${reservationId}`,
@@ -463,7 +518,12 @@ export function mockHttp(path: string, init?: RequestInit) {
         }
         const daysAhead = parseNumberParam(url.searchParams.get('days_ahead'));
         const includePastMinutes = parseNumberParam(url.searchParams.get('include_past_minutes'));
-        return makeReservationsMock({ daysAhead, includePastMinutes });
+        const store = ensureReservationsStore();
+        const reservations = filterReservationsForRange(store, {
+          daysAhead: daysAhead ?? undefined,
+          includePastMinutes: includePastMinutes ?? undefined,
+        });
+        return { reservations };
       }
       break;
     case '/pros/clients':
@@ -484,6 +544,71 @@ export function mockHttp(path: string, init?: RequestInit) {
       break;
     default:
       break;
+  }
+
+  if (pathname.startsWith('/pros/reservations/')) {
+    if (!hasProsSession) {
+      throw new MockHttpError(401, 'No active session', 'No active session (mock)');
+    }
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.length >= 4) {
+      const reservationId = segments[2];
+      const action = segments[3];
+      const store = ensureReservationsStore();
+      const index = store.findIndex((reservation) => reservation.id === reservationId);
+      if (index === -1) {
+        throw new MockHttpError(404, 'Reservation not found', 'Reservation not found (mock)');
+      }
+      if (method === 'POST' && action === 'cancel') {
+        store.splice(index, 1);
+        return { ok: true, message: `Reserva ${reservationId} cancelada (mock).` };
+      }
+      if (method === 'POST' && action === 'reschedule') {
+        const entry = store[index];
+        const durationMs = (() => {
+          const start = new Date(entry.start);
+          const end = entry.end ? new Date(entry.end) : new Date(start.getTime() + 45 * 60_000);
+          return Math.max(45 * 60_000, end.getTime() - start.getTime());
+        })();
+
+        let newStart = new Date(entry.start);
+        if (body && typeof body.new_start === 'string') {
+          const parsed = new Date(String(body.new_start));
+          if (!Number.isNaN(parsed.getTime())) newStart = parsed;
+        } else {
+          if (body && typeof body.new_date === 'string') {
+            const parts = body.new_date.split('-').map((part: string) => Number.parseInt(part, 10));
+            if (parts.length === 3 && parts.every((value) => Number.isFinite(value))) {
+              newStart.setFullYear(parts[0], parts[1] - 1, parts[2]);
+            }
+          }
+          if (body && typeof body.new_time === 'string') {
+            const parts = body.new_time.split(':').map((part: string) => Number.parseInt(part, 10));
+            if (parts.length >= 2 && Number.isFinite(parts[0])) {
+              newStart.setHours(parts[0], Number.isFinite(parts[1]) ? parts[1] : 0, 0, 0);
+            }
+          }
+        }
+
+        const newStartIso = newStart.toISOString();
+        const newEndIso = new Date(newStart.getTime() + durationMs).toISOString();
+        store[index] = {
+          ...entry,
+          start: newStartIso,
+          end: newEndIso,
+          updated_at: new Date().toISOString(),
+        };
+        store.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+        return {
+          ok: true,
+          message: `Reserva ${reservationId} reprogramada (mock).`,
+          reservation_id: reservationId,
+          start: newStartIso,
+          end: newEndIso,
+        };
+      }
+    }
   }
 
   return undefined;
