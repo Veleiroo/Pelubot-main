@@ -21,6 +21,7 @@ export type AgendaAppointmentsCardProps = {
   dayLabel: string;
   summary: AgendaSummary;
   appointments: Appointment[];
+  isToday: boolean;
   onCreate: () => void;
   onAction: (action: 'reschedule' | 'cancel', appointment: Appointment) => void;
   minHeight: number;

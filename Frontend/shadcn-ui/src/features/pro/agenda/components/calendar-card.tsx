@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarNav } from '@/components/ui/CalendarNav';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 import type { AgendaCalendarCardProps } from '../types';
@@ -40,8 +40,8 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
       busyDates,
       fromMonth,
       toMonth,
-      title = 'Calendario general',
-      description = 'Visualiza tus citas del mes sin salir de esta pantalla.',
+      title = 'Calendario',
+      description,
       disablePrev,
       disableNext,
       onSelectDay,
@@ -93,16 +93,17 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
                 ...(startOfToday ? { past: { before: startOfToday } } : {}),
               }}
               modifiersClassNames={{
-                busy: 'calendar-day--busy text-emerald-200 font-semibold',
+                busy:
+                  'calendar-day--busy relative after:absolute after:bottom-2 after:left-1/2 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-emerald-300 after:content-[""]',
                 today:
-                  'calendar-day--today ring-[1.5px] ring-white/55 bg-white/10 text-white rounded-full focus-visible:outline-none',
+                  'calendar-day--today ring-2 ring-white/45 bg-white/10 text-white rounded-full focus-visible:outline-none',
                 selected:
                   'calendar-day--selected ring-[1.5px] ring-white/55 bg-white/14 text-white font-semibold shadow-[0_12px_32px_rgba(15,23,42,0.28)] hover:bg-white/16 rounded-full focus-visible:outline-none',
                 weekend: 'text-white/75',
                 past:
-                  'calendar-day--past text-white/35 hover:bg-transparent hover:text-white/35 hover:ring-0 focus-visible:ring-0 active:scale-100 cursor-default',
+                  'calendar-day--past text-white/30 hover:bg-transparent hover:text-white/30 hover:ring-0 focus-visible:ring-0 active:scale-100 cursor-default',
                 disabled: 'cursor-not-allowed opacity-35 hover:bg-transparent',
-                outside: 'text-white/35',
+                outside: 'text-white/30',
               }}
               className="mx-auto w-full max-w-[21.75rem] text-white/92"
               classNames={{
@@ -114,7 +115,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
                 table: 'table-fixed border-collapse text-white/90 mx-auto [&>tbody]:gap-y-2',
                 head_row: '',
                 head_cell:
-                  'h-6 text-center text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-white/60 md:h-7 md:text-[0.78rem]',
+                  'h-6 text-center text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-white/55 md:h-7 md:text-[0.75rem]',
                 row: '',
                 cell: 'p-0 text-center align-middle transition-colors duration-150 md:px-[1px]',
                 day: 'p-0 text-center align-middle',

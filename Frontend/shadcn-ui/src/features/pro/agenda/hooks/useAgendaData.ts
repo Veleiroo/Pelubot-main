@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, isValid, parseISO } from 'date-fns';
+import { differenceInMinutes, format, isValid, parseISO } from 'date-fns';
 
 import { api, ApiError, type ProReservationsResponse, type ProReservation } from '@/lib/api';
 
@@ -16,17 +16,24 @@ const mapReservation = (reservation: ProReservation, now: Date): Appointment | n
   const start = parseISO(reservation.start);
   if (!isValid(start)) return null;
 
+  const end = reservation.end ? parseISO(reservation.end) : null;
   const status = toAppointmentStatus(start, now);
   const client = reservation.customer_name?.trim() || 'Cliente por confirmar';
   const service = reservation.service_name?.trim() || reservation.service_id || 'Servicio por confirmar';
+  const durationMinutes = end && isValid(end) ? Math.max(0, differenceInMinutes(end, start)) : undefined;
 
   return {
     id: reservation.id,
     date: format(start, 'yyyy-MM-dd'),
     time: format(start, 'HH:mm'),
+    endTime: end && isValid(end) ? format(end, 'HH:mm') : undefined,
     client,
+    clientPhone: reservation.customer_phone ?? undefined,
+    clientEmail: reservation.customer_email ?? undefined,
     service,
+    serviceId: reservation.service_id,
     status,
+    durationMinutes,
     notes: reservation.notes ?? undefined,
   };
 };

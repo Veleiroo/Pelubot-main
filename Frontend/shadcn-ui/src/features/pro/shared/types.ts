@@ -4,9 +4,14 @@ export type Appointment = {
   id: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:mm
+  endTime?: string; // HH:mm
   client: string;
+  clientPhone?: string;
+  clientEmail?: string;
   service: string;
+  serviceId?: string;
   status: AppointmentStatus;
+  durationMinutes?: number;
   notes?: string;
 };
 

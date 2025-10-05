@@ -40,6 +40,7 @@ export const useAgendaState = (appointments: Appointment[]) => {
 
   const summary = useMemo(() => summarizeAppointments(selectedAppointments), [selectedAppointments]);
   const dayLabel = useMemo(() => formatAgendaDayLabel(selectedDate), [selectedDate]);
+  const isTodaySelected = useMemo(() => format(selectedDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'), [selectedDate, today]);
 
   const handleSelectDay = (day?: Date) => {
     const normalized = normalizeDay(day);
@@ -82,5 +83,6 @@ export const useAgendaState = (appointments: Appointment[]) => {
     handleMonthChange,
     goToMonth,
     setCurrentMonth,
+    isTodaySelected,
   };
 };
