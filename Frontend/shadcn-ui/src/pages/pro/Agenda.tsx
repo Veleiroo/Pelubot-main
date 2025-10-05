@@ -4,9 +4,11 @@ import { es } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import { CalendarNav } from '@/components/ui/CalendarNav';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 type AppointmentStatus = 'confirmada' | 'pendiente' | 'cancelada';
 
@@ -51,6 +53,8 @@ const STATUS_STYLES: Record<AppointmentStatus, string> = {
   pendiente: 'bg-amber-400/15 text-amber-200 ring-1 ring-amber-400/30',
   cancelada: 'bg-rose-400/15 text-rose-200 ring-1 ring-rose-400/30',
 };
+
+const MIN_APPOINTMENTS_CARD_HEIGHT = 440;
 
 const ProsAgenda = () => {
   const { toast } = useToast();
@@ -156,6 +160,25 @@ const ProsAgenda = () => {
     return addMonths(base, 6);
   }, []);
 
+  const previousMonthCandidate = useMemo(() => startOfMonth(addMonths(currentMonth, -1)), [currentMonth]);
+  const nextMonthCandidate = useMemo(() => startOfMonth(addMonths(currentMonth, 1)), [currentMonth]);
+  const disablePrevNav = previousMonthCandidate < fromMonth;
+  const disableNextNav = nextMonthCandidate > toMonth;
+
+  const goToMonth = (target: Date) => {
+    setCurrentMonth(startOfMonth(target));
+  };
+
+  const handlePrevNav = () => {
+    if (disablePrevNav) return;
+    goToMonth(previousMonthCandidate);
+  };
+
+  const handleNextNav = () => {
+    if (disableNextNav) return;
+    goToMonth(nextMonthCandidate);
+  };
+
   useLayoutEffect(() => {
     const recalc = () => {
       const root = layoutRef.current;
@@ -188,7 +211,7 @@ const ProsAgenda = () => {
   }, []);
 
   return (
-    <section ref={layoutRef} className="space-y-8">
+  <section ref={layoutRef} className="space-y-5">
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold text-white">Agenda</h1>
         <p className="text-sm text-white/60">
@@ -199,70 +222,88 @@ const ProsAgenda = () => {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <Card
           ref={calendarCardRef}
-          className="text-card-foreground flex flex-col gap-8 rounded-3xl border border-white/10 bg-white/8 p-6 shadow-lg shadow-emerald-900/25 backdrop-blur"
+          className="text-card-foreground flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/8 p-4 shadow-lg shadow-emerald-900/25 backdrop-blur md:gap-4 md:p-6"
         >
-          <CardHeader className="space-y-1.5 flex flex-col gap-4 p-0">
-            <div className="space-y-1">
-              <CardTitle className="text-lg font-semibold text-white">Calendario general</CardTitle>
-              <CardDescription className="text-sm text-white/70">
-                Los días con citas destacan con un indicador sutil.
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
-                <span className="relative inline-flex h-2.5 w-2.5 items-center justify-center rounded-full bg-emerald-400/80 shadow-[0_0_6px_rgba(16,185,129,0.5)]" aria-hidden="true" />
-                <span>Día con citas</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
-                <span className="inline-flex h-2.5 w-2.5 items-center justify-center rounded-full border border-emerald-400/70" aria-hidden="true" />
-                <span>Hoy</span>
-              </div>
-            </div>
+          <CardHeader className="p-0 text-center">
+            <CardTitle className="text-center text-2xl font-semibold tracking-tight text-white md:text-[2.6rem] md:leading-tight">
+              Calendario general
+            </CardTitle>
+            <CardDescription className="mx-auto max-w-sm text-xs text-white/60 leading-tight md:hidden">
+              Visualiza tus citas del mes sin salir de esta pantalla.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="p-0">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
+          <CardContent className="flex flex-1 flex-col items-center justify-center gap-4 p-0">
+            <CalendarNav
               month={currentMonth}
-              onSelect={handleSelectDay}
-              onMonthChange={handleMonthChange}
-              modifiers={{ busy: busyDates }}
-              modifiersClassNames={{ busy: 'pelu-day-has-appointments' }}
-              className="w-full rounded-[2.75rem] border border-white/10 bg-white/8 p-7 text-white shadow-[inset_0_0_1.5rem_rgba(15,118,110,0.18)] backdrop-blur-sm"
-              classNames={{
-                months: 'flex flex-col gap-8',
-                month: 'space-y-6 rounded-3xl bg-white/8 p-5 shadow-[0_0.5rem_1.5rem_rgba(8,47,40,0.28)] backdrop-blur-sm',
-                table: 'w-full border-separate border-spacing-y-2 border-spacing-x-2',
-                caption: 'flex w-full items-center justify-between gap-6 rounded-2xl border border-white/10 bg-white/8 px-5 py-3 text-white',
-                nav: 'flex items-center gap-3',
-                nav_button:
-                  'inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:border-emerald-400/60 hover:bg-emerald-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400/70',
-                nav_button_previous: '',
-                nav_button_next: '',
-                caption_label: 'text-lg font-semibold capitalize tracking-[0.02em] text-white',
-                head_cell: 'text-[0.75rem] uppercase tracking-[0.32em] text-white/60',
-                row: 'gap-3',
-                cell: 'p-1 text-center align-middle',
-                day: 'text-center align-middle',
-                day_button:
-                  'relative inline-flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-2xl text-base font-semibold text-white/80 transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400/70',
-                day_selected:
-                  'bg-emerald-500/90 text-white shadow-[0_0_18px_rgba(16,185,129,0.45)] hover:bg-emerald-500/90 focus:bg-emerald-500/90',
-                day_today:
-                  'border border-emerald-400/70 text-emerald-200 rounded-2xl font-semibold',
-                day_outside:
-                  'text-white/35 aria-selected:bg-white/10 aria-selected:text-white/60',
-              }}
-              fromMonth={fromMonth}
-              toMonth={toMonth}
+              onPrev={handlePrevNav}
+              onNext={handleNextNav}
+              disablePrev={disablePrevNav}
+              disableNext={disableNextNav}
+              className="mt-2 self-center md:mt-3"
             />
+            <div className="w-full rounded-[2.2rem] border border-white/12 bg-white/6 px-5 pb-5 pt-5 shadow-inner shadow-emerald-900/10 outline outline-1 outline-white/10 md:px-7 md:pb-6 md:pt-6">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                month={currentMonth}
+                onSelect={handleSelectDay}
+                onMonthChange={handleMonthChange}
+                modifiers={{ busy: busyDates, today: [today], weekend: { dayOfWeek: [0, 6] } }}
+                modifiersClassNames={{
+                  busy: 'text-emerald-200 font-semibold',
+                  today: 'ring-2 ring-white/70 text-white font-semibold',
+                  selected: 'ring-[3px] ring-white/80 text-white font-semibold',
+                  weekend: 'text-white/70',
+                  disabled: 'cursor-not-allowed opacity-40',
+                  outside: 'text-white/35',
+                }}
+                className="w-full text-white/92"
+                classNames={{
+                  months: 'flex w-full flex-col gap-3 md:gap-4',
+                  month: 'w-full',
+                  caption: 'hidden',
+                  month_caption: 'sr-only',
+                  caption_label: 'sr-only',
+                  table: 'w-full text-white/90',
+                  head_row: 'grid grid-cols-7 gap-2 md:gap-3',
+                  head_cell:
+                    'flex h-6 items-center justify-center text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-white/60 md:h-7 md:text-[0.78rem]',
+                  row: 'grid grid-cols-7 gap-2 md:gap-3',
+                  cell: 'flex items-center justify-center text-center',
+                  day: 'w-full',
+                  day_button: cn(
+                    'relative flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-semibold text-white/85 transition-[box-shadow,color] duration-150 md:h-[3.25rem] md:w-[3.25rem]',
+                    'hover:ring-2 hover:ring-white/55',
+                    'focus-visible:ring-2 focus-visible:ring-white/70',
+                    'active:duration-75',
+                    'disabled:hover:outline-none disabled:hover:bg-transparent',
+                    'motion-reduce:transition-none [font-variant-numeric:tabular-nums]'
+                  ),
+                  day_selected: '',
+                  day_today: '',
+                  day_outside: '',
+                  day_disabled: '',
+                  day_hidden: 'invisible',
+                  nav: 'hidden',
+                }}
+                hideNavigation
+                fromMonth={fromMonth}
+                toMonth={toMonth}
+              />
+            </div>
           </CardContent>
         </Card>
 
         <Card
           ref={agendaCardRef}
           className="text-card-foreground flex flex-col rounded-3xl border border-white/10 bg-white/8 p-6 shadow-lg shadow-emerald-900/25 backdrop-blur"
-          style={agendaCardHeight ? { height: agendaCardHeight } : undefined}
+          style={(() => {
+            if (!agendaCardHeight) {
+              return { minHeight: MIN_APPOINTMENTS_CARD_HEIGHT };
+            }
+            const clamped = Math.max(agendaCardHeight, MIN_APPOINTMENTS_CARD_HEIGHT);
+            return { height: clamped, minHeight: MIN_APPOINTMENTS_CARD_HEIGHT };
+          })()}
         >
           <CardHeader className="space-y-1.5 flex flex-col gap-4 p-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
