@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ChevronLeft, ChevronRight } from '@/lib/icons';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from '@/lib/icons';
 import { DayPicker } from 'react-day-picker';
 import { es as esLocale } from 'date-fns/locale';
 import type { Locale } from 'date-fns';
@@ -9,12 +9,22 @@ import { buttonVariants } from '@/components/ui/button';
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
+const mergeLocale = (base: Locale, override?: Partial<Locale>): Locale => ({
+  ...base,
+  ...(override ?? {}),
+  options: {
+    ...(base.options ?? {}),
+    ...(override?.options ?? {}),
+    weekStartsOn: 1,
+  },
+});
+
 function Calendar({ className, classNames, showOutsideDays = true, locale, ...props }: CalendarProps) {
   // Usar español con lunes como primer día.
-  const loc = React.useMemo(() => {
-    const base: Locale = locale ?? esLocale;
-    return { ...base, options: { ...(base.options || {}), weekStartsOn: 1 } } as Locale;
-  }, [locale]);
+  const loc = React.useMemo(
+    () => mergeLocale(esLocale, locale ?? undefined),
+    [locale]
+  );
 
   // Límite de navegación: hoy .. hoy + 183 días (≈6 meses).
   const today = React.useMemo(() => new Date(), []);
@@ -52,13 +62,10 @@ function Calendar({ className, classNames, showOutsideDays = true, locale, ...pr
         cell: 'p-0 text-center align-middle',
         // Celda ligera y botón de día centrado para no romper columnas.
         day: 'p-0 text-center align-middle',
-        day_button: cn(
-          buttonVariants({ variant: 'ghost' }),
-          'h-9 w-9 p-0 font-normal aria-selected:opacity-100 inline-flex items-center justify-center mx-auto rounded-full'
-        ),
+        day_button: cn(buttonVariants({ variant: 'ghost' }), 'h-9 w-9 p-0 font-normal aria-selected:opacity-100 inline-flex items-center justify-center mx-auto'),
         day_range_end: 'day-range-end',
         day_selected:
-          'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-full',
+          'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
         day_today: 'bg-accent text-accent-foreground',
         day_outside:
           'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
@@ -68,8 +75,23 @@ function Calendar({ className, classNames, showOutsideDays = true, locale, ...pr
         ...classNames,
       }}
       components={{
-        IconLeft: ({ ..._props }) => <ChevronLeft className="h-4 w-4" />,
-        IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
+        Chevron: ({ orientation = 'right', className, size = 16, disabled }) => {
+          const Icon = (() => {
+            switch (orientation) {
+              case 'left':
+                return ChevronLeft;
+              case 'right':
+                return ChevronRight;
+              case 'up':
+                return ChevronUp;
+              case 'down':
+                return ChevronDown;
+              default:
+                return ChevronRight;
+            }
+          })();
+          return <Icon className={cn('h-4 w-4', disabled && 'opacity-40', className)} size={size} />;
+        },
       }}
       {...props}
     />

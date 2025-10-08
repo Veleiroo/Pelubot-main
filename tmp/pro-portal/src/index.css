@@ -1,0 +1,175 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 15% 8%;
+    --foreground: 0 0% 98%;
+    --card: 220 14% 11%;
+    --card-foreground: 0 0% 98%;
+    --muted: 220 12% 18%;
+    --muted-foreground: 220 10% 70%;
+    --border: 220 12% 24%;
+    --ring: 160 84% 39%;
+    --brand: 160 84% 39%;
+    --brand-foreground: 160 100% 10%;
+    --accent: 160 84% 39%;
+    --accent-foreground: 160 100% 10%;
+    --brand-green: #059669;
+    --brand-green-dark: #047857;
+    --accent-gold: #FACC15;
+    --text-primary: #FFFFFF;
+    --text-secondary: #9CA3AF;
+    --text-accent-muted: #6B7280;
+    --icon-muted: #CBD5E1;
+    --card-bg: #23272F;
+    --divider: #2E333C;
+  }
+
+  .dark {
+    --background: 220 15% 8%;
+    --foreground: 0 0% 98%;
+    --card: 220 14% 11%;
+    --card-foreground: 0 0% 98%;
+    --muted: 220 12% 18%;
+    --muted-foreground: 220 10% 70%;
+    --border: 220 12% 24%;
+    --ring: 160 84% 39%;
+    --brand: 160 84% 39%;
+    --brand-foreground: 160 100% 10%;
+    --accent: 160 84% 39%;
+    --accent-foreground: 160 100% 10%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body,
+  .dark body {
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
+
+/* Calendario (DayPicker) — estilo consistente y alineado */
+.pelu-cal {
+  /* Forzamos que el ancho/alto de las celdas coincida con los botones custom */
+  --rdp-day-width: 2.9rem;
+  --rdp-day-height: 2.9rem;
+  --rdp-day_button-width: 2.5rem;
+  --rdp-day_button-height: 2.5rem;
+  --rdp-weekday-padding: 0.25rem 0;
+  --rdp-selected-border: none;
+}
+
+@media (min-width: 768px) {
+  .pelu-cal {
+  --rdp-day-width: 3.15rem;
+  --rdp-day-height: 3.15rem;
+  --rdp-day_button-width: 2.75rem;
+  --rdp-day_button-height: 2.75rem;
+  }
+}
+
+/* Mostrar celdas fuera de mes como huecos en blanco, sin romper el grid */
+.pelu-cal .rdp-outside,
+.pelu-cal [data-outside="true"] {
+  opacity: 0.45;
+  color: rgba(226, 232, 240, 0.55);
+}
+
+/* Días de la semana */
+.pelu-cal .rdp-head_cell {
+  color: #a3a3a3; /* neutral-400 */
+  font-weight: 600;
+}
+
+/* Celdas de días */
+.pelu-cal .rdp-day {
+  height: 46px;
+  width: 46px;
+  border-radius: 12px;
+}
+.pelu-cal .rdp-day_button {
+  border-radius: 9999px;
+}
+@media (min-width: 768px) {
+  .pelu-cal .rdp-day {
+    height: 50px;
+    width: 50px;
+  }
+}
+.pelu-cal .rdp-day:where([aria-disabled="true"]) {
+  opacity: .4;
+}
+
+/* Día seleccionado (marca) */
+.pelu-cal .rdp-day_selected:not([data-outside]) {
+  background: transparent;
+}
+
+/* Navegación de meses */
+.pelu-cal .rdp-caption_label {
+  font-weight: 700;
+}
+.pelu-cal .rdp-nav {
+  display: flex;
+  gap: 6px;
+}
+.pelu-cal .rdp-nav_button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+  background: #111111;
+  color: #e5e7eb; /* neutral-200 */
+}
+.pelu-cal .rdp-nav_button:hover {
+  border-color: #00D4AA;
+  color: #00D4AA;
+}
+.pelu-cal .rdp-nav_button[disabled] {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+/* Agenda calendar custom modifiers */
+
+.pelu-cal .rdp-day_button.calendar-day--today,
+.pelu-cal .rdp-day_button.calendar-day--selected {
+  border-radius: 9999px;
+}
+
+.pelu-cal .rdp-day_button.calendar-day--today {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.pelu-cal .rdp-day_button.calendar-day--selected {
+  background-color: rgba(148, 163, 184, 0.18);
+  color: rgba(255, 255, 255, 0.97);
+}
+
+.pelu-cal .rdp-day_button.calendar-day--selected:hover {
+  background-color: rgba(160, 177, 195, 0.22);
+}
+
+.pelu-cal .rdp-day_button.calendar-day--past {
+  color: rgba(226, 232, 240, 0.35);
+  background-color: transparent;
+}
+
+.pelu-cal .rdp-day_selected,
+.pelu-cal .rdp-selected,
+.pelu-cal .rdp-day_selected .rdp-day_button,
+.pelu-cal .rdp-selected .rdp-day_button,
+.pelu-cal .rdp-day_button[aria-selected="true"] {
+  border-radius: 9999px;
+}
+
+.pelu-cal .rdp-day_selected .rdp-day_button,
+.pelu-cal .rdp-selected .rdp-day_button {
+  border: none;
+}

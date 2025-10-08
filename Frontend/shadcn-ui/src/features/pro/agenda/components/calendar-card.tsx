@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarNav } from '@/components/ui/CalendarNav';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 import type { AgendaCalendarCardProps } from '../types';
@@ -16,18 +16,6 @@ const legendItems: LegendItemProps[] = [
   {
     indicatorClassName: 'bg-emerald-300/90 shadow-[0_0_0_3px_rgba(16,185,129,0.18)]',
     label: 'Días con citas',
-  },
-  {
-    indicatorClassName: 'bg-white/90 shadow-[0_0_0_3px_rgba(255,255,255,0.16)]',
-    label: 'Hoy',
-  },
-  {
-    indicatorClassName: 'bg-white/35 shadow-[0_0_0_3px_rgba(255,255,255,0.08)]',
-    label: 'Pasado',
-  },
-  {
-    indicatorClassName: 'bg-cyan-200/80 shadow-[0_0_0_3px_rgba(8,145,178,0.16)]',
-    label: 'Fines de semana',
   },
 ];
 
@@ -57,29 +45,27 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
       <Card
         ref={ref}
         className={cn(
-          'group relative flex flex-col gap-4 overflow-hidden rounded-[2.1rem] border border-white/12 text-white shadow-[0_24px_70px_rgba(3,7,18,0.7)] ring-1 ring-white/10 backdrop-blur-md md:gap-5',
-          'bg-slate-950/80 before:absolute before:-inset-px before:-z-10 before:rounded-[2.25rem] before:border before:border-white/8 before:bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.24),transparent_60%)] before:opacity-90 before:transition-opacity before:duration-300 before:ease-out',
-          'after:pointer-events-none after:absolute after:inset-x-8 after:top-0 after:-z-10 after:h-32 after:rounded-full after:bg-[radial-gradient(circle_at_top,rgba(236,72,153,0.18),transparent_65%)] after:opacity-40 after:blur-3xl'
+          'group relative flex flex-col overflow-hidden rounded-[2.1rem] border border-white/18 bg-slate-950/85 text-white shadow-[0_24px_70px_rgba(3,7,18,0.65)] backdrop-blur-md'
         )}
       >
-        <CardHeader className="flex flex-col items-center gap-2 p-0 text-center md:gap-3">
-          <CardTitle className="text-balance text-center text-2xl font-semibold tracking-tight text-white md:text-[2.55rem] md:leading-tight">
+        <CardHeader className="flex flex-col items-center gap-2 pb-0 pt-6 text-center md:pt-7">
+          <CardTitle className="text-balance text-center text-2xl font-semibold tracking-tight text-white md:text-3xl">
             {title}
           </CardTitle>
-          <CardDescription className="mx-auto max-w-sm text-xs leading-tight text-white/70 md:text-sm md:leading-snug">
+          <CardDescription className="mx-auto max-w-sm text-sm leading-snug text-white/70">
             {description}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-1 flex-col items-center justify-center gap-4 p-0 md:gap-6">
+        <CardContent className="flex flex-1 flex-col items-center gap-6 px-6 pb-6 pt-6 md:gap-7 md:px-8 md:pb-8">
           <CalendarNav
             month={currentMonth}
             onPrev={onPrev}
             onNext={onNext}
             disablePrev={disablePrev}
             disableNext={disableNext}
-            className="mt-2 w-full max-w-[18rem] self-center rounded-full border border-white/12 bg-white/6 px-4 py-1.5 text-sm font-medium text-white/90 shadow-inner shadow-slate-900/40 ring-1 ring-white/10 md:mt-1.5"
+            className="w-full max-w-[18rem] self-center rounded-full border border-white/12 bg-white/5 px-4 py-1.5 text-sm font-medium text-white/80 shadow-inner shadow-slate-900/30 ring-1 ring-white/12"
           />
-          <div className="mx-auto flex w-full max-w-[23.5rem] justify-center rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/12 via-white/8 to-white/0 p-4 shadow-inner shadow-emerald-900/20 backdrop-blur md:max-w-[24.75rem] md:p-6">
+          <div className="mx-auto flex w-full max-w-full justify-center rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/12 via-white/8 to-white/0 p-5 shadow-inner shadow-emerald-900/20 backdrop-blur md:p-6">
             <Calendar
               mode="single"
               selected={selectedDate}
@@ -94,7 +80,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
               }}
               modifiersClassNames={{
                 busy:
-                  'calendar-day--busy relative after:absolute after:bottom-2 after:left-1/2 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-emerald-300 after:content-[""]',
+                  'calendar-day--busy relative after:absolute after:bottom-1.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-emerald-300 after:content-[""]',
                 today:
                   'calendar-day--today ring-2 ring-white/45 bg-white/10 text-white rounded-full focus-visible:outline-none',
                 selected:
@@ -105,7 +91,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
                 disabled: 'cursor-not-allowed opacity-35 hover:bg-transparent',
                 outside: 'text-white/30',
               }}
-              className="mx-auto w-full max-w-[21.75rem] text-white/92"
+              className="mx-auto w-full max-w-[27.25rem] text-white/92 !px-0 md:max-w-[29rem]"
               classNames={{
                 months: 'flex flex-col items-center gap-4 md:gap-5',
                 month: 'flex flex-col items-center',
@@ -120,7 +106,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
                 cell: 'p-0 text-center align-middle transition-colors duration-150 md:px-[1px]',
                 day: 'p-0 text-center align-middle',
                 day_button: cn(
-                  'relative flex h-12 w-12 items-center justify-center rounded-full text-lg font-semibold text-white/85 transition-[box-shadow,color,transform] duration-150 ease-out md:h-[3.35rem] md:w-[3.35rem] md:rounded-full',
+                  'relative flex h-10 w-10 items-center justify-center rounded-full text-base font-semibold text-white/85 transition-[box-shadow,color,transform] duration-150 ease-out md:h-[2.75rem] md:w-[2.75rem] md:rounded-full',
                   'hover:bg-white/10 hover:text-white hover:ring-2 hover:ring-white/55',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950',
                   'active:scale-[0.97] active:bg-white/15',
@@ -139,7 +125,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
               toMonth={toMonth}
             />
           </div>
-          <div className="flex w-full max-w-[24.75rem] flex-wrap items-center justify-center gap-2.5 text-[0.7rem] text-white/60 md:text-xs">
+          <div className="mt-2 flex w-full max-w-[28rem] items-center justify-center gap-2.5 rounded-full bg-white/4 px-4 py-3 text-[0.7rem] text-white/65 shadow-inner shadow-slate-900/25 ring-1 ring-white/10 md:max-w-[30rem] md:text-xs">
             {legendItems.map((item) => (
               <CalendarLegendItem key={item.label} {...item} />
             ))}
@@ -153,7 +139,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
 CalendarCard.displayName = 'AgendaCalendarCard';
 
 const CalendarLegendItem = ({ indicatorClassName, label }: LegendItemProps) => (
-  <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 shadow-inner shadow-slate-900/20">
+  <div className="flex items-center gap-2 rounded-full border border-white/12 bg-transparent px-3 py-1.5">
     <span className={cn('h-2.5 w-2.5 rounded-full', indicatorClassName)} aria-hidden />
     <span className="font-medium text-white/70">{label}</span>
   </div>

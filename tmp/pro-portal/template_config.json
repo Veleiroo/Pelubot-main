@@ -1,0 +1,15 @@
+{
+  "description": "- Plantilla por defecto shadcn/ui. Si los requisitos del usuario no especifican stack, lenguaje, herramientas o componentes, esta plantilla sirve para apps web generales, juegos o utilidades. - Incluye una estructura básica con directorios src/hooks, src/lib y src/components. En src/components están todos los componentes de shadcn-ui, sin instalaciones adicionales. Si no es necesario, no modifiques archivos fuera de src.",
+  "required_fields": [],
+  "required_files": [
+    "README.md",
+    "src/App.tsx",
+    "src/main.tsx",
+    "src/pages/Index.tsx",
+    "index.html"
+  ],
+  "lang": "typescript",
+  "framework": "react",
+  "name": "shadcn/ui",
+  "scene": "default_web_project"
+}

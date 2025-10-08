@@ -148,6 +148,7 @@ const makeReservationsMock = (options?: { daysAhead?: number; includePastMinutes
         start: start.toISOString(),
         end: end.toISOString(),
         customer_name: `Cliente ${index + slotIdx + 1}`,
+  customer_email: `cliente${index + slotIdx + 1}@pelubot.mock`,
         customer_phone: '+34 600 000 000',
         notes: slotIdx % 3 === 0 ? 'Confirmar preferencia de estilo.' : undefined,
         created_at: new Date(start.getTime() - 5 * 60_000).toISOString(),
