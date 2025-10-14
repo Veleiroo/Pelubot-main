@@ -1,9 +1,9 @@
 import type { AppointmentStatus } from './types';
 
 export const STATUS_STYLES: Record<AppointmentStatus, string> = {
-  confirmada: 'bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30',
-  pendiente: 'bg-amber-400/15 text-amber-200 ring-1 ring-amber-400/30',
-  cancelada: 'bg-rose-400/15 text-rose-200 ring-1 ring-rose-400/30',
+  confirmada: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  pendiente: 'border-amber-200 bg-amber-50 text-amber-700',
+  cancelada: 'border-rose-200 bg-rose-50 text-rose-700',
 };
 
 export const MIN_APPOINTMENTS_CARD_HEIGHT = 440;

@@ -53,17 +53,25 @@
   }
 }
 
-/* Calendario (DayPicker) — estilo consistente y alineado */
+/* Calendario (DayPicker) — dimensiones y grid */
 .pelu-cal {
-  /* Variables CSS para dimensiones consistentes */
-  --rdp-day-width: 3.5rem;
-  --rdp-day-height: 3.5rem;
-  --rdp-day_button-width: 3.5rem;
-  --rdp-day_button-height: 3.5rem;
+  --rdp-day-width: 3.25rem;
+  --rdp-day-height: 3.25rem;
+  --rdp-day_button-width: 3.25rem;
+  --rdp-day_button-height: 3.25rem;
   --rdp-weekday-padding: 0.5rem 0;
 }
 
 @media (min-width: 640px) {
+  .pelu-cal {
+    --rdp-day-width: 3.75rem;
+    --rdp-day-height: 3.75rem;
+    --rdp-day_button-width: 3.75rem;
+    --rdp-day_button-height: 3.75rem;
+  }
+}
+
+@media (min-width: 768px) {
   .pelu-cal {
     --rdp-day-width: 4rem;
     --rdp-day-height: 4rem;
@@ -72,16 +80,6 @@
   }
 }
 
-@media (min-width: 768px) {
-  .pelu-cal {
-    --rdp-day-width: 4.5rem;
-    --rdp-day-height: 4.5rem;
-    --rdp-day_button-width: 4.5rem;
-    --rdp-day_button-height: 4.5rem;
-  }
-}
-
-/* Tabla del calendario - asegurar distribución uniforme */
 .pelu-cal .rdp-month {
   width: 100%;
 }
@@ -96,24 +94,15 @@
   margin-bottom: 0.5rem;
 }
 
-/* Asegurar que todas las celdas tengan el mismo ancho */
 .pelu-cal .rdp-weekday,
 .pelu-cal .rdp-day {
   width: calc(100% / 7);
   text-align: center;
 }
 
-/* Mostrar celdas fuera de mes como huecos en blanco, sin romper el grid */
-.pelu-cal .rdp-outside,
-.pelu-cal [data-outside="true"] {
-  opacity: 0.3;
-  pointer-events: none;
-}
-
-/* Días de la semana */
 .pelu-cal .rdp-weekday {
-  color: rgba(148, 163, 184, 0.9);
-  font-weight: 800;
+  color: hsl(var(--muted-foreground));
+  font-weight: 700;
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -131,147 +120,10 @@
   }
 }
 
-/* Botones de días */
-.pelu-cal .rdp-day_button {
-  border-radius: 0.875rem;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: rgba(148, 163, 184, 0.95);
-  letter-spacing: 0.01em;
-  background: transparent;
-  border: 1px solid transparent;
-  transition:
-    background 0.18s ease,
-    color 0.18s ease,
-    border-color 0.18s ease,
-    transform 0.18s ease;
-  position: relative;
-  cursor: pointer;
-}
-
-@media (min-width: 640px) {
-  .pelu-cal .rdp-day_button {
-    font-size: 1rem;
-  }
-}
-
-@media (min-width: 768px) {
-  .pelu-cal .rdp-day_button {
-    font-size: 1.075rem;
-  }
-}
-
-.pelu-cal .rdp-day_button:hover {
-  background: rgba(148, 163, 184, 0.08);
-  color: rgba(226, 232, 240, 0.98);
-  border-color: rgba(148, 163, 184, 0.35);
-}
-
-.pelu-cal .rdp-day_button:focus-visible {
-  outline: none;
-  border-color: rgba(16, 185, 129, 0.5);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
-}
-
-.pelu-cal .rdp-day_button:active {
-  transform: translateY(1px) scale(0.99);
-}
-
-.pelu-cal .rdp-day:where([aria-disabled='true']) {
+.pelu-cal .rdp-outside,
+.pelu-cal [data-outside='true'] {
   opacity: 0.35;
   pointer-events: none;
-}
-
-/* Agenda calendar custom modifiers */
-.pelu-cal .rdp-day_button.calendar-day--busy {
-  position: relative;
-}
-
-.pelu-cal .rdp-day_button.calendar-day--busy::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0.4rem;
-  transform: translateX(-50%);
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 9999px;
-  background: rgba(16, 185, 129, 1);
-  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
-  transition: transform 0.18s ease;
-}
-
-@media (min-width: 640px) {
-  .pelu-cal .rdp-day_button.calendar-day--busy::after {
-    bottom: 0.45rem;
-    width: 0.5rem;
-    height: 0.5rem;
-  }
-}
-
-.pelu-cal .rdp-day_button.calendar-day--busy:hover::after {
-  transform: translateX(-50%) scale(1.15);
-}
-
-.pelu-cal .rdp-day_button.calendar-day--selected {
-  background: rgba(16, 185, 129, 0.15);
-  border-color: rgba(16, 185, 129, 0.45);
-  color: rgba(226, 232, 240, 1);
-  box-shadow: 0 8px 18px -8px rgba(16, 185, 129, 0.4);
-}
-
-.pelu-cal .rdp-day_button.calendar-day--selected:hover {
-  background: rgba(16, 185, 129, 0.18);
-  border-color: rgba(16, 185, 129, 0.55);
-}
-
-.pelu-cal .rdp-day_button.calendar-day--today {
-  background: rgba(16, 185, 129, 0.08);
-  border-color: rgba(16, 185, 129, 0.45);
-  color: rgba(167, 243, 208, 1);
-  font-weight: 700;
-}
-
-.pelu-cal .rdp-day_button.calendar-day--today.calendar-day--selected {
-  background: rgba(16, 185, 129, 0.22);
-  border-color: rgba(16, 185, 129, 0.6);
-  color: rgba(226, 232, 240, 1);
-}
-
-.pelu-cal .rdp-day_button.calendar-day--past {
-  color: rgba(148, 163, 184, 0.35);
-  border-color: transparent;
-  background: transparent;
-}
-
-.pelu-cal .rdp-day_button.calendar-day--weekend {
-  color: rgba(148, 163, 184, 0.75);
-}
-
-.pelu-cal .rdp-day_button.calendar-day--outside {
-  opacity: 0.35;
-}
-
-.pelu-cal .rdp-day_button.calendar-day--disabled {
-  cursor: not-allowed;
-  opacity: 0.25;
-}
-
-.pelu-cal .rdp-day_selected,
-.pelu-cal .rdp-selected {
-  border-radius: 0.875rem;
-}
-
-@media (min-width: 640px) {
-  .pelu-cal .rdp-day_selected,
-  .pelu-cal .rdp-selected {
-    border-radius: 1rem;
-  }
 }
 
 /* Scrollbar personalizado para el contenedor de citas */

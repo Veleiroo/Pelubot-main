@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 import type { AgendaCalendarCardProps } from '../types';
 
-const legendItems = [{ indicatorClassName: 'bg-emerald-400', label: 'Días con citas' }];
+const legendItems = [{ indicatorClassName: 'bg-primary', label: 'Días con citas' }];
 
 export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
   (
@@ -56,31 +56,36 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
     }, [currentMonth]);
 
     return (
-      <Card ref={ref} className="flex h-full flex-col border-white/10 bg-slate-950/60 text-white">
-        <CardHeader className="gap-4 border-b border-white/10 pb-4">
+      <Card
+        ref={ref}
+        className="flex h-full flex-col border border-border/50 bg-card text-card-foreground shadow-sm"
+      >
+        <CardHeader className="gap-4 border-b border-border/50 pb-4">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <CardTitle className="text-lg font-semibold">{title}</CardTitle>
               {description ? (
-                <CardDescription className="text-xs text-white/70 sm:text-sm">{description}</CardDescription>
+                <CardDescription className="text-xs text-muted-foreground sm:text-sm">
+                  {description}
+                </CardDescription>
               ) : null}
             </div>
-            <div className="flex items-center gap-1 rounded-md bg-white/5 p-1 text-white/80">
+            <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/40 p-1 text-muted-foreground">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-white/80 hover:bg-white/10 hover:text-white disabled:text-white/40"
+                className="h-8 w-8 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground disabled:text-muted-foreground/50"
                 onClick={onPrev}
                 disabled={disablePrev}
                 aria-label="Mes anterior"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="px-3 text-sm font-medium capitalize text-white">{monthLabel}</span>
+              <span className="px-3 text-sm font-medium capitalize text-foreground">{monthLabel}</span>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-white/80 hover:bg-white/10 hover:text-white disabled:text-white/40"
+                className="h-8 w-8 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground disabled:text-muted-foreground/50"
                 onClick={onNext}
                 disabled={disableNext}
                 aria-label="Mes siguiente"
@@ -104,15 +109,16 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
               ...(startOfToday ? { past: { before: startOfToday } } : {}),
             }}
             modifiersClassNames={{
-              busy: 'calendar-day--busy',
-              today: 'calendar-day--today',
-              selected: 'calendar-day--selected',
-              weekend: 'calendar-day--weekend',
-              past: 'calendar-day--past',
-              disabled: 'calendar-day--disabled',
-              outside: 'calendar-day--outside',
+              busy:
+                'after:absolute after:bottom-2 after:left-1/2 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-primary after:content-[""]',
+              today: 'border border-primary/40 text-primary',
+              selected: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary',
+              weekend: 'text-muted-foreground',
+              past: 'text-muted-foreground/50',
+              disabled: 'pointer-events-none opacity-40',
+              outside: 'pointer-events-none opacity-40',
             }}
-            className="pelu-cal mx-auto w-full !px-0"
+            className="mx-auto w-full !px-0"
             classNames={{
               months: 'w-full space-y-4',
               month: 'flex flex-col gap-4',
@@ -120,16 +126,17 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
               month_caption: 'sr-only',
               caption_label: 'sr-only',
               month_grid: 'w-full',
-              weekdays: 'grid w-full grid-cols-7 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-white/60 sm:text-xs',
+              weekdays:
+                'grid w-full grid-cols-7 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground sm:text-xs',
               weekday: 'flex h-9 items-center justify-center',
               week: 'grid grid-cols-7 gap-2',
               day: 'aspect-square',
               day_button:
-                'group/calendar-day relative flex h-full w-full items-center justify-center rounded-lg border border-transparent text-sm font-medium text-white/80 transition-colors hover:border-white/40 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950',
-              day_selected: 'calendar-day--selected',
-              day_today: 'calendar-day--today',
-              day_outside: 'calendar-day--outside',
-              day_disabled: 'calendar-day--disabled',
+                'group relative flex h-full w-full items-center justify-center rounded-lg border border-transparent text-sm font-medium text-muted-foreground transition-colors hover:border-border hover:bg-muted/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+              day_selected: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary',
+              day_today: 'border border-primary/40 text-primary',
+              day_outside: 'pointer-events-none opacity-40',
+              day_disabled: 'pointer-events-none opacity-40',
               day_hidden: 'invisible',
               nav: 'hidden',
             }}
@@ -138,7 +145,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
             toMonth={toMonth}
           />
 
-          <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-white/5 p-4 text-xs text-white/70 sm:flex-row sm:items-center sm:justify-between sm:text-sm">
+          <div className="flex flex-col gap-4 rounded-lg border border-border/50 bg-muted/30 p-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:text-sm">
             <div className="flex items-center gap-3">
               {legendItems.map((item) => (
                 <span key={item.label} className="flex items-center gap-2">
@@ -147,7 +154,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
                 </span>
               ))}
             </div>
-            <label htmlFor="agenda-busy-toggle" className="flex items-center gap-3 font-medium text-white/80">
+            <label htmlFor="agenda-busy-toggle" className="flex items-center gap-3 font-medium text-muted-foreground">
               <Switch
                 id="agenda-busy-toggle"
                 checked={highlightBusy}
