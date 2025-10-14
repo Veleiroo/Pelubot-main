@@ -223,29 +223,42 @@ export const ProsAgendaView = () => {
 
   return (
     <main className="space-y-6">
-      <header className="flex flex-col gap-4 text-white sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold sm:text-3xl">Agenda profesional</h1>
-          <p className="text-sm text-white/70 sm:text-base">
-            Revisa tus próximas citas y organiza tu disponibilidad desde aquí.
-          </p>
+      <header className="grid gap-6 rounded-2xl border border-border/50 bg-card p-6 text-foreground shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-semibold tracking-tight">Agenda profesional</h1>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Revisa tus próximas citas y organiza tu disponibilidad desde aquí.
+            </p>
+          </div>
           {isFetching && !isLoading && (
-            <div className="flex items-center gap-2 text-xs text-white/60">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               <span>Sincronizando agenda...</span>
             </div>
           )}
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          className="inline-flex items-center gap-2 self-start rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 hover:text-white sm:text-sm"
-          onClick={() => refetch()}
-          disabled={isFetching}
-        >
-          <Loader2 className={cn('h-4 w-4', isFetching ? 'animate-spin' : '')} aria-hidden />
-          Actualizar
-        </Button>
+        <div className="flex flex-col items-start gap-4 text-sm text-muted-foreground sm:items-end">
+          <Button
+            type="button"
+            variant="ghost"
+            className={cn(
+              'inline-flex items-center gap-2 rounded-lg border border-border/50 bg-card px-4 py-2 font-medium text-foreground shadow-sm transition-colors hover:bg-muted/50',
+              isFetching ? 'cursor-wait opacity-90' : ''
+            )}
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            <Loader2 className={cn('h-4 w-4', isFetching ? 'animate-spin' : '')} aria-hidden />
+            Actualizar
+          </Button>
+          <div className="flex items-center gap-2 sm:justify-end">
+            <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full border border-border/50 bg-muted/50 px-3 py-1 text-sm font-semibold text-foreground">
+              {appointments.length}
+            </span>
+            <span className="text-sm font-medium text-muted-foreground">Citas sincronizadas</span>
+          </div>
+        </div>
       </header>
 
       {errorMessage && (
