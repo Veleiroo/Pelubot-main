@@ -14,7 +14,7 @@ type LegendItemProps = {
 
 const legendItems: LegendItemProps[] = [
   {
-    indicatorClassName: 'bg-emerald-300/90 shadow-[0_0_0_3px_rgba(16,185,129,0.18)]',
+    indicatorClassName: 'bg-gradient-to-br from-emerald-400 to-emerald-500 shadow-[0_0_12px_rgba(52,211,153,0.8)]',
     label: 'Días con citas',
   },
 ];
@@ -44,29 +44,23 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
     return (
       <Card
         ref={ref}
-        className={cn(
-          'group relative flex flex-col overflow-hidden rounded-[2.1rem] border border-white/18 bg-slate-950/85 text-white shadow-[0_24px_70px_rgba(3,7,18,0.65)] backdrop-blur-md'
-        )}
+        className="group relative flex flex-col overflow-hidden rounded-[2rem] border border-slate-700/40 bg-gradient-to-br from-slate-900/95 via-slate-800/90 to-slate-900/95 text-white shadow-2xl shadow-slate-950/50 backdrop-blur-xl transition-all duration-300 hover:shadow-emerald-500/5"
       >
-        <CardHeader className="flex flex-col items-center gap-2 pb-0 pt-6 text-center md:pt-7">
-          <CardTitle className="text-balance text-center text-2xl font-semibold tracking-tight text-white md:text-3xl">
-            {title}
-          </CardTitle>
-          <CardDescription className="mx-auto max-w-sm text-sm leading-snug text-white/70">
-            {description}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-1 flex-col items-center gap-6 px-6 pb-6 pt-6 md:gap-7 md:px-8 md:pb-8">
+        {/* Efecto de luz superior */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+        
+        <CardHeader className="relative flex shrink-0 flex-col items-center gap-4 border-b border-slate-700/30 bg-gradient-to-b from-slate-800/50 to-transparent px-4 pb-4 pt-5 backdrop-blur-sm sm:px-6 sm:pb-5 sm:pt-6">
           <CalendarNav
             month={currentMonth}
             onPrev={onPrev}
             onNext={onNext}
             disablePrev={disablePrev}
             disableNext={disableNext}
-            className="w-full max-w-[18rem] self-center rounded-full border border-white/12 bg-white/5 px-4 py-1.5 text-sm font-medium text-white/80 shadow-inner shadow-slate-900/30 ring-1 ring-white/12"
+            className="group/nav w-full max-w-[20rem] rounded-2xl border border-slate-600/50 bg-gradient-to-br from-slate-800/80 to-slate-900/80 px-4 py-2.5 text-base font-bold text-white shadow-lg shadow-slate-950/30 ring-1 ring-slate-700/50 backdrop-blur-md transition-all duration-300 hover:border-emerald-500/40 hover:shadow-emerald-500/10 hover:ring-emerald-500/30 sm:px-5 sm:py-3 sm:text-lg"
           />
-          <div className="mx-auto flex w-full max-w-full justify-center rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/12 via-white/8 to-white/0 p-5 shadow-inner shadow-emerald-900/20 backdrop-blur md:p-6">
-            <Calendar
+        </CardHeader>
+        <CardContent className="relative flex flex-1 flex-col items-center justify-center px-4 pb-6 pt-5 sm:px-6 sm:pb-8 sm:pt-7">
+          <Calendar
               mode="single"
               selected={selectedDate}
               month={currentMonth}
@@ -78,41 +72,32 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
                 weekend: { dayOfWeek: [0, 6] },
                 ...(startOfToday ? { past: { before: startOfToday } } : {}),
               }}
-              modifiersClassNames={{
+              modifiersClassNames={{    
                 busy:
-                  'calendar-day--busy relative after:absolute after:bottom-1.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-emerald-300 after:content-[""]',
+                  'calendar-day--busy relative after:absolute after:bottom-1.5 after:left-1/2 after:h-2 after:w-2 after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-br after:from-emerald-400 after:to-emerald-500 after:shadow-[0_0_10px_rgba(52,211,153,0.9)] after:content-[""] after:animate-pulse',
                 today:
-                  'calendar-day--today ring-2 ring-white/45 bg-white/10 text-white rounded-full focus-visible:outline-none',
+                  'calendar-day--today',
                 selected:
-                  'calendar-day--selected ring-[1.5px] ring-white/55 bg-white/14 text-white font-semibold shadow-[0_12px_32px_rgba(15,23,42,0.28)] hover:bg-white/16 rounded-full focus-visible:outline-none',
-                weekend: 'text-white/75',
+                  'calendar-day--selected',
+                weekend: 'text-white/70',
                 past:
-                  'calendar-day--past text-white/30 hover:bg-transparent hover:text-white/30 hover:ring-0 focus-visible:ring-0 active:scale-100 cursor-default',
-                disabled: 'cursor-not-allowed opacity-35 hover:bg-transparent',
-                outside: 'text-white/30',
+                  'calendar-day--past',
+                disabled: 'cursor-not-allowed opacity-20',
+                outside: 'opacity-25',
               }}
-              className="mx-auto w-full max-w-[27.25rem] text-white/92 !px-0 md:max-w-[29rem]"
+              className="pelu-cal mx-auto w-full !px-0"
               classNames={{
-                months: 'flex flex-col items-center gap-4 md:gap-5',
-                month: 'flex flex-col items-center',
+                months: 'flex flex-col items-center',
+                month: 'flex flex-col items-center w-full',
                 caption: 'hidden',
                 month_caption: 'sr-only',
                 caption_label: 'sr-only',
-                table: 'table-fixed border-collapse text-white/90 mx-auto [&>tbody]:gap-y-2',
-                head_row: '',
-                head_cell:
-                  'h-6 text-center text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-white/55 md:h-7 md:text-[0.75rem]',
-                row: '',
-                cell: 'p-0 text-center align-middle transition-colors duration-150 md:px-[1px]',
-                day: 'p-0 text-center align-middle',
-                day_button: cn(
-                  'relative flex h-10 w-10 items-center justify-center rounded-full text-base font-semibold text-white/85 transition-[box-shadow,color,transform] duration-150 ease-out md:h-[2.75rem] md:w-[2.75rem] md:rounded-full',
-                  'hover:bg-white/10 hover:text-white hover:ring-2 hover:ring-white/55',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950',
-                  'active:scale-[0.97] active:bg-white/15',
-                  'disabled:hover:outline-none disabled:hover:bg-transparent',
-                  'motion-reduce:transition-none [font-variant-numeric:tabular-nums]'
-                ),
+                month_grid: 'w-full',
+                weekdays: 'flex w-full',
+                weekday: 'flex-1 text-center',
+                week: 'flex w-full mt-1',
+                day: 'flex-1 p-1',
+                day_button: 'w-full h-full',
                 day_selected: '',
                 day_today: '',
                 day_outside: '',
@@ -124,8 +109,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
               fromMonth={fromMonth}
               toMonth={toMonth}
             />
-          </div>
-          <div className="mt-2 flex w-full max-w-[28rem] items-center justify-center gap-2.5 rounded-full bg-white/4 px-4 py-3 text-[0.7rem] text-white/65 shadow-inner shadow-slate-900/25 ring-1 ring-white/10 md:max-w-[30rem] md:text-xs">
+          <div className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-slate-600/40 bg-gradient-to-br from-slate-800/60 to-slate-900/60 px-4 py-3 text-xs text-white/80 shadow-lg shadow-slate-950/30 backdrop-blur-md ring-1 ring-slate-700/40 sm:mt-6 sm:gap-3 sm:px-5 sm:py-3.5 sm:text-sm">
             {legendItems.map((item) => (
               <CalendarLegendItem key={item.label} {...item} />
             ))}
@@ -139,8 +123,8 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
 CalendarCard.displayName = 'AgendaCalendarCard';
 
 const CalendarLegendItem = ({ indicatorClassName, label }: LegendItemProps) => (
-  <div className="flex items-center gap-2 rounded-full border border-white/12 bg-transparent px-3 py-1.5">
-    <span className={cn('h-2.5 w-2.5 rounded-full', indicatorClassName)} aria-hidden />
-    <span className="font-medium text-white/70">{label}</span>
+  <div className="flex items-center gap-2 sm:gap-3">
+    <span className={cn('h-2.5 w-2.5 rounded-full sm:h-3 sm:w-3', indicatorClassName)} aria-hidden />
+    <span className="text-xs font-semibold text-white sm:text-sm">{label}</span>
   </div>
 );

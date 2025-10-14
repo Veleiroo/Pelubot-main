@@ -55,54 +55,151 @@
 
 /* Calendario (DayPicker) — estilo consistente y alineado */
 .pelu-cal {
-  /* Forzamos que el ancho/alto de las celdas coincida con los botones custom */
-  --rdp-day-width: 2.9rem;
-  --rdp-day-height: 2.9rem;
-  --rdp-day_button-width: 2.5rem;
-  --rdp-day_button-height: 2.5rem;
-  --rdp-weekday-padding: 0.25rem 0;
-  --rdp-selected-border: none;
+  /* Variables CSS para dimensiones consistentes */
+  --rdp-day-width: 3rem;
+  --rdp-day-height: 3rem;
+  --rdp-day_button-width: 3rem;
+  --rdp-day_button-height: 3rem;
+  --rdp-weekday-padding: 0.5rem 0;
+}
+
+@media (min-width: 640px) {
+  .pelu-cal {
+    --rdp-day-width: 3.5rem;
+    --rdp-day-height: 3.5rem;
+    --rdp-day_button-width: 3.5rem;
+    --rdp-day_button-height: 3.5rem;
+  }
 }
 
 @media (min-width: 768px) {
   .pelu-cal {
-  --rdp-day-width: 3.15rem;
-  --rdp-day-height: 3.15rem;
-  --rdp-day_button-width: 2.75rem;
-  --rdp-day_button-height: 2.75rem;
+    --rdp-day-width: 4rem;
+    --rdp-day-height: 4rem;
+    --rdp-day_button-width: 4rem;
+    --rdp-day_button-height: 4rem;
   }
+}
+
+/* Tabla del calendario - asegurar distribución uniforme */
+.pelu-cal .rdp-month {
+  width: 100%;
+}
+
+.pelu-cal .rdp-month_grid {
+  width: 100%;
+  border-spacing: 0;
+  border-collapse: separate;
+}
+
+.pelu-cal .rdp-weekdays {
+  margin-bottom: 0.5rem;
+}
+
+/* Asegurar que todas las celdas tengan el mismo ancho */
+.pelu-cal .rdp-weekday,
+.pelu-cal .rdp-day {
+  width: calc(100% / 7);
+  text-align: center;
 }
 
 /* Mostrar celdas fuera de mes como huecos en blanco, sin romper el grid */
 .pelu-cal .rdp-outside,
 .pelu-cal [data-outside="true"] {
-  opacity: 0.45;
-  color: rgba(226, 232, 240, 0.55);
+  opacity: 0.3;
+  pointer-events: none;
 }
 
 /* Días de la semana */
-.pelu-cal .rdp-head_cell {
-  color: #a3a3a3; /* neutral-400 */
-  font-weight: 600;
+.pelu-cal .rdp-weekday {
+  color: rgba(148, 163, 184, 0.9);
+  font-weight: 800;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-/* Celdas de días */
-.pelu-cal .rdp-day {
-  height: 46px;
-  width: 46px;
-  border-radius: 12px;
-}
-.pelu-cal .rdp-day_button {
-  border-radius: 9999px;
-}
-@media (min-width: 768px) {
-  .pelu-cal .rdp-day {
-    height: 50px;
-    width: 50px;
+@media (min-width: 640px) {
+  .pelu-cal .rdp-weekday {
+    font-size: 0.7rem;
   }
 }
+
+@media (min-width: 768px) {
+  .pelu-cal .rdp-weekday {
+    font-size: 0.75rem;
+  }
+}
+
+/* Botones de días */
+.pelu-cal .rdp-day_button {
+  border-radius: 0.875rem;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .pelu-cal .rdp-day_button {
+    border-radius: 1rem;
+    font-size: 1.125rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .pelu-cal .rdp-day_button {
+    font-size: 1.375rem;
+  }
+}
+
+.pelu-cal .rdp-day_button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0.875rem;
+  padding: 2px;
+  background: linear-gradient(135deg, transparent, transparent);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+@media (min-width: 640px) {
+  .pelu-cal .rdp-day_button::before {
+    border-radius: 1rem;
+  }
+}
+
+.pelu-cal .rdp-day_button:hover::before {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(52, 211, 153, 0.3));
+  opacity: 1;
+}
+
+.pelu-cal .rdp-day_button:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(16, 185, 129, 0.08));
+  color: rgba(255, 255, 255, 1);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 0 20px rgba(16, 185, 129, 0.15);
+}
+
+.pelu-cal .rdp-day_button:active {
+  transform: translateY(0) scale(0.98);
+  transition-duration: 0.1s;
+}
+
 .pelu-cal .rdp-day:where([aria-disabled="true"]) {
-  opacity: .4;
+  opacity: 0.25;
+  pointer-events: none;
 }
 
 /* Día seleccionado (marca) */
@@ -110,66 +207,77 @@
   background: transparent;
 }
 
-/* Navegación de meses */
-.pelu-cal .rdp-caption_label {
-  font-weight: 700;
-}
-.pelu-cal .rdp-nav {
-  display: flex;
-  gap: 6px;
-}
-.pelu-cal .rdp-nav_button {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid #2a2a2a;
-  background: #111111;
-  color: #e5e7eb; /* neutral-200 */
-}
-.pelu-cal .rdp-nav_button:hover {
-  border-color: #00D4AA;
-  color: #00D4AA;
-}
-.pelu-cal .rdp-nav_button[disabled] {
-  opacity: .35;
-  cursor: not-allowed;
-}
-
 /* Agenda calendar custom modifiers */
-
-.pelu-cal .rdp-day_button.calendar-day--today,
-.pelu-cal .rdp-day_button.calendar-day--selected {
-  border-radius: 9999px;
+.pelu-cal .rdp-day_button.calendar-day--busy {
+  position: relative;
 }
 
 .pelu-cal .rdp-day_button.calendar-day--today {
-  background-color: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.92);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.15));
+  color: rgb(16, 185, 129);
+  font-weight: 900;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25), 0 4px 12px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  text-shadow: 0 0 16px rgba(16, 185, 129, 0.5);
+}
+
+@media (min-width: 640px) {
+  .pelu-cal .rdp-day_button.calendar-day--today {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25), 0 4px 16px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    text-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+  }
+}
+
+.pelu-cal .rdp-day_button.calendar-day--today:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(52, 211, 153, 0.25));
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4), 0 6px 20px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px) scale(1.05);
+}
+
+@media (min-width: 640px) {
+  .pelu-cal .rdp-day_button.calendar-day--today:hover {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.4), 0 8px 24px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
 }
 
 .pelu-cal .rdp-day_button.calendar-day--selected {
-  background-color: rgba(148, 163, 184, 0.18);
-  color: rgba(255, 255, 255, 0.97);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(148, 163, 184, 0.12));
+  color: rgba(255, 255, 255, 1);
+  font-weight: 800;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2), 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+@media (min-width: 640px) {
+  .pelu-cal .rdp-day_button.calendar-day--selected {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2), 0 8px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
 }
 
 .pelu-cal .rdp-day_button.calendar-day--selected:hover {
-  background-color: rgba(160, 177, 195, 0.22);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(148, 163, 184, 0.18));
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3), 0 10px 28px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+@media (min-width: 640px) {
+  .pelu-cal .rdp-day_button.calendar-day--selected:hover {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3), 0 12px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
 }
 
 .pelu-cal .rdp-day_button.calendar-day--past {
-  color: rgba(226, 232, 240, 0.35);
+  color: rgba(255, 255, 255, 0.2);
   background-color: transparent;
+  pointer-events: none;
 }
 
 .pelu-cal .rdp-day_selected,
-.pelu-cal .rdp-selected,
-.pelu-cal .rdp-day_selected .rdp-day_button,
-.pelu-cal .rdp-selected .rdp-day_button,
-.pelu-cal .rdp-day_button[aria-selected="true"] {
-  border-radius: 9999px;
+.pelu-cal .rdp-selected {
+  border-radius: 0.875rem;
 }
 
-.pelu-cal .rdp-day_selected .rdp-day_button,
-.pelu-cal .rdp-selected .rdp-day_button {
-  border: none;
+@media (min-width: 640px) {
+  .pelu-cal .rdp-day_selected,
+  .pelu-cal .rdp-selected {
+    border-radius: 1rem;
+  }
 }

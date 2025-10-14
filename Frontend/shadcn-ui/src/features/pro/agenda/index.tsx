@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Loader2, RefreshCcw } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -263,49 +263,25 @@ export const ProsAgendaView = () => {
     : undefined;
 
   return (
-    <section ref={layoutRef} className="space-y-6">
-      <header className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-white">Agenda</h1>
-            <p className="text-sm text-white/60">
-              Visualiza tu calendario, revisa tus citas y gestiona cambios desde un solo lugar.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2 rounded-full border-white/20 text-white/80 hover:bg-white/10"
-            onClick={() => refetch()}
-            disabled={isFetching}
-          >
-            {isFetching ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCcw className="h-4 w-4" />
-            )}
-            Actualizar
-          </Button>
+    <section ref={layoutRef} className="mb-6 space-y-6">
+      {errorMessage && (
+        <Alert variant="destructive" className="border-red-500/50 bg-red-500/15 text-red-100 backdrop-blur">
+          <AlertTitle className="font-bold">No pudimos cargar tu agenda</AlertTitle>
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
+      {isLoading && appointments.length === 0 && (
+        <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-600/40 bg-slate-800/40 px-6 py-4 text-base text-white/80 backdrop-blur-sm">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="font-medium">Cargando tu agenda...</span>
         </div>
-        {errorMessage && (
-          <Alert variant="destructive" className="border-red-500/40 bg-red-500/10 text-red-100">
-            <AlertTitle>No pudimos cargar tu agenda</AlertTitle>
-            <AlertDescription>{errorMessage}</AlertDescription>
-          </Alert>
-        )}
-        {isLoading && appointments.length === 0 && (
-          <div className="flex items-center gap-2 text-sm text-white/70">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Obteniendo citas recientes...</span>
-          </div>
-        )}
-      </header>
+      )}
 
       <div
         className={cn(
-          'grid items-start gap-6',
-          'xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]',
-          '2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]'
+          'grid items-start gap-4 sm:gap-6',
+          'grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]',
+          'lg:h-[calc(100vh-140px)]'
         )}
       >
         <CalendarCard
@@ -449,16 +425,16 @@ const CreateAppointmentDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-white/10 bg-slate-950/95 text-white">
-        <DialogHeader className="space-y-2">
-          <DialogTitle>Crear cita</DialogTitle>
-          <DialogDescription className="text-white/70">
+      <DialogContent className="max-w-[calc(100%-2rem)] border-white/10 bg-slate-950/95 text-white sm:max-w-lg">
+        <DialogHeader className="space-y-1.5 sm:space-y-2">
+          <DialogTitle className="text-lg sm:text-xl">Crear cita</DialogTitle>
+          <DialogDescription className="text-xs text-white/70 sm:text-sm">
             Registra una nueva cita para el {formatDialogDate(date)}.
           </DialogDescription>
         </DialogHeader>
-        <form className="space-y-5" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="service">Servicio</Label>
+        <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="service" className="text-xs sm:text-sm">Servicio</Label>
             <Select value={serviceId} onValueChange={setServiceId} disabled={services.length === 0 || isSubmitting}>
               <SelectTrigger id="service" className="border-white/15 bg-white/5 text-white">
                 <SelectValue placeholder="Selecciona un servicio" />
@@ -473,9 +449,9 @@ const CreateAppointmentDialog = ({
             </Select>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="time">Hora de inicio</Label>
+          <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="time" className="text-xs sm:text-sm">Hora de inicio</Label>
               <Select value={time} onValueChange={setTime} disabled={isSubmitting}>
                 <SelectTrigger id="time" className="border-white/15 bg-white/5 text-white">
                   <SelectValue placeholder="Elige una hora" />
@@ -489,8 +465,8 @@ const CreateAppointmentDialog = ({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="client-name">Nombre de la persona</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="client-name" className="text-xs sm:text-sm">Nombre de la persona</Label>
               <Input
                 id="client-name"
                 value={clientName}
@@ -502,9 +478,9 @@ const CreateAppointmentDialog = ({
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="client-phone">Teléfono de contacto</Label>
+          <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="client-phone" className="text-xs sm:text-sm">Teléfono de contacto</Label>
               <Input
                 id="client-phone"
                 value={clientPhone}
@@ -514,8 +490,8 @@ const CreateAppointmentDialog = ({
                 disabled={isSubmitting}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="client-email">Correo electrónico (opcional)</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="client-email" className="text-xs sm:text-sm">Correo electrónico (opcional)</Label>
               <Input
                 id="client-email"
                 type="email"
@@ -528,25 +504,25 @@ const CreateAppointmentDialog = ({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notas internas</Label>
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="notes" className="text-xs sm:text-sm">Notas internas</Label>
             <Textarea
               id="notes"
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               placeholder="Preferencias o recordatorios para el equipo"
-              className="min-h-[96px] border-white/15 bg-white/5 text-white placeholder:text-white/40"
+              className="min-h-[80px] border-white/15 bg-white/5 text-sm text-white placeholder:text-white/40 sm:min-h-[96px]"
               disabled={isSubmitting}
             />
           </div>
 
-          {error && <p className="text-sm text-rose-300">{error}</p>}
+          {error && <p className="text-xs text-rose-300 sm:text-sm">{error}</p>}
 
           <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              className="rounded-full border-white/20 text-white/80 hover:bg-white/10"
+              className="rounded-full border-white/20 text-sm text-white/80 hover:bg-white/10"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
@@ -554,7 +530,7 @@ const CreateAppointmentDialog = ({
             </Button>
             <Button
               type="submit"
-              className="rounded-full bg-emerald-500 px-5 text-sm font-semibold text-emerald-950 hover:bg-emerald-400"
+              className="rounded-full bg-emerald-500 px-4 text-sm font-semibold text-emerald-950 hover:bg-emerald-400 sm:px-5"
               disabled={isSubmitting || services.length === 0}
             >
               {isSubmitting ? (
@@ -618,16 +594,16 @@ const RescheduleAppointmentDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg border-white/10 bg-slate-950/95 text-white">
-        <DialogHeader className="space-y-2 text-left">
-          <DialogTitle>Reprogramar cita</DialogTitle>
-          <DialogDescription className="text-white/70">
+      <DialogContent className="max-w-[calc(100%-2rem)] border-white/10 bg-slate-950/95 text-white sm:max-w-lg">
+        <DialogHeader className="space-y-1.5 text-left sm:space-y-2">
+          <DialogTitle className="text-lg sm:text-xl">Reprogramar cita</DialogTitle>
+          <DialogDescription className="text-xs text-white/70 sm:text-sm">
             Ajusta la hora para {appointment.client} ({formatDialogDate(appointmentDate)}).
           </DialogDescription>
         </DialogHeader>
-        <form className="space-y-5" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="new-time">Nueva hora</Label>
+        <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="new-time" className="text-xs sm:text-sm">Nueva hora</Label>
             <Select value={time} onValueChange={setTime} disabled={isSubmitting}>
               <SelectTrigger id="new-time" className="border-white/15 bg-white/5 text-white">
                 <SelectValue placeholder="Selecciona una hora" />
@@ -640,26 +616,26 @@ const RescheduleAppointmentDialog = ({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-white/40">Duración estimada: {durationMinutes} minutos.</p>
+            <p className="text-[10px] text-white/40 sm:text-xs">Duración estimada: {durationMinutes} minutos.</p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
-            <p className="text-base font-semibold text-white">{appointment.service}</p>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-white/80 sm:rounded-2xl sm:p-4 sm:text-sm">
+            <p className="text-sm font-semibold text-white sm:text-base">{appointment.service}</p>
             <p>{appointment.client}</p>
             {(appointment.clientPhone || appointment.clientEmail) && (
-              <p className="text-xs text-white/60">
+              <p className="text-[10px] text-white/60 sm:text-xs">
                 {[appointment.clientPhone, appointment.clientEmail].filter(Boolean).join(' · ')}
               </p>
             )}
           </div>
 
-          {error && <p className="text-sm text-rose-300">{error}</p>}
+          {error && <p className="text-xs text-rose-300 sm:text-sm">{error}</p>}
 
           <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              className="rounded-full border-white/20 text-white/80 hover:bg-white/10"
+              className="rounded-full border-white/20 text-sm text-white/80 hover:bg-white/10"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
@@ -667,7 +643,7 @@ const RescheduleAppointmentDialog = ({
             </Button>
             <Button
               type="submit"
-              className="rounded-full bg-emerald-500 px-5 text-sm font-semibold text-emerald-950 hover:bg-emerald-400"
+              className="rounded-full bg-emerald-500 px-4 text-sm font-semibold text-emerald-950 hover:bg-emerald-400 sm:px-5"
               disabled={isSubmitting}
             >
               {isSubmitting ? (
@@ -724,31 +700,31 @@ const CancelAppointmentDialog = ({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="border-white/10 bg-slate-950/95 text-white">
-        <AlertDialogHeader className="space-y-2 text-left">
-          <AlertDialogTitle>Cancelar cita</AlertDialogTitle>
-          <AlertDialogDescription className="text-white/70">
+      <AlertDialogContent className="max-w-[calc(100%-2rem)] border-white/10 bg-slate-950/95 text-white sm:max-w-lg">
+        <AlertDialogHeader className="space-y-1.5 text-left sm:space-y-2">
+          <AlertDialogTitle className="text-lg sm:text-xl">Cancelar cita</AlertDialogTitle>
+          <AlertDialogDescription className="text-xs text-white/70 sm:text-sm">
             ¿Quieres cancelar la cita de {appointment.client} el {formatDialogDate(appointmentDate)} a las {appointment.time} h?
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
-          <p className="text-base font-semibold text-white">{appointment.service}</p>
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-white/80 sm:rounded-2xl sm:p-4 sm:text-sm">
+          <p className="text-sm font-semibold text-white sm:text-base">{appointment.service}</p>
           {service && <p>Duración estimada: {service.duration_min} minutos.</p>}
           {(appointment.clientPhone || appointment.clientEmail) && (
-            <p className="text-xs text-white/60">
+            <p className="text-[10px] text-white/60 sm:text-xs">
               {[appointment.clientPhone, appointment.clientEmail].filter(Boolean).join(' · ')}
             </p>
           )}
-          {appointment.notes && <p className="text-xs text-white/60">Notas: {appointment.notes}</p>}
+          {appointment.notes && <p className="text-[10px] text-white/60 sm:text-xs">Notas: {appointment.notes}</p>}
         </div>
-        {error && <p className="text-sm text-rose-300">{error}</p>}
+        {error && <p className="text-xs text-rose-300 sm:text-sm">{error}</p>}
         <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-          <AlertDialogCancel className="rounded-full border-white/20 bg-transparent text-white/80 hover:bg-white/10" disabled={isSubmitting}>
+          <AlertDialogCancel className="rounded-full border-white/20 bg-transparent text-sm text-white/80 hover:bg-white/10" disabled={isSubmitting}>
             Mantener cita
           </AlertDialogCancel>
           <Button
             type="button"
-            className="rounded-full bg-rose-500 px-5 text-sm font-semibold text-rose-50 hover:bg-rose-400"
+            className="rounded-full bg-rose-500 px-4 text-sm font-semibold text-rose-50 hover:bg-rose-400 sm:px-5"
             onClick={handleConfirm}
             disabled={isSubmitting}
           >
