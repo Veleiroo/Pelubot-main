@@ -103,16 +103,16 @@ export const AppointmentsCard = forwardRef<HTMLDivElement, AgendaAppointmentsCar
                   const contact = contactLabel(appointment);
                   const statusColor =
                     appointment.status === 'confirmada'
-                      ? 'border-l-emerald-500 bg-emerald-500/5'
+                      ? 'before:bg-emerald-500 bg-emerald-500/5'
                       : appointment.status === 'pendiente'
-                      ? 'border-l-amber-500 bg-amber-500/5'
-                      : 'border-l-rose-500 bg-rose-500/5';
+                      ? 'before:bg-amber-500 bg-amber-500/5'
+                      : 'before:bg-rose-500 bg-rose-500/5';
 
                   return (
                     <article
                       key={appointment.id}
                       className={cn(
-                        'group/card relative overflow-hidden rounded-lg border border-slate-600/40 border-l-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-3 text-sm shadow-md shadow-slate-950/20 backdrop-blur-md transition-all duration-300 hover:scale-[1.02] hover:border-slate-500/60 hover:shadow-lg hover:shadow-slate-950/30 sm:rounded-xl sm:p-4',
+                        'group/card relative overflow-hidden rounded-lg border border-slate-600/40 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-3 text-sm shadow-md shadow-slate-950/20 backdrop-blur-md transition-all duration-300 before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:content-[""] before:pointer-events-none hover:scale-[1.02] hover:border-slate-500/60 hover:shadow-lg hover:shadow-slate-950/30 sm:rounded-xl sm:p-4 sm:before:w-1.5 origin-left',
                         statusColor
                       )}
                     >
