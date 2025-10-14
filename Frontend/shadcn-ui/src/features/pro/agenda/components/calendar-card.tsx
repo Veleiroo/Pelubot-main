@@ -97,7 +97,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
                 weekday: 'flex-1 text-center',
                 week: 'flex w-full mt-1',
                 day: 'flex-1 p-1',
-                day_button: 'w-full h-full',
+                day_button: 'w-full h-full mx-0 my-0',
                 day_selected: '',
                 day_today: '',
                 day_outside: '',
