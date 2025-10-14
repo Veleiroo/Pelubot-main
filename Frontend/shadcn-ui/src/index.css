@@ -213,29 +213,28 @@
 }
 
 .pelu-cal .rdp-day_button.calendar-day--today {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.15));
-  color: rgb(16, 185, 129);
-  font-weight: 900;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25), 0 4px 12px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  text-shadow: 0 0 16px rgba(16, 185, 129, 0.5);
+  background: transparent;
+  color: rgba(16, 185, 129, 0.95);
+  font-weight: 800;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.55), 0 2px 6px rgba(15, 23, 42, 0.35);
+  text-shadow: none;
 }
 
 @media (min-width: 640px) {
   .pelu-cal .rdp-day_button.calendar-day--today {
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25), 0 4px 16px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    text-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.55), 0 3px 10px rgba(15, 23, 42, 0.35);
   }
 }
 
 .pelu-cal .rdp-day_button.calendar-day--today:hover {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(52, 211, 153, 0.25));
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4), 0 6px 20px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.7), 0 8px 18px rgba(16, 185, 129, 0.2);
   transform: translateY(-2px) scale(1.05);
 }
 
 @media (min-width: 640px) {
   .pelu-cal .rdp-day_button.calendar-day--today:hover {
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.4), 0 8px 24px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.7), 0 10px 24px rgba(16, 185, 129, 0.25);
   }
 }
 
@@ -245,6 +244,12 @@
   font-weight: 800;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2), 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);
+}
+
+.pelu-cal .rdp-day_button.calendar-day--today.calendar-day--selected {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(5, 150, 105, 0.12));
+  color: rgba(16, 185, 129, 0.98);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.75), 0 0 0 5px rgba(16, 185, 129, 0.18), 0 8px 22px rgba(0, 0, 0, 0.35);
 }
 
 @media (min-width: 640px) {
