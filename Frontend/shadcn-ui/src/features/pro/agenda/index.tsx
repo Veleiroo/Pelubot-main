@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -16,8 +16,6 @@ import { useToast } from '@/hooks/use-toast';
 import { api, ApiError, type Service } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useProSession } from '@/store/pro';
-
-import { MIN_APPOINTMENTS_CARD_HEIGHT } from '../shared/constants';
 import type { Appointment } from '../shared/types';
 import { AppointmentsCard } from './components/appointments-card';
 import { CalendarCard } from './components/calendar-card';
@@ -59,10 +57,6 @@ type RescheduleFormValues = {
 export const ProsAgendaView = () => {
   const { toast } = useToast();
   const { session } = useProSession();
-  const layoutRef = useRef<HTMLElement>(null);
-  const calendarCardRef = useRef<HTMLDivElement>(null);
-  const appointmentsCardRef = useRef<HTMLDivElement>(null);
-  const [appointmentsCardHeight, setAppointmentsCardHeight] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
@@ -211,41 +205,6 @@ export const ProsAgendaView = () => {
     }
   };
 
-  useLayoutEffect(() => {
-    const recalc = () => {
-      const root = layoutRef.current;
-      const calendarCard = calendarCardRef.current;
-      const appointmentsCard = appointmentsCardRef.current;
-      const isDesktop = window.innerWidth >= 1280;
-      if (!root || !calendarCard || !appointmentsCard || !isDesktop) {
-        setAppointmentsCardHeight(null);
-        return;
-      }
-
-      const viewportHeight = window.innerHeight;
-      const rootRect = root.getBoundingClientRect();
-      const cardRect = calendarCard.getBoundingClientRect();
-      const gap = 24;
-      const buffer = 40;
-
-      const available = viewportHeight - rootRect.top - cardRect.height - gap - buffer;
-      if (!Number.isFinite(available) || available <= 320) {
-        setAppointmentsCardHeight(null);
-        return;
-      }
-
-      setAppointmentsCardHeight(Math.min(available, 720));
-    };
-
-    recalc();
-    window.addEventListener('resize', recalc);
-    return () => window.removeEventListener('resize', recalc);
-  }, []);
-
-  const computedHeight = appointmentsCardHeight === null
-    ? null
-    : Math.max(appointmentsCardHeight, MIN_APPOINTMENTS_CARD_HEIGHT);
-
   if (!stylist) {
     return (
       <section className="flex min-h-[320px] flex-col items-center justify-center gap-3 text-white/80">
@@ -263,7 +222,32 @@ export const ProsAgendaView = () => {
     : undefined;
 
   return (
-    <section ref={layoutRef} className="mb-6 space-y-6">
+    <main className="space-y-6">
+      <header className="flex flex-col gap-4 text-white sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold sm:text-3xl">Agenda profesional</h1>
+          <p className="text-sm text-white/70 sm:text-base">
+            Revisa tus próximas citas y organiza tu disponibilidad desde aquí.
+          </p>
+          {isFetching && !isLoading && (
+            <div className="flex items-center gap-2 text-xs text-white/60">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              <span>Sincronizando agenda...</span>
+            </div>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className="inline-flex items-center gap-2 self-start rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 hover:text-white sm:text-sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+        >
+          <Loader2 className={cn('h-4 w-4', isFetching ? 'animate-spin' : '')} aria-hidden />
+          Actualizar
+        </Button>
+      </header>
+
       {errorMessage && (
         <Alert variant="destructive" className="border-red-500/50 bg-red-500/15 text-red-100 backdrop-blur">
           <AlertTitle className="font-bold">No pudimos cargar tu agenda</AlertTitle>
@@ -277,15 +261,8 @@ export const ProsAgendaView = () => {
         </div>
       )}
 
-      <div
-        className={cn(
-          'grid items-start gap-4 sm:gap-6',
-          'grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]',
-          'lg:h-[calc(100vh-140px)]'
-        )}
-      >
+      <section className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
         <CalendarCard
-          ref={calendarCardRef}
           selectedDate={selectedDate}
           currentMonth={currentMonth}
           today={today}
@@ -302,17 +279,14 @@ export const ProsAgendaView = () => {
         />
 
         <AppointmentsCard
-          ref={appointmentsCardRef}
           dayLabel={dayLabel}
           summary={summary}
           appointments={selectedAppointments}
           isToday={isTodaySelected}
           onCreate={handleCreateClick}
           onAction={handleAppointmentAction}
-          minHeight={MIN_APPOINTMENTS_CARD_HEIGHT}
-          height={computedHeight}
         />
-      </div>
+      </section>
 
       <CreateAppointmentDialog
         open={createOpen}
@@ -347,7 +321,7 @@ export const ProsAgendaView = () => {
         isSubmitting={isCancelling}
         onConfirm={handleCancelConfirm}
       />
-    </section>
+    </main>
   );
 };
 

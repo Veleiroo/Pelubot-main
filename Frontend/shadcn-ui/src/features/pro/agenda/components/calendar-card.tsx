@@ -1,25 +1,15 @@
 import { forwardRef, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 import type { AgendaCalendarCardProps } from '../types';
 
-type LegendItemProps = {
-  indicatorClassName: string;
-  label: string;
-};
-
-const legendItems: LegendItemProps[] = [
-  {
-    indicatorClassName: 'bg-primary shadow-[0_0_0_2px_rgba(16,185,129,0.22)]',
-    label: 'Días con citas',
-  },
-];
+const legendItems = [{ indicatorClassName: 'bg-emerald-400', label: 'Días con citas' }];
 
 export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
   (
@@ -41,7 +31,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
     },
     ref
   ) => {
-    const [showBusyDays, setShowBusyDays] = useState(true);
+    const [highlightBusy, setHighlightBusy] = useState(true);
 
     const startOfToday = useMemo(() => {
       if (!today) return null;
@@ -50,15 +40,14 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
 
     const startOfTodayTime = startOfToday?.getTime();
 
-    const futureBusyDates = useMemo(() => {
+    const busyModifierDates = useMemo(() => {
+      if (!highlightBusy) return [];
       if (!startOfTodayTime) return busyDates;
       return busyDates.filter((date) => {
-        const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        return normalizedDate.getTime() >= startOfTodayTime;
+        const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        return normalized.getTime() >= startOfTodayTime;
       });
-    }, [busyDates, startOfTodayTime]);
-
-    const busyModifierDates = showBusyDays ? futureBusyDates : [];
+    }, [busyDates, highlightBusy, startOfTodayTime]);
 
     const monthLabel = useMemo(() => {
       const monthName = currentMonth.toLocaleDateString('es-ES', { month: 'long' });
@@ -67,46 +56,41 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
     }, [currentMonth]);
 
     return (
-      <Card
-        ref={ref}
-        className="group relative flex flex-col overflow-hidden rounded-[1.5rem] border border-border/60 bg-card/80 text-foreground shadow-soft transition-colors duration-300 hover:border-border"
-      >
-        <CardHeader className="relative flex shrink-0 flex-col gap-6 border-b border-border/60 bg-card/70 px-6 py-6 text-left backdrop-blur-sm sm:px-8">
-          <div className="flex flex-col gap-1.5">
-            <CardTitle className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem]">
-              {title}
-            </CardTitle>
-            {description ? (
-              <CardDescription className="max-w-[22rem] text-sm text-muted-foreground sm:text-base">
-                {description}
-              </CardDescription>
-            ) : null}
-          </div>
-          <div className="group/nav flex w-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-base font-medium text-muted-foreground shadow-soft transition-colors duration-300 sm:px-6 sm:py-3.5 sm:text-lg">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onPrev}
-              disabled={disablePrev}
-              className="text-muted-foreground hover:bg-muted/40 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="text-base font-medium capitalize text-foreground">
-              {monthLabel}
+      <Card ref={ref} className="flex h-full flex-col border-white/10 bg-slate-950/60 text-white">
+        <CardHeader className="gap-4 border-b border-white/10 pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+              {description ? (
+                <CardDescription className="text-xs text-white/70 sm:text-sm">{description}</CardDescription>
+              ) : null}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onNext}
-              disabled={disableNext}
-              className="text-muted-foreground hover:bg-muted/40 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1 rounded-md bg-white/5 p-1 text-white/80">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white/80 hover:bg-white/10 hover:text-white disabled:text-white/40"
+                onClick={onPrev}
+                disabled={disablePrev}
+                aria-label="Mes anterior"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="px-3 text-sm font-medium capitalize text-white">{monthLabel}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white/80 hover:bg-white/10 hover:text-white disabled:text-white/40"
+                onClick={onNext}
+                disabled={disableNext}
+                aria-label="Mes siguiente"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="relative flex flex-1 flex-col gap-6 px-6 pb-8 pt-6 sm:px-8 sm:pb-10">
+        <CardContent className="flex flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
           <Calendar
             mode="single"
             selected={selectedDate}
@@ -130,19 +114,18 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
             }}
             className="pelu-cal mx-auto w-full !px-0"
             classNames={{
-              months: 'w-full space-y-6',
+              months: 'w-full space-y-4',
               month: 'flex flex-col gap-4',
               caption: 'hidden',
               month_caption: 'sr-only',
               caption_label: 'sr-only',
               month_grid: 'w-full',
-              weekdays:
-                'grid w-full grid-cols-7 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80 sm:text-[0.7rem]',
+              weekdays: 'grid w-full grid-cols-7 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-white/60 sm:text-xs',
               weekday: 'flex h-9 items-center justify-center',
-              week: 'grid grid-cols-7 gap-2 sm:gap-3',
+              week: 'grid grid-cols-7 gap-2',
               day: 'aspect-square',
               day_button:
-                'group/calendar-day relative flex h-full w-full items-center justify-center rounded-xl border border-transparent text-sm font-semibold text-muted-foreground transition-all duration-200 hover:border-primary/40 hover:bg-primary/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                'group/calendar-day relative flex h-full w-full items-center justify-center rounded-lg border border-transparent text-sm font-medium text-white/80 transition-colors hover:border-white/40 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950',
               day_selected: 'calendar-day--selected',
               day_today: 'calendar-day--today',
               day_outside: 'calendar-day--outside',
@@ -154,17 +137,23 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
             fromMonth={fromMonth}
             toMonth={toMonth}
           />
-          <div className="flex w-full flex-col gap-4 rounded-2xl border border-border/60 bg-card/70 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3.5 sm:text-sm">
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+
+          <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-white/5 p-4 text-xs text-white/70 sm:flex-row sm:items-center sm:justify-between sm:text-sm">
+            <div className="flex items-center gap-3">
               {legendItems.map((item) => (
-                <CalendarLegendItem key={item.label} {...item} />
+                <span key={item.label} className="flex items-center gap-2">
+                  <span className={cn('h-2.5 w-2.5 rounded-full', item.indicatorClassName)} aria-hidden />
+                  <span>{item.label}</span>
+                </span>
               ))}
             </div>
-            <label
-              htmlFor="agenda-busy-toggle"
-              className="flex items-center gap-3 text-sm font-medium text-muted-foreground"
-            >
-              <Switch id="agenda-busy-toggle" checked={showBusyDays} onCheckedChange={setShowBusyDays} />
+            <label htmlFor="agenda-busy-toggle" className="flex items-center gap-3 font-medium text-white/80">
+              <Switch
+                id="agenda-busy-toggle"
+                checked={highlightBusy}
+                onCheckedChange={setHighlightBusy}
+                aria-label="Resaltar días con citas"
+              />
               <span>Resaltar días con citas</span>
             </label>
           </div>
@@ -175,10 +164,3 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
 );
 
 CalendarCard.displayName = 'AgendaCalendarCard';
-
-const CalendarLegendItem = ({ indicatorClassName, label }: LegendItemProps) => (
-  <div className="flex items-center gap-2 sm:gap-3">
-    <span className={cn('h-2.5 w-2.5 rounded-full sm:h-3 sm:w-3', indicatorClassName)} aria-hidden />
-    <span className="text-xs font-medium text-muted-foreground sm:text-sm">{label}</span>
-  </div>
-);

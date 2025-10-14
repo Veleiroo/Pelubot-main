@@ -1,9 +1,8 @@
 import { forwardRef } from 'react';
-import { Calendar, Check, Clock, Mail, MessageSquare, Phone, Plus, Trash2, X } from 'lucide-react';
+import { Calendar, Mail, Phone, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
@@ -17,219 +16,139 @@ const timeRangeLabel = (appointment: Appointment) =>
 const contactLabel = (appointment: Appointment) => {
   const phone = appointment.clientPhone?.trim();
   const email = appointment.clientEmail?.trim();
-  
+
   if (!phone && !email) return null;
-  
+
   return { phone, email };
 };
 
 export const AppointmentsCard = forwardRef<HTMLDivElement, AgendaAppointmentsCardProps>(
-  ({ dayLabel, summary, appointments, isToday, onCreate, onAction, minHeight, height }, ref) => {
-    const cardStyle = (() => {
-      if (!height) return { minHeight } as const;
-      const clamped = Math.max(height, minHeight);
-      return { height: clamped, minHeight } as const;
-    })();
-
+  ({ dayLabel, summary, appointments, isToday, onCreate, onAction }, ref) => {
     return (
-      <Card
-        ref={ref}
-        className="group relative flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-border/60 bg-card/80 text-foreground shadow-soft transition-colors duration-300"
-        style={cardStyle}
-      >
-        {/* Header fijo con backdrop-blur */}
-        <div className="sticky top-0 z-10 shrink-0 space-y-3 border-b border-border/60 bg-card/90 px-4 pb-3 pt-4 backdrop-blur-sm sm:space-y-4 sm:px-6 sm:pb-4 sm:pt-5 md:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <CardTitle className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl md:text-3xl">
-                {dayLabel}
-              </CardTitle>
-              {isToday && (
-                <Badge
-                  variant="outline"
-                  className="rounded-full border-primary/40 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground sm:text-xs"
-                >
-                  Hoy
-                </Badge>
-              )}
+      <Card ref={ref} className="flex h-full flex-col border-white/10 bg-slate-950/60 text-white">
+        <CardHeader className="gap-3 border-b border-white/10 pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle className="text-lg font-semibold">{dayLabel}</CardTitle>
+              <CardDescription className="text-xs text-white/70 sm:text-sm">
+                {summary.total > 0
+                  ? `${summary.total} ${summary.total === 1 ? 'cita programada' : 'citas programadas'}`
+                  : 'Sin citas registradas'}
+              </CardDescription>
+              {isToday && <p className="text-xs font-medium uppercase tracking-wide text-emerald-300">Hoy</p>}
             </div>
             <Button
-              variant="default"
+              variant="ghost"
               size="sm"
-              className="gap-2 rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-soft transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary sm:px-4 sm:text-sm"
+              className="gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 hover:text-white sm:text-sm"
               onClick={onCreate}
               aria-label="Crear nueva cita"
             >
               <Plus className="h-4 w-4" />
-              <span>Crear cita</span>
+              Crear cita
             </Button>
           </div>
-          
-          {/* Stats con iconos de Lucide */}
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:gap-3 sm:text-sm">
-            <span className="font-medium text-foreground">
-              {summary.total > 0
-                ? `${summary.total} ${summary.total === 1 ? 'cita' : 'citas'}`
-                : 'Sin citas'}
-            </span>
-            {summary.total > 0 && (
-              <>
-                <span className="text-muted-foreground/60">•</span>
-                <div className="flex flex-wrap gap-2">
-                  {summary.confirmadas > 0 && (
-                    <Badge
-                      variant="outline"
-                      className="gap-1.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      <span>{summary.confirmadas}</span>
-                    </Badge>
-                  )}
-                  {summary.pendientes > 0 && (
-                    <Badge variant="outline" className="gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-200">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>{summary.pendientes}</span>
-                    </Badge>
-                  )}
-                  {summary.canceladas > 0 && (
-                    <Badge variant="outline" className="gap-1.5 border-rose-500/30 bg-rose-500/10 text-rose-200">
-                      <X className="h-3.5 w-3.5" />
-                      <span>{summary.canceladas}</span>
-                    </Badge>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
 
-        {/* Contenido con scroll personalizado */}
-        <CardContent className="appointments-container flex-1 overflow-hidden px-4 pb-4 pt-3 sm:px-6 sm:pb-6 sm:pt-4 md:px-8">
+          {summary.total > 0 && (
+            <dl className="flex flex-wrap gap-3 text-xs text-white/60 sm:text-sm">
+              <div className="flex items-center gap-2">
+                <dt className="font-medium text-white">Confirmadas</dt>
+                <dd className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-white">{summary.confirmadas}</dd>
+              </div>
+              <div className="flex items-center gap-2">
+                <dt className="font-medium text-white">Pendientes</dt>
+                <dd className="rounded-full bg-amber-500/20 px-2 py-0.5 text-white">{summary.pendientes}</dd>
+              </div>
+              <div className="flex items-center gap-2">
+                <dt className="font-medium text-white">Canceladas</dt>
+                <dd className="rounded-full bg-rose-500/20 px-2 py-0.5 text-white">{summary.canceladas}</dd>
+              </div>
+            </dl>
+          )}
+        </CardHeader>
+        <CardContent className="flex flex-1 flex-col px-4 pb-4 pt-3 sm:px-6 sm:pb-6 sm:pt-4">
           {appointments.length > 0 ? (
             <ScrollArea className="h-full pr-1 sm:pr-2">
-              <div className="space-y-3">
-                {appointments.map((appointment, index) => {
+              <ul className="space-y-3">
+                {appointments.map((appointment) => {
                   const contact = contactLabel(appointment);
-                  const statusColor =
-                    appointment.status === 'confirmada'
-                      ? 'border-l-emerald-500/60 bg-emerald-500/8'
-                      : appointment.status === 'pendiente'
-                      ? 'border-l-amber-500/60 bg-amber-500/8'
-                      : 'border-l-rose-500/60 bg-rose-500/8';
 
                   return (
-                    <article
-                      key={appointment.id}
-                      style={{
-                        animationDelay: `${index * 50}ms`,
-                      }}
-                      className={cn(
-                        'group/card relative overflow-hidden rounded-2xl border border-border/60 border-l-4 p-4 text-sm shadow-soft transition-transform duration-200 animate-in fade-in slide-in-from-bottom-4 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-card/85 sm:p-5',
-                        statusColor
-                      )}
-                    >
-                      {/* Botones en absolute top-right */}
-                      <div className="absolute right-3 top-3 flex gap-1.5 sm:right-4 sm:top-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1 rounded-full border-border/60 bg-background/60 px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary"
-                          onClick={() => onAction('reschedule', appointment)}
-                          title="Reprogramar cita"
-                          aria-label="Reprogramar cita"
-                        >
-                          <Calendar className="h-3 w-3" />
-                          <span className="hidden sm:inline">Reprog.</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1 rounded-full border-border/60 bg-background/60 px-3 text-xs font-medium text-destructive transition-colors hover:border-destructive/40 hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-destructive"
-                          onClick={() => onAction('cancel', appointment)}
-                          title="Cancelar cita"
-                          aria-label="Cancelar cita"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          <span className="hidden sm:inline">Cancel.</span>
-                        </Button>
-                      </div>
-
-                      <div className="pr-24">
-                        <div className="space-y-2">
-                          {/* Hora y Estado */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center rounded-lg border border-border/60 bg-background/60 px-3 py-1.5 text-sm font-medium text-foreground tabular-nums">
-                              {timeRangeLabel(appointment)}
-                            </span>
-                            <span
-                              className={cn(
-                                'inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold uppercase tracking-wide',
-                                STATUS_STYLES[appointment.status]
-                              )}
-                            >
-                              {appointment.status}
-                            </span>
-                          </div>
-
-                          {/* Cliente y Servicio */}
-                          <div className="space-y-0.5">
-                            <p className="text-base font-semibold text-foreground transition-colors duration-200 group-hover/card:text-primary">
-                              {appointment.client}
-                            </p>
-                            <p className="text-xs font-medium text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground">
-                              {appointment.service}
-                            </p>
-                          </div>
-
-                          {/* Contacto con iconos */}
-                          {contact && (
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                              {contact.phone && (
-                                <div className="flex items-center gap-1.5">
-                                  <Phone className="h-3.5 w-3.5" />
-                                  <span>{contact.phone}</span>
-                                </div>
-                              )}
-                              {contact.email && (
-                                <div className="flex items-center gap-1.5">
-                                  <Mail className="h-3.5 w-3.5" />
-                                  <span>{contact.email}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                    <li key={appointment.id}>
+                      <article className="relative flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-4 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <span className="inline-flex items-center rounded-md bg-white/10 px-3 py-1 text-sm font-medium tabular-nums">
+                            {timeRangeLabel(appointment)}
+                          </span>
+                          <span
+                            className={cn(
+                              'inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide',
+                              STATUS_STYLES[appointment.status]
+                            )}
+                          >
+                            {appointment.status}
+                          </span>
                         </div>
 
-                        {/* Notas interactivas */}
-                        {appointment.notes && (
-                          <button
-                            className="mt-3 flex w-full items-start gap-2 rounded-lg border border-border/60 bg-background/50 p-2.5 text-left text-xs text-muted-foreground transition-colors duration-200 hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                            onClick={() => {
-                              // Aquí podrías abrir un modal o tooltip con las notas
-                              console.log('Ver notas:', appointment.notes);
-                            }}
-                            aria-label="Ver notas de la cita"
-                          >
-                            <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span className="flex-1">{appointment.notes}</span>
-                          </button>
+                        <div className="space-y-1">
+                          <p className="text-base font-semibold text-white">{appointment.client}</p>
+                          <p className="text-xs text-white/70">{appointment.service}</p>
+                        </div>
+
+                        {contact && (
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-white/70">
+                            {contact.phone && (
+                              <span className="flex items-center gap-1.5">
+                                <Phone className="h-3.5 w-3.5" aria-hidden />
+                                <span>{contact.phone}</span>
+                              </span>
+                            )}
+                            {contact.email && (
+                              <span className="flex items-center gap-1.5">
+                                <Mail className="h-3.5 w-3.5" aria-hidden />
+                                <span>{contact.email}</span>
+                              </span>
+                            )}
+                          </div>
                         )}
-                      </div>
-                    </article>
+
+                        {appointment.notes && (
+                          <p className="rounded-md bg-white/5 px-3 py-2 text-xs text-white/70">Notas: {appointment.notes}</p>
+                        )}
+
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-2 rounded-md border border-white/10 bg-transparent px-3 py-2 text-xs text-white hover:bg-white/10"
+                            onClick={() => onAction('reschedule', appointment)}
+                            aria-label="Reprogramar cita"
+                          >
+                            <Calendar className="h-4 w-4" />
+                            Reprogramar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-2 rounded-md border border-rose-400/40 bg-transparent px-3 py-2 text-xs text-rose-200 hover:bg-rose-500/20"
+                            onClick={() => onAction('cancel', appointment)}
+                            aria-label="Cancelar cita"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Cancelar
+                          </Button>
+                        </div>
+                      </article>
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
             </ScrollArea>
           ) : (
-            <div className="relative flex h-full min-h-[240px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/60 bg-background/40 text-center sm:min-h-[280px]">
-              <div className="space-y-3 p-6 sm:space-y-4 sm:p-8">
-                <p className="text-4xl sm:text-5xl">📅</p>
-                <p className="text-lg font-semibold text-foreground sm:text-xl">Día libre</p>
-                <p className="text-xs text-muted-foreground sm:text-sm">Este día no tiene citas programadas</p>
-                <p className="text-[10px] text-muted-foreground/80 sm:text-xs">
-                  Haz clic en "Crear cita" para agregar una nueva
-                </p>
-              </div>
+            <div className="flex h-full min-h-[240px] flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/5 text-center">
+              <p className="text-4xl">📅</p>
+              <p className="mt-2 text-base font-semibold text-white">Día libre</p>
+              <p className="text-xs text-white/60">No hay citas programadas para esta fecha.</p>
             </div>
           )}
         </CardContent>
