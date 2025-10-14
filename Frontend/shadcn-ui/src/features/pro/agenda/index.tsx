@@ -1,27 +1,72 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Loader2 } from 'lucide-react';
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Loader2,
+  Mail,
+  Phone,
+  Plus,
+  RefreshCcw,
+  Trash2,
+} from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Card } from '@/components/ui/card';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { api, ApiError, type Service } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useProSession } from '@/store/pro';
-import type { Appointment } from '../shared/types';
-import { AppointmentsCard } from './components/appointments-card';
-import { CalendarCard } from './components/calendar-card';
+import { STATUS_STYLES } from '../shared/constants';
+import type { AgendaSummary, Appointment } from '../shared/types';
 import { useAgendaActions } from './hooks/useAgendaActions';
 import { useAgendaData } from './hooks/useAgendaData';
 import { useAgendaState } from './hooks/useAgendaState';
+
+type CreateFormValues = {
+  serviceId: string;
+  serviceName: string;
+  durationMinutes: number;
+  time: string;
+  clientName: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  notes?: string;
+};
+
+type RescheduleFormValues = {
+  newTime: string;
+  durationMinutes: number;
+};
 
 const TIME_OPTIONS = Array.from({ length: (22 - 8) * 2 + 1 }, (_, index) => {
   const base = 8 * 60 + index * 30;
@@ -38,20 +83,22 @@ const toErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-type CreateFormValues = {
-  serviceId: string;
-  serviceName: string;
-  durationMinutes: number;
-  time: string;
-  clientName: string;
-  clientPhone?: string;
-  clientEmail?: string;
-  notes?: string;
+const capitalize = (value: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : value);
+
+const STATUS_BORDER_ACCENTS: Record<Appointment['status'], string> = {
+  confirmada: 'border-l-emerald-400',
+  pendiente: 'border-l-amber-400',
+  cancelada: 'border-l-rose-400',
 };
 
-type RescheduleFormValues = {
-  newTime: string;
-  durationMinutes: number;
+const timeRangeLabel = (appointment: Appointment) =>
+  appointment.endTime ? `${appointment.time} h · ${appointment.endTime} h` : `${appointment.time} h`;
+
+const contactLabel = (appointment: Appointment) => {
+  const phone = appointment.clientPhone?.trim();
+  const email = appointment.clientEmail?.trim();
+  if (!phone && !email) return null;
+  return { phone, email };
 };
 
 export const ProsAgendaView = () => {
@@ -70,13 +117,7 @@ export const ProsAgendaView = () => {
     enabled: Boolean(stylist),
   });
 
-  const {
-    appointments,
-    isLoading,
-    isFetching,
-    errorMessage,
-    refetch,
-  } = useAgendaData(Boolean(stylist));
+  const { appointments, isLoading, isFetching, errorMessage, refetch } = useAgendaData(Boolean(stylist));
 
   const {
     selectedDate,
@@ -115,6 +156,9 @@ export const ProsAgendaView = () => {
     isRescheduling,
     isCancelling,
   } = useAgendaActions({ professionalId: stylist?.id });
+
+  const formattedDayLabel = useMemo(() => capitalize(dayLabel), [dayLabel]);
+  const pendingCount = summary.pendientes;
 
   const handlePrevNav = () => {
     if (disablePrevNav) return;
@@ -207,7 +251,7 @@ export const ProsAgendaView = () => {
 
   if (!stylist) {
     return (
-      <section className="flex min-h-[320px] flex-col items-center justify-center gap-3 text-white/80">
+      <section className="flex min-h-[320px] flex-col items-center justify-center gap-3 text-muted-foreground">
         <Loader2 className="h-6 w-6 animate-spin" />
         <p className="text-sm">Cargando tu agenda...</p>
       </section>
@@ -222,84 +266,94 @@ export const ProsAgendaView = () => {
     : undefined;
 
   return (
-    <main className="space-y-6">
-      <header className="grid gap-6 rounded-2xl border border-border/50 bg-card p-6 text-foreground shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-semibold tracking-tight">Agenda profesional</h1>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              Revisa tus próximas citas y organiza tu disponibilidad desde aquí.
-            </p>
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border/50 bg-card/60 backdrop-blur">
+        <div className="container mx-auto flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-semibold text-foreground">PELUBOT PRO</span>
+            {stylist?.name ? <span className="text-sm text-muted-foreground">— {stylist.name}</span> : null}
           </div>
-          {isFetching && !isLoading && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              <span>Sincronizando agenda...</span>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col items-start gap-4 text-sm text-muted-foreground sm:items-end">
-          <Button
-            type="button"
-            variant="ghost"
-            className={cn(
-              'inline-flex items-center gap-2 rounded-lg border border-border/50 bg-card px-4 py-2 font-medium text-foreground shadow-sm transition-colors hover:bg-muted/50',
-              isFetching ? 'cursor-wait opacity-90' : ''
-            )}
-            onClick={() => refetch()}
-            disabled={isFetching}
-          >
-            <Loader2 className={cn('h-4 w-4', isFetching ? 'animate-spin' : '')} aria-hidden />
-            Actualizar
-          </Button>
-          <div className="flex items-center gap-2 sm:justify-end">
-            <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full border border-border/50 bg-muted/50 px-3 py-1 text-sm font-semibold text-foreground">
-              {appointments.length}
-            </span>
-            <span className="text-sm font-medium text-muted-foreground">Citas sincronizadas</span>
+
+          <nav className="hidden items-center gap-1 md:flex">
+            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+              Resumen
+            </Button>
+            <Button variant="ghost" className="bg-muted/50 text-foreground font-medium hover:text-foreground">
+              Agenda
+            </Button>
+            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+              Clientes
+            </Button>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className={cn(
+                'gap-2 border-border/60 bg-transparent text-sm text-muted-foreground transition hover:bg-muted/40',
+                isFetching ? 'cursor-wait opacity-80' : ''
+              )}
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCcw className={cn('h-4 w-4', isFetching ? 'animate-spin' : '')} />
+              Actualizar
+            </Button>
+            <Button
+              onClick={handleCreateClick}
+              className="gap-2 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus className="h-4 w-4" />
+              Nueva cita
+            </Button>
           </div>
         </div>
       </header>
 
-      {errorMessage && (
-        <Alert variant="destructive" className="border-red-500/50 bg-red-500/15 text-red-100 backdrop-blur">
-          <AlertTitle className="font-bold">No pudimos cargar tu agenda</AlertTitle>
-          <AlertDescription>{errorMessage}</AlertDescription>
-        </Alert>
-      )}
-      {isLoading && appointments.length === 0 && (
-        <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-600/40 bg-slate-800/40 px-6 py-4 text-base text-white/80 backdrop-blur-sm">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="font-medium">Cargando tu agenda...</span>
-        </div>
-      )}
+      <main className="container mx-auto space-y-6 px-6 py-8">
+        {errorMessage ? (
+          <Alert variant="destructive" className="border-red-500/50 bg-red-500/15 text-red-100 backdrop-blur">
+            <AlertTitle className="font-bold">No pudimos cargar tu agenda</AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        ) : null}
 
-      <section className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
-        <CalendarCard
-          selectedDate={selectedDate}
-          currentMonth={currentMonth}
-          today={today}
-          busyDates={busyDates}
-          fromMonth={fromMonth}
-          toMonth={toMonth}
-          disablePrev={disablePrevNav}
-          disableNext={disableNextNav}
-          onSelectDay={handleSelectDay}
-          onMonthChange={handleMonthChange}
-          onPrev={handlePrevNav}
-          onNext={handleNextNav}
-          description="Selecciona un día para revisar o añadir citas."
-        />
+        {isLoading && appointments.length === 0 ? (
+          <div className="flex items-center justify-center gap-3 rounded-2xl border border-border/60 bg-muted/30 px-6 py-4 text-base text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="font-medium">Cargando tu agenda...</span>
+          </div>
+        ) : null}
 
-        <AppointmentsCard
-          dayLabel={dayLabel}
-          summary={summary}
-          appointments={selectedAppointments}
-          isToday={isTodaySelected}
-          onCreate={handleCreateClick}
-          onAction={handleAppointmentAction}
-        />
-      </section>
+        <section className="grid gap-8 lg:grid-cols-[360px_1fr]">
+          <AgendaCalendarPanel
+            selectedDate={selectedDate}
+            currentMonth={currentMonth}
+            today={today}
+            busyDates={busyDates}
+            fromMonth={fromMonth}
+            toMonth={toMonth}
+            disablePrev={disablePrevNav}
+            disableNext={disableNextNav}
+            onSelectDay={handleSelectDay}
+            onMonthChange={handleMonthChange}
+            onPrev={handlePrevNav}
+            onNext={handleNextNav}
+          />
+
+          <AppointmentsListPanel
+            dayLabel={formattedDayLabel}
+            summary={summary}
+            appointments={selectedAppointments}
+            isToday={isTodaySelected}
+            pendingCount={pendingCount}
+            isFetching={isFetching}
+            onCreate={handleCreateClick}
+            onAction={handleAppointmentAction}
+          />
+        </section>
+      </main>
 
       <CreateAppointmentDialog
         open={createOpen}
@@ -334,11 +388,306 @@ export const ProsAgendaView = () => {
         isSubmitting={isCancelling}
         onConfirm={handleCancelConfirm}
       />
-    </main>
+    </div>
   );
 };
 
 export default ProsAgendaView;
+
+type AgendaCalendarPanelProps = {
+  selectedDate: Date;
+  currentMonth: Date;
+  today: Date;
+  busyDates: Date[];
+  fromMonth: Date;
+  toMonth: Date;
+  disablePrev: boolean;
+  disableNext: boolean;
+  onSelectDay: (day?: Date) => void;
+  onMonthChange: (month: Date) => void;
+  onPrev: () => void;
+  onNext: () => void;
+};
+
+const AgendaCalendarPanel = ({
+  selectedDate,
+  currentMonth,
+  today,
+  busyDates,
+  fromMonth,
+  toMonth,
+  disablePrev,
+  disableNext,
+  onSelectDay,
+  onMonthChange,
+  onPrev,
+  onNext,
+}: AgendaCalendarPanelProps) => {
+  const [highlightBusy, setHighlightBusy] = useState(true);
+
+  const busyModifierDates = useMemo(() => (highlightBusy ? busyDates : []), [busyDates, highlightBusy]);
+
+  const monthLabel = useMemo(() => {
+    const monthName = currentMonth.toLocaleDateString('es-ES', { month: 'long' });
+    return `${capitalize(monthName)} ${currentMonth.getFullYear()}`;
+  }, [currentMonth]);
+
+  return (
+    <Card className="space-y-6 border border-border/60 bg-card/70 p-6">
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-semibold text-foreground">Calendario</h2>
+          <p className="text-sm text-muted-foreground">Selecciona un día para revisar o añadir citas.</p>
+        </div>
+
+        <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-muted/40 px-2 py-1 text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground disabled:opacity-40"
+            onClick={onPrev}
+            disabled={disablePrev}
+            aria-label="Mes anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="px-4 text-base font-semibold capitalize tracking-tight text-foreground">{monthLabel}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground disabled:opacity-40"
+            onClick={onNext}
+            disabled={disableNext}
+            aria-label="Mes siguiente"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          month={currentMonth}
+          onSelect={onSelectDay}
+          onMonthChange={onMonthChange}
+          fromMonth={fromMonth}
+          toMonth={toMonth}
+          showOutsideDays
+          modifiers={{
+            busy: busyModifierDates,
+            today: today ? [today] : [],
+          }}
+          modifiersClassNames={{
+            busy:
+              'after:absolute after:bottom-2 after:left-1/2 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-primary/80 after:content-[""]',
+            today: 'border border-primary/50 text-primary',
+            selected:
+              'bg-primary text-primary-foreground shadow-[0_8px_20px_rgba(47,129,237,0.35)] hover:bg-primary rounded-full',
+            outside: 'pointer-events-none text-muted-foreground/40',
+            disabled: 'pointer-events-none opacity-40',
+          }}
+          className="w-full"
+          classNames={{
+            months: 'flex w-full flex-col gap-4',
+            month: 'space-y-4',
+            caption: 'hidden',
+            month_caption: 'sr-only',
+            caption_label: 'sr-only',
+            month_grid: 'space-y-2',
+            weekdays:
+              'grid grid-cols-7 text-center text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground sm:text-[0.7rem]',
+            weekday: 'py-2',
+            week: 'grid grid-cols-7 gap-1',
+            day: 'flex items-center justify-center',
+            day_button:
+              'relative inline-flex h-11 w-11 items-center justify-center rounded-full text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/20 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+            day_selected:
+              'bg-primary text-primary-foreground font-semibold shadow-[0_8px_20px_rgba(47,129,237,0.35)] hover:bg-primary rounded-full',
+            day_today: 'border border-primary/50 text-primary',
+            day_outside: 'pointer-events-none text-muted-foreground/40',
+            day_disabled: 'pointer-events-none opacity-40',
+            day_hidden: 'invisible',
+            nav: 'hidden',
+          }}
+        />
+      </div>
+
+      <div className="flex items-center justify-between border-t border-border/60 pt-4">
+        <label htmlFor="agenda-toggle" className="text-sm font-medium text-foreground">
+          Días con citas
+        </label>
+        <Switch id="agenda-toggle" checked={highlightBusy} onCheckedChange={setHighlightBusy} />
+      </div>
+    </Card>
+  );
+};
+
+type AppointmentsListPanelProps = {
+  dayLabel: string;
+  summary: AgendaSummary;
+  appointments: Appointment[];
+  isToday: boolean;
+  pendingCount: number;
+  isFetching: boolean;
+  onCreate: () => void;
+  onAction: (action: 'reschedule' | 'cancel', appointment: Appointment) => void;
+};
+
+const AppointmentsListPanel = ({
+  dayLabel,
+  summary,
+  appointments,
+  isToday,
+  pendingCount,
+  isFetching,
+  onCreate,
+  onAction,
+}: AppointmentsListPanelProps) => (
+  <Card className="space-y-6 border border-border/60 bg-card/70 p-6">
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h1 className="text-3xl font-semibold text-foreground capitalize">{dayLabel}</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <span className="text-foreground font-medium">
+            {appointments.length} {appointments.length === 1 ? 'cita' : 'citas'}
+          </span>
+          <Badge variant="secondary" className="gap-1.5 bg-muted text-foreground">
+            <Clock className="h-3 w-3" />
+            {pendingCount}
+          </Badge>
+          {isToday ? (
+            <Badge variant="outline" className="border-primary/40 text-primary">
+              Hoy
+            </Badge>
+          ) : null}
+          {isFetching ? (
+            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Actualizando...
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <Button
+        onClick={onCreate}
+        className="gap-2 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+      >
+        <Plus className="h-4 w-4" />
+        Crear cita
+      </Button>
+    </div>
+
+    {appointments.length > 0 ? (
+      <div className="space-y-4">
+        {appointments.map((appointment) => {
+          const contact = contactLabel(appointment);
+
+          return (
+            <div
+              key={appointment.id}
+              className={cn(
+                'rounded-2xl border border-border/60 bg-card/80 p-6 transition hover:shadow-md',
+                'border-l-4',
+                STATUS_BORDER_ACCENTS[appointment.status]
+              )}
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <span className="inline-flex items-center gap-2 font-medium text-foreground">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    {timeRangeLabel(appointment)}
+                  </span>
+                  <Badge
+                    className={cn(
+                      'rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide',
+                      STATUS_STYLES[appointment.status]
+                    )}
+                  >
+                    {appointment.status}
+                  </Badge>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xl font-semibold text-foreground">{appointment.client}</p>
+                  <p className="text-sm text-muted-foreground">{appointment.service}</p>
+                </div>
+
+                {contact ? (
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                    {contact.phone ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5" />
+                        {contact.phone}
+                      </span>
+                    ) : null}
+                    {contact.email ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5" />
+                        {contact.email}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {appointment.notes ? (
+                  <p className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    Notas: {appointment.notes}
+                  </p>
+                ) : null}
+
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 px-3 text-xs font-medium text-muted-foreground transition hover:text-primary"
+                    onClick={() => onAction('reschedule', appointment)}
+                  >
+                    <CalendarIcon className="h-4 w-4" />
+                    Reprogramar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 px-3 text-xs font-medium text-rose-500 transition hover:text-rose-600"
+                    onClick={() => onAction('cancel', appointment)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 p-10 text-center">
+        <p className="text-4xl">📅</p>
+        <p className="mt-3 text-lg font-semibold text-foreground">No hay citas programadas</p>
+        <p className="text-sm text-muted-foreground">
+          Crea una nueva reserva para este día desde el botón superior.
+        </p>
+      </div>
+    )}
+
+    <div className="grid grid-cols-1 gap-3 border-t border-border/60 pt-4 sm:grid-cols-3">
+      <div className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Confirmadas</p>
+        <p className="mt-2 text-lg font-semibold text-foreground">{summary.confirmadas}</p>
+      </div>
+      <div className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Pendientes</p>
+        <p className="mt-2 text-lg font-semibold text-foreground">{summary.pendientes}</p>
+      </div>
+      <div className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Canceladas</p>
+        <p className="mt-2 text-lg font-semibold text-foreground">{summary.canceladas}</p>
+      </div>
+    </div>
+  </Card>
+);
 
 type CreateAppointmentDialogProps = {
   open: boolean;
@@ -421,7 +770,9 @@ const CreateAppointmentDialog = ({
         </DialogHeader>
         <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
           <div className="space-y-1.5 sm:space-y-2">
-            <Label htmlFor="service" className="text-xs sm:text-sm">Servicio</Label>
+            <Label htmlFor="service" className="text-xs sm:text-sm">
+              Servicio
+            </Label>
             <Select value={serviceId} onValueChange={setServiceId} disabled={services.length === 0 || isSubmitting}>
               <SelectTrigger id="service" className="border-white/15 bg-white/5 text-white">
                 <SelectValue placeholder="Selecciona un servicio" />
@@ -438,7 +789,9 @@ const CreateAppointmentDialog = ({
 
           <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
             <div className="space-y-1.5 sm:space-y-2">
-              <Label htmlFor="time" className="text-xs sm:text-sm">Hora de inicio</Label>
+              <Label htmlFor="time" className="text-xs sm:text-sm">
+                Hora de inicio
+              </Label>
               <Select value={time} onValueChange={setTime} disabled={isSubmitting}>
                 <SelectTrigger id="time" className="border-white/15 bg-white/5 text-white">
                   <SelectValue placeholder="Elige una hora" />
@@ -453,7 +806,9 @@ const CreateAppointmentDialog = ({
               </Select>
             </div>
             <div className="space-y-1.5 sm:space-y-2">
-              <Label htmlFor="client-name" className="text-xs sm:text-sm">Nombre de la persona</Label>
+              <Label htmlFor="client-name" className="text-xs sm:text-sm">
+                Nombre de la persona
+              </Label>
               <Input
                 id="client-name"
                 value={clientName}
@@ -467,7 +822,9 @@ const CreateAppointmentDialog = ({
 
           <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
             <div className="space-y-1.5 sm:space-y-2">
-              <Label htmlFor="client-phone" className="text-xs sm:text-sm">Teléfono de contacto</Label>
+              <Label htmlFor="client-phone" className="text-xs sm:text-sm">
+                Teléfono de contacto
+              </Label>
               <Input
                 id="client-phone"
                 value={clientPhone}
@@ -478,7 +835,9 @@ const CreateAppointmentDialog = ({
               />
             </div>
             <div className="space-y-1.5 sm:space-y-2">
-              <Label htmlFor="client-email" className="text-xs sm:text-sm">Correo electrónico (opcional)</Label>
+              <Label htmlFor="client-email" className="text-xs sm:text-sm">
+                Correo electrónico (opcional)
+              </Label>
               <Input
                 id="client-email"
                 type="email"
@@ -492,7 +851,9 @@ const CreateAppointmentDialog = ({
           </div>
 
           <div className="space-y-1.5 sm:space-y-2">
-            <Label htmlFor="notes" className="text-xs sm:text-sm">Notas internas</Label>
+            <Label htmlFor="notes" className="text-xs sm:text-sm">
+              Notas internas
+            </Label>
             <Textarea
               id="notes"
               value={notes}
@@ -590,7 +951,9 @@ const RescheduleAppointmentDialog = ({
         </DialogHeader>
         <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
           <div className="space-y-1.5 sm:space-y-2">
-            <Label htmlFor="new-time" className="text-xs sm:text-sm">Nueva hora</Label>
+            <Label htmlFor="new-time" className="text-xs sm:text-sm">
+              Nueva hora
+            </Label>
             <Select value={time} onValueChange={setTime} disabled={isSubmitting}>
               <SelectTrigger id="new-time" className="border-white/15 bg-white/5 text-white">
                 <SelectValue placeholder="Selecciona una hora" />
