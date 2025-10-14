@@ -49,14 +49,20 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
         {/* Efecto de luz superior */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
         
-        <CardHeader className="relative flex shrink-0 flex-col items-center gap-4 border-b border-slate-700/30 bg-gradient-to-b from-slate-800/50 to-transparent px-4 pb-4 pt-5 backdrop-blur-sm sm:px-6 sm:pb-5 sm:pt-6">
+        <CardHeader className="relative flex shrink-0 flex-col gap-4 border-b border-slate-700/30 bg-gradient-to-b from-slate-800/50 to-transparent px-4 pb-5 pt-5 text-center backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:text-left">
+          <div className="flex w-full flex-col gap-1">
+            <CardTitle className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{title}</CardTitle>
+            {description ? (
+              <CardDescription className="text-sm text-slate-200/70 sm:text-base">{description}</CardDescription>
+            ) : null}
+          </div>
           <CalendarNav
             month={currentMonth}
             onPrev={onPrev}
             onNext={onNext}
             disablePrev={disablePrev}
             disableNext={disableNext}
-            className="group/nav w-full max-w-[20rem] rounded-2xl border border-slate-600/50 bg-gradient-to-br from-slate-800/80 to-slate-900/80 px-4 py-2.5 text-base font-bold text-white shadow-lg shadow-slate-950/30 ring-1 ring-slate-700/50 backdrop-blur-md transition-all duration-300 hover:border-emerald-500/40 hover:shadow-emerald-500/10 hover:ring-emerald-500/30 sm:px-5 sm:py-3 sm:text-lg"
+            className="group/nav w-full max-w-[20rem] rounded-2xl border border-slate-600/50 bg-gradient-to-br from-slate-800/80 to-slate-900/80 px-4 py-2.5 text-base font-bold text-white shadow-lg shadow-slate-950/30 ring-1 ring-slate-700/50 backdrop-blur-md transition-all duration-300 hover:border-emerald-500/40 hover:shadow-emerald-500/10 hover:ring-emerald-500/30 sm:w-auto sm:px-5 sm:py-3 sm:text-lg"
           />
         </CardHeader>
         <CardContent className="relative flex flex-1 flex-col items-center justify-center px-4 pb-6 pt-5 sm:px-6 sm:pb-8 sm:pt-7">
