@@ -143,86 +143,82 @@ export const ProsShell = () => {
   const activePath = normalizedPath.startsWith('/pros') ? normalizedPath : '/pros';
 
   return (
-    <div className="relative isolate min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(130deg,rgba(16,185,129,0.12)_0%,rgba(15,118,110,0.04)_46%,rgba(15,23,42,0)_100%)]" />
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-2/3 bg-gradient-to-r from-slate-950/70 via-slate-950/25 to-transparent" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(210deg,rgba(59,130,246,0.12)_0%,rgba(15,23,42,0)_60%)] mix-blend-screen" />
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="border-b border-border/50 bg-card">
+        <div className="container flex h-16 items-center gap-4">
+          <div className="flex shrink-0 items-center gap-2 text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">
+            <span className="text-sm font-semibold text-foreground">Pelubot Pro</span>
+            {session?.stylist && (
+              <span className="hidden text-muted-foreground/80 md:inline">
+                • {session.stylist.display_name ?? session.stylist.name}
+              </span>
+            )}
+          </div>
 
-      <header className="relative z-10 border-b border-white/10 bg-slate-950/60 backdrop-blur-xl">
-        <div className="mx-auto w-full max-w-6xl px-6 py-4 sm:px-8">
-          <div className="flex flex-wrap items-center gap-3 md:flex-nowrap">
-            <div className="flex shrink-0 items-center gap-2 text-[10px] uppercase tracking-[0.28em] text-white/40">
-              <span className="font-semibold text-emerald-200/80">Pelubot Pro</span>
-              {session?.stylist && (
-                <span className="hidden text-white/30 md:inline">
-                  • {session.stylist.display_name ?? session.stylist.name}
-                </span>
+          <nav className="flex flex-1 items-center justify-center gap-2">
+            {PROS_NAV_ITEMS.map((item) => {
+              const normalized = item.to.replace(/\/$/, '') || '/pros';
+              const isActive =
+                normalized === '/pros'
+                  ? activePath === '/pros'
+                  : activePath.startsWith(normalized);
+
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={`group inline-flex h-9 items-center gap-2 rounded-md border border-border/50 px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                    isActive
+                      ? 'bg-muted text-foreground'
+                      : 'bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  {item.label}
+                  {item.soon && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-foreground">
+                      <Wand2 className="h-3 w-3" aria-hidden="true" /> Pronto
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-9 rounded-md border-border/50 bg-card px-4 text-sm font-semibold text-foreground hover:bg-muted"
+              onClick={() =>
+                toast({
+                  title: 'Crear cita',
+                  description: 'El calendario completo estará disponible pronto.',
+                })
+              }
+            >
+              <CalendarPlus className="mr-2 h-4 w-4" aria-hidden="true" />
+              Nueva cita
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-9 rounded-md px-4 text-sm font-semibold text-muted-foreground hover:bg-muted"
+              disabled={logout.isPending}
+              onClick={() => logout.mutate()}
+            >
+              {logout.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
               )}
-            </div>
-
-            <nav className="order-3 flex w-full flex-wrap items-center justify-center gap-2 md:order-none md:flex-1 md:flex-nowrap">
-              {PROS_NAV_ITEMS.map((item) => {
-                const normalized = item.to.replace(/\/$/, '') || '/pros';
-                const isActive =
-                  normalized === '/pros'
-                    ? activePath === '/pros'
-                    : activePath.startsWith(normalized);
-
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={`group inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 ${
-                      isActive
-                        ? 'bg-white/10 text-white shadow-[0_0_25px_rgba(16,185,129,0.15)]'
-                        : 'border border-white/10 text-white/70 hover:border-white/30 hover:text-white'
-                    }`}
-                  >
-                    {item.label}
-                    {item.soon && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-200">
-                        <Wand2 className="h-3 w-3" aria-hidden="true" /> Pronto
-                      </span>
-                    )}
-                  </NavLink>
-                );
-              })}
-            </nav>
-
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                className="h-10 rounded-full border-emerald-400/60 px-4 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/10"
-                onClick={() =>
-                  toast({
-                    title: 'Crear cita',
-                    description: 'El calendario completo estará disponible pronto.',
-                  })
-                }
-              >
-                <CalendarPlus className="mr-2 h-4 w-4" aria-hidden="true" />
-                Nueva cita
-              </Button>
-              <Button
-                variant="ghost"
-                className="h-10 rounded-full px-4 text-sm font-semibold text-white/70 hover:bg-white/10"
-                disabled={logout.isPending}
-                onClick={() => logout.mutate()}
-              >
-                {logout.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
-                )}
-                Salir
-              </Button>
-            </div>
+              Salir
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto w-full max-w-6xl px-6 py-10 sm:px-8">
-        <Outlet />
+      <main className="flex-1 py-10">
+        <div className="container">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
