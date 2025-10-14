@@ -64,7 +64,7 @@ function Calendar({ className, classNames, showOutsideDays = true, locale, ...pr
       day: cn('p-0 text-center align-middle', classNames?.day),
       day_button: cn(
         buttonVariants({ variant: 'ghost' }),
-        'h-9 w-9 p-0 font-normal aria-selected:opacity-100 inline-flex items-center justify-center mx-auto',
+        'h-9 w-9 p-0 font-normal aria-selected:opacity-100 inline-flex items-center justify-center mx-auto text-slate-200 hover:text-white transition-colors duration-200',
         classNames?.day_button
       ),
       day_range_end: cn('day-range-end', classNames?.day_range_end),

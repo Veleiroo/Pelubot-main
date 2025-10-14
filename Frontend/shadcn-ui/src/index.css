@@ -181,15 +181,15 @@
 }
 
 .pelu-cal .rdp-day_button:hover::before {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(52, 211, 153, 0.3));
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.1));
   opacity: 1;
 }
 
 .pelu-cal .rdp-day_button:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(16, 185, 129, 0.08));
-  color: rgba(255, 255, 255, 1);
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 0 20px rgba(16, 185, 129, 0.15);
+  background: rgba(148, 163, 184, 0.14);
+  color: rgba(248, 250, 252, 1);
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.4), 0 2px 6px rgba(15, 23, 42, 0.12);
 }
 
 .pelu-cal .rdp-day_button:active {
