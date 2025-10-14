@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Calendar } from '@/components/ui/calendar';
@@ -16,7 +16,7 @@ type LegendItemProps = {
 
 const legendItems: LegendItemProps[] = [
   {
-    indicatorClassName: 'bg-gradient-to-br from-emerald-400 to-emerald-500 shadow-[0_0_12px_rgba(52,211,153,0.8)]',
+    indicatorClassName: 'bg-primary shadow-[0_0_0_2px_rgba(16,185,129,0.22)]',
     label: 'Días con citas',
   },
 ];
@@ -41,117 +41,134 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
     },
     ref
   ) => {
-    const startOfToday = today ? new Date(today.getFullYear(), today.getMonth(), today.getDate()) : undefined;
-    const futureBusyDates = startOfToday
-      ? busyDates.filter((date) => {
-          const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-          return normalizedDate.getTime() >= startOfToday.getTime();
-        })
-      : busyDates;
+    const [showBusyDays, setShowBusyDays] = useState(true);
+
+    const startOfToday = useMemo(() => {
+      if (!today) return null;
+      return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    }, [today]);
+
+    const startOfTodayTime = startOfToday?.getTime();
+
+    const futureBusyDates = useMemo(() => {
+      if (!startOfTodayTime) return busyDates;
+      return busyDates.filter((date) => {
+        const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        return normalizedDate.getTime() >= startOfTodayTime;
+      });
+    }, [busyDates, startOfTodayTime]);
+
+    const busyModifierDates = showBusyDays ? futureBusyDates : [];
+
+    const monthLabel = useMemo(() => {
+      const monthName = currentMonth.toLocaleDateString('es-ES', { month: 'long' });
+      const normalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+      return `${normalizedMonth} ${currentMonth.getFullYear()}`;
+    }, [currentMonth]);
 
     return (
       <Card
         ref={ref}
-        className="p-6 bg-card border-border/50"
+        className="group relative flex flex-col overflow-hidden rounded-[1.5rem] border border-border/60 bg-card/80 text-foreground shadow-soft transition-colors duration-300 hover:border-border"
       >
-        <div className="space-y-6">
-          <div>
-            <CardTitle className="text-2xl font-semibold text-foreground mb-2">
+        <CardHeader className="relative flex shrink-0 flex-col gap-6 border-b border-border/60 bg-card/70 px-6 py-6 text-left backdrop-blur-sm sm:px-8">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem]">
               {title}
             </CardTitle>
             {description ? (
-              <CardDescription className="text-sm text-muted-foreground">
+              <CardDescription className="max-w-[22rem] text-sm text-muted-foreground sm:text-base">
                 {description}
               </CardDescription>
             ) : null}
           </div>
-
-          {/* Month Navigation estilo Marina */}
-          <div className="flex items-center justify-between">
-            <Button 
-              variant="ghost" 
+          <div className="group/nav flex w-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-base font-medium text-muted-foreground shadow-soft transition-colors duration-300 sm:px-6 sm:py-3.5 sm:text-lg">
+            <Button
+              variant="ghost"
               size="icon"
               onClick={onPrev}
               disabled={disablePrev}
+              className="text-muted-foreground hover:bg-muted/40 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="text-base font-medium">
-              {currentMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+            <div className="text-base font-medium capitalize text-foreground">
+              {monthLabel}
             </div>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               onClick={onNext}
               disabled={disableNext}
+              className="text-muted-foreground hover:bg-muted/40 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          {/* Calendar Grid estilo Marina */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-7 gap-1">
-              {['LU', 'MA', 'MI', 'JU', 'VI', 'SÁ', 'DO'].map((day) => (
-                <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
-                  {day}
-                </div>
+        </CardHeader>
+        <CardContent className="relative flex flex-1 flex-col gap-6 px-6 pb-8 pt-6 sm:px-8 sm:pb-10">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            month={currentMonth}
+            onSelect={onSelectDay}
+            onMonthChange={onMonthChange}
+            modifiers={{
+              busy: busyModifierDates,
+              today: startOfToday ? [startOfToday] : [],
+              weekend: { dayOfWeek: [0, 6] },
+              ...(startOfToday ? { past: { before: startOfToday } } : {}),
+            }}
+            modifiersClassNames={{
+              busy: 'calendar-day--busy',
+              today: 'calendar-day--today',
+              selected: 'calendar-day--selected',
+              weekend: 'calendar-day--weekend',
+              past: 'calendar-day--past',
+              disabled: 'calendar-day--disabled',
+              outside: 'calendar-day--outside',
+            }}
+            className="pelu-cal mx-auto w-full !px-0"
+            classNames={{
+              months: 'w-full space-y-6',
+              month: 'flex flex-col gap-4',
+              caption: 'hidden',
+              month_caption: 'sr-only',
+              caption_label: 'sr-only',
+              month_grid: 'w-full',
+              weekdays:
+                'grid w-full grid-cols-7 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80 sm:text-[0.7rem]',
+              weekday: 'flex h-9 items-center justify-center',
+              week: 'grid grid-cols-7 gap-2 sm:gap-3',
+              day: 'aspect-square',
+              day_button:
+                'group/calendar-day relative flex h-full w-full items-center justify-center rounded-xl border border-transparent text-sm font-semibold text-muted-foreground transition-all duration-200 hover:border-primary/40 hover:bg-primary/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+              day_selected: 'calendar-day--selected',
+              day_today: 'calendar-day--today',
+              day_outside: 'calendar-day--outside',
+              day_disabled: 'calendar-day--disabled',
+              day_hidden: 'invisible',
+              nav: 'hidden',
+            }}
+            hideNavigation
+            fromMonth={fromMonth}
+            toMonth={toMonth}
+          />
+          <div className="flex w-full flex-col gap-4 rounded-2xl border border-border/60 bg-card/70 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3.5 sm:text-sm">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              {legendItems.map((item) => (
+                <CalendarLegendItem key={item.label} {...item} />
               ))}
             </div>
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              month={currentMonth}
-              onSelect={onSelectDay}
-              onMonthChange={onMonthChange}
-              modifiers={{
-                busy: futureBusyDates,
-                today: today ? [today] : [],
-                weekend: { dayOfWeek: [0, 6] },
-                ...(startOfToday ? { past: { before: startOfToday } } : {}),
-              }}
-              modifiersClassNames={{
-                busy: 'bg-primary text-primary-foreground hover:bg-primary/80 shadow-lg shadow-primary/20',
-                today: 'bg-accent text-accent-foreground',
-                selected: 'bg-primary text-primary-foreground',
-                weekend: 'text-muted-foreground/50',
-                past: 'text-muted-foreground/30',
-                disabled: 'text-muted-foreground/30',
-                outside: 'text-muted-foreground/30',
-              }}
-              className="w-full"
-              classNames={{
-                months: 'w-full',
-                month: 'w-full',
-                caption: 'hidden',
-                month_caption: 'sr-only',
-                caption_label: 'sr-only',
-                month_grid: 'w-full mt-0',
-                weekdays: 'hidden',
-                weekday: 'hidden',
-                week: 'grid grid-cols-7 gap-1 mt-0',
-                day: 'aspect-square',
-                day_button: 'aspect-square rounded-lg text-sm font-medium transition-all relative w-full h-full flex items-center justify-center hover:bg-muted/50',
-                day_selected: '',
-                day_today: '',
-                day_outside: '',
-                day_disabled: '',
-                day_hidden: 'invisible',
-                nav: 'hidden',
-              }}
-              hideNavigation
-              fromMonth={fromMonth}
-              toMonth={toMonth}
-            />
-          </div>
-
-          {/* Days with appointments toggle estilo Marina */}
-          <div className="flex items-center justify-between pt-4 border-t border-border/50">
-            <label htmlFor="appointments-toggle" className="text-sm font-medium text-foreground cursor-pointer">
-              Días con citas
+            <label
+              htmlFor="agenda-busy-toggle"
+              className="flex items-center gap-3 text-sm font-medium text-muted-foreground"
+            >
+              <Switch id="agenda-busy-toggle" checked={showBusyDays} onCheckedChange={setShowBusyDays} />
+              <span>Resaltar días con citas</span>
             </label>
-            <Switch id="appointments-toggle" defaultChecked />
           </div>
-        </div>
+        </CardContent>
       </Card>
     );
   }
@@ -162,6 +179,6 @@ CalendarCard.displayName = 'AgendaCalendarCard';
 const CalendarLegendItem = ({ indicatorClassName, label }: LegendItemProps) => (
   <div className="flex items-center gap-2 sm:gap-3">
     <span className={cn('h-2.5 w-2.5 rounded-full sm:h-3 sm:w-3', indicatorClassName)} aria-hidden />
-    <span className="text-xs font-semibold text-white sm:text-sm">{label}</span>
+    <span className="text-xs font-medium text-muted-foreground sm:text-sm">{label}</span>
   </div>
 );

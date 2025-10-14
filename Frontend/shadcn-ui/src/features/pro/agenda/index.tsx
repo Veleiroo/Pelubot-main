@@ -263,93 +263,56 @@ export const ProsAgendaView = () => {
     : undefined;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header mejorado estilo Marina */}
-      <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 sm:px-6 py-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <div className="text-lg sm:text-xl font-semibold text-foreground">PELUBOT PRO</div>
-              <span className="text-xs sm:text-sm text-muted-foreground">— {stylist?.name || 'AGENDA'}</span>
-            </div>
-
-            <nav className="hidden md:flex items-center gap-1">
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-                Resumen
-              </Button>
-              <Button variant="ghost" className="text-foreground font-medium bg-muted/50">
-                Agenda
-              </Button>
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-                Clientes
-              </Button>
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-                Estadísticas
-              </Button>
-            </nav>
-
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <Button 
-                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto"
-                onClick={handleCreateClick}
-              >
-                <span className="text-lg">+</span>
-                <span className="hidden sm:inline">Nueva cita</span>
-                <span className="sm:hidden">Crear cita</span>
-              </Button>
-            </div>
-          </div>
+    <section ref={layoutRef} className="mb-6 space-y-6">
+      {errorMessage && (
+        <Alert variant="destructive" className="border-red-500/50 bg-red-500/15 text-red-100 backdrop-blur">
+          <AlertTitle className="font-bold">No pudimos cargar tu agenda</AlertTitle>
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
+      {isLoading && appointments.length === 0 && (
+        <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-600/40 bg-slate-800/40 px-6 py-4 text-base text-white/80 backdrop-blur-sm">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="font-medium">Cargando tu agenda...</span>
         </div>
-      </header>
+      )}
 
-      {/* Main Content */}
-      <main ref={layoutRef} className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {errorMessage && (
-          <Alert variant="destructive" className="mb-6 border-red-500/50 bg-red-500/15 text-red-100 backdrop-blur">
-            <AlertTitle className="font-bold">No pudimos cargar tu agenda</AlertTitle>
-            <AlertDescription>{errorMessage}</AlertDescription>
-          </Alert>
+      <div
+        className={cn(
+          'grid items-start gap-4 sm:gap-6',
+          'grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]',
+          'lg:h-[calc(100vh-140px)]'
         )}
-        {isLoading && appointments.length === 0 && (
-          <div className="mb-6 flex items-center justify-center gap-3 rounded-2xl border border-slate-600/40 bg-slate-800/40 px-6 py-4 text-base text-white/80 backdrop-blur-sm">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="font-medium">Cargando tu agenda...</span>
-          </div>
-        )}
+      >
+        <CalendarCard
+          ref={calendarCardRef}
+          selectedDate={selectedDate}
+          currentMonth={currentMonth}
+          today={today}
+          busyDates={busyDates}
+          fromMonth={fromMonth}
+          toMonth={toMonth}
+          disablePrev={disablePrevNav}
+          disableNext={disableNextNav}
+          onSelectDay={handleSelectDay}
+          onMonthChange={handleMonthChange}
+          onPrev={handlePrevNav}
+          onNext={handleNextNav}
+          description="Selecciona un día para revisar o añadir citas."
+        />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 lg:gap-8">
-          {/* Calendar Sidebar */}
-          <CalendarCard
-            ref={calendarCardRef}
-            selectedDate={selectedDate}
-            currentMonth={currentMonth}
-            today={today}
-            busyDates={busyDates}
-            fromMonth={fromMonth}
-            toMonth={toMonth}
-            disablePrev={disablePrevNav}
-            disableNext={disableNextNav}
-            onSelectDay={handleSelectDay}
-            onMonthChange={handleMonthChange}
-            onPrev={handlePrevNav}
-            onNext={handleNextNav}
-            description="Selecciona un día para revisar o añadir citas."
-          />
-
-          {/* Appointments List */}
-          <AppointmentsCard
-            ref={appointmentsCardRef}
-            dayLabel={dayLabel}
-            summary={summary}
-            appointments={selectedAppointments}
-            isToday={isTodaySelected}
-            onCreate={handleCreateClick}
-            onAction={handleAppointmentAction}
-            minHeight={MIN_APPOINTMENTS_CARD_HEIGHT}
-            height={computedHeight}
-          />
-        </div>
-      </main>
+        <AppointmentsCard
+          ref={appointmentsCardRef}
+          dayLabel={dayLabel}
+          summary={summary}
+          appointments={selectedAppointments}
+          isToday={isTodaySelected}
+          onCreate={handleCreateClick}
+          onAction={handleAppointmentAction}
+          minHeight={MIN_APPOINTMENTS_CARD_HEIGHT}
+          height={computedHeight}
+        />
+      </div>
 
       <CreateAppointmentDialog
         open={createOpen}
@@ -384,7 +347,7 @@ export const ProsAgendaView = () => {
         isSubmitting={isCancelling}
         onConfirm={handleCancelConfirm}
       />
-    </div>
+    </section>
   );
 };
 
