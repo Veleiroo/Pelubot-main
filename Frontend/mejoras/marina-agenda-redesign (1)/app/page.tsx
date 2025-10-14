@@ -228,20 +228,6 @@ export default function AgendaPage() {
                             {appointment.email}
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2 pt-2">
-                          <input
-                            type="checkbox"
-                            id={`confirm-${appointment.id}`}
-                            className="rounded border-border bg-muted"
-                          />
-                          <label
-                            htmlFor={`confirm-${appointment.id}`}
-                            className="text-sm text-muted-foreground cursor-pointer"
-                          >
-                            Confirmar preferencia de estilo
-                          </label>
-                        </div>
                       </div>
 
                       <div className="flex gap-2">
