@@ -24,6 +24,4 @@ export type AgendaAppointmentsCardProps = {
   isToday: boolean;
   onCreate: () => void;
   onAction: (action: 'reschedule' | 'cancel', appointment: Appointment) => void;
-  minHeight: number;
-  height?: number | null;
 };
