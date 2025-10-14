@@ -36,44 +36,74 @@ function Calendar({ className, classNames, showOutsideDays = true, locale, ...pr
   const fromMonth = props.fromMonth ?? today;
   const toMonth = props.toMonth ?? toMonthDefault;
 
+  const mergedClassNames = React.useMemo(() => {
+    const base: Record<string, string | undefined> = {
+      months: cn(
+        'flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0',
+        classNames?.months
+      ),
+      month: cn('space-y-3', classNames?.month),
+      caption: cn('flex justify-center pt-1 relative items-center', classNames?.caption),
+      caption_label: cn('text-sm font-medium text-neutral-100', classNames?.caption_label),
+      nav: cn('space-x-1 flex items-center', classNames?.nav),
+      nav_button: cn(
+        buttonVariants({ variant: 'ghost' }),
+        'h-7 w-7 p-0 text-neutral-100 hover:bg-neutral-800 hover:text-white',
+        classNames?.nav_button
+      ),
+      nav_button_previous: cn('absolute left-1', classNames?.nav_button_previous),
+      nav_button_next: cn('absolute right-1', classNames?.nav_button_next),
+      table: cn('w-full border-collapse table-fixed', classNames?.table),
+      head_row: cn('', classNames?.head_row),
+      head_cell: cn(
+        'text-muted-foreground h-8 text-[0.72rem] uppercase tracking-wide text-center',
+        classNames?.head_cell
+      ),
+      row: cn('', classNames?.row),
+      cell: cn('p-0 text-center align-middle', classNames?.cell),
+      day: cn('p-0 text-center align-middle', classNames?.day),
+      day_button: cn(
+        buttonVariants({ variant: 'ghost' }),
+        'h-9 w-9 p-0 font-normal aria-selected:opacity-100 inline-flex items-center justify-center mx-auto',
+        classNames?.day_button
+      ),
+      day_range_end: cn('day-range-end', classNames?.day_range_end),
+      day_selected: cn(
+        'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
+        classNames?.day_selected
+      ),
+      day_today: cn('bg-accent text-accent-foreground', classNames?.day_today),
+      day_outside: cn(
+        'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
+        classNames?.day_outside
+      ),
+      day_disabled: cn('text-muted-foreground opacity-50', classNames?.day_disabled),
+      day_range_middle: cn(
+        'aria-selected:bg-accent aria-selected:text-accent-foreground',
+        classNames?.day_range_middle
+      ),
+      day_hidden: cn('invisible', classNames?.day_hidden),
+    };
+
+    if (classNames) {
+      for (const [key, value] of Object.entries(classNames)) {
+        if (!(key in base)) {
+          base[key] = value;
+        }
+      }
+    }
+
+    return base as CalendarProps['classNames'];
+  }, [classNames]);
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
       locale={loc}
       fromMonth={fromMonth}
       toMonth={toMonth}
-  className={cn('pelu-cal px-1.5 py-2', className)}
-      classNames={{
-        months: 'flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0',
-        month: 'space-y-3',
-        caption: 'flex justify-center pt-1 relative items-center',
-        caption_label: 'text-sm font-medium text-neutral-100',
-        nav: 'space-x-1 flex items-center',
-        nav_button: cn(
-          buttonVariants({ variant: 'ghost' }),
-          'h-7 w-7 p-0 text-neutral-100 hover:bg-neutral-800 hover:text-white'
-        ),
-        nav_button_previous: 'absolute left-1',
-        nav_button_next: 'absolute right-1',
-        table: 'w-full border-collapse table-fixed',
-        head_row: '',
-        head_cell: 'text-muted-foreground h-8 text-[0.72rem] uppercase tracking-wide text-center',
-        row: '',
-        cell: 'p-0 text-center align-middle',
-        // Celda ligera y botón de día centrado para no romper columnas.
-        day: 'p-0 text-center align-middle',
-        day_button: cn(buttonVariants({ variant: 'ghost' }), 'h-9 w-9 p-0 font-normal aria-selected:opacity-100 inline-flex items-center justify-center mx-auto'),
-        day_range_end: 'day-range-end',
-        day_selected:
-          'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
-        day_today: 'bg-accent text-accent-foreground',
-        day_outside:
-          'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
-        day_disabled: 'text-muted-foreground opacity-50',
-        day_range_middle: 'aria-selected:bg-accent aria-selected:text-accent-foreground',
-        day_hidden: 'invisible',
-        ...classNames,
-      }}
+      className={cn('pelu-cal px-1.5 py-2', className)}
+      classNames={mergedClassNames}
       components={{
         Chevron: ({ orientation = 'right', className, size = 16, disabled }) => {
           const Icon = (() => {
