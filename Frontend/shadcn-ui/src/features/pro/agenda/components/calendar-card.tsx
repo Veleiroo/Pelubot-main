@@ -40,6 +40,12 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
     ref
   ) => {
     const startOfToday = today ? new Date(today.getFullYear(), today.getMonth(), today.getDate()) : undefined;
+    const futureBusyDates = startOfToday
+      ? busyDates.filter((date) => {
+          const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+          return normalizedDate.getTime() >= startOfToday.getTime();
+        })
+      : busyDates;
 
     return (
       <Card
@@ -73,7 +79,7 @@ export const CalendarCard = forwardRef<HTMLDivElement, AgendaCalendarCardProps>(
               onSelect={onSelectDay}
               onMonthChange={onMonthChange}
               modifiers={{
-                busy: busyDates,
+                busy: futureBusyDates,
                 today: today ? [today] : [],
                 weekend: { dayOfWeek: [0, 6] },
                 ...(startOfToday ? { past: { before: startOfToday } } : {}),
