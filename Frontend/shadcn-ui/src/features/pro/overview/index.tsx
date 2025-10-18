@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { useToast } from '@/hooks/use-toast';
@@ -6,6 +6,7 @@ import { useProSession } from '@/store/pro';
 
 import { AppointmentCard } from './components/appointment-card';
 import { DailySummary } from './components/daily-summary';
+import { NewAppointmentModal, type NewAppointmentFormValues } from './components/new-appointment-modal';
 import { TodayAppointments } from './components/today-appointments';
 import { useOverviewData } from './hooks/useOverviewData';
 import type { AppointmentActionType } from './types';
@@ -13,6 +14,8 @@ import type { AppointmentActionType } from './types';
 export const ProsOverviewView = () => {
   const { toast } = useToast();
   const { session } = useProSession();
+
+  const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
 
   const stylist = session?.stylist;
   const {
@@ -39,11 +42,31 @@ export const ProsOverviewView = () => {
   );
 
   const handleCreateAppointment = useCallback(() => {
-    toast({
-      title: 'Crear cita',
-      description: 'Muy pronto podrás agendar directamente desde aquí.',
-    });
-  }, [toast]);
+    setIsNewAppointmentOpen(true);
+  }, []);
+
+  const handleNewAppointmentModalChange = useCallback((open: boolean) => {
+    setIsNewAppointmentOpen(open);
+  }, []);
+
+  const handleConfirmNewAppointment = useCallback(
+    ({ client, date, time, service }: NewAppointmentFormValues) => {
+      const schedule = new Date(`${date}T${time}`);
+      const dateLabel = Number.isNaN(schedule.getTime())
+        ? `${date} a las ${time} h`
+        : `${new Intl.DateTimeFormat('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          }).format(schedule)} a las ${time} h`;
+
+      toast({
+        title: 'Cita creada',
+        description: `Registraremos la cita para ${client} (${service}) el ${dateLabel}.`,
+      });
+    },
+    [toast]
+  );
 
   if (!stylist) {
     return (
@@ -55,31 +78,41 @@ export const ProsOverviewView = () => {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <section className="grid gap-6 lg:grid-cols-[400px_1fr]">
-        <div className="space-y-6">
-          <AppointmentCard
-            appointment={upcomingAppointment}
+    <>
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <section className="grid gap-6 lg:grid-cols-[400px_1fr]">
+          <div className="space-y-6">
+            <AppointmentCard
+              appointment={upcomingAppointment}
+              isLoading={isInitialOverviewLoading}
+              onAction={handleAppointmentAction}
+            />
+            <DailySummary summary={summary} isLoading={isInitialOverviewLoading} />
+          </div>
+          <TodayAppointments
+            appointments={todayAppointments}
+            summary={summary}
             isLoading={isInitialOverviewLoading}
-            onAction={handleAppointmentAction}
+            errorMessage={overviewErrorMessage}
+            onSelectAppointment={(id) =>
+              toast({
+                title: 'Detalle en construcción',
+                description: `Abriremos la cita ${id} en breve.`,
+              })
+            }
+            onCreateAppointment={handleCreateAppointment}
           />
-          <DailySummary summary={summary} isLoading={isInitialOverviewLoading} />
-        </div>
-        <TodayAppointments
-          appointments={todayAppointments}
-          summary={summary}
-          isLoading={isInitialOverviewLoading}
-          errorMessage={overviewErrorMessage}
-          onSelectAppointment={(id) =>
-            toast({
-              title: 'Detalle en construcción',
-              description: `Abriremos la cita ${id} en breve.`,
-            })
-          }
-          onCreateAppointment={handleCreateAppointment}
-        />
-      </section>
-    </div>
+        </section>
+      </div>
+
+      <NewAppointmentModal
+        open={isNewAppointmentOpen}
+        onOpenChange={handleNewAppointmentModalChange}
+        suggestedDate={upcomingAppointment?.raw.start ?? null}
+        suggestedService={upcomingAppointment?.service ?? null}
+        onConfirm={handleConfirmNewAppointment}
+      />
+    </>
   );
 };
 
