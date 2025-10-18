@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import { useMemo } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useProSession } from '@/store/pro';
 
@@ -35,8 +36,8 @@ export const ProsClientsView = () => {
 
   if (!stylist) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center text-sm text-white/70">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+      <div className="flex min-h-[320px] items-center justify-center text-sm text-muted-foreground">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
         Cargando cartera de clientes...
       </div>
     );
@@ -50,17 +51,22 @@ export const ProsClientsView = () => {
   };
 
   return (
-    <section className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold text-white">Clientes</h1>
-        <p className="text-sm text-white/60">
-          Visualiza tus contactos, detecta oportunidades y prepara campañas de fidelización.
-        </p>
+    <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground">Clientes</h1>
+          <p className="text-sm text-muted-foreground">
+            Visualiza tus contactos, detecta oportunidades y prepara campañas de fidelización.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          Actualizar
+        </Button>
       </header>
 
       <SummaryGrid summary={summary} isLoading={isLoading} />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <ClientsTable
           clients={clients}
           isLoading={isLoading}
@@ -73,8 +79,8 @@ export const ProsClientsView = () => {
         <div className="space-y-6">
           <SegmentsCard segments={segments} isLoading={isLoading} />
           <FollowUpsCard followUps={followUps} isLoading={isLoading} />
-          <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5 text-sm text-white/70">
-            <p className="font-medium text-white">¿Qué viene después?</p>
+          <div className="rounded-2xl border border-dashed border-border/60 bg-card/70 p-5 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">¿Qué viene después?</p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>Edición de fichas con notas y etiquetas personalizadas.</li>
               <li>Filtros avanzados (ticket medio, servicios favoritos, última visita).</li>
@@ -83,7 +89,7 @@ export const ProsClientsView = () => {
             <button
               type="button"
               onClick={handleComingSoon}
-              className="mt-4 inline-flex items-center rounded-full border border-white/20 px-4 py-2 text-xs font-medium uppercase tracking-wide text-white/70 transition hover:border-white/40 hover:text-white"
+              className="mt-4 inline-flex items-center rounded-full border border-border/60 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground transition hover:bg-muted/30 hover:text-foreground"
             >
               Avisarme cuando esté listo
             </button>

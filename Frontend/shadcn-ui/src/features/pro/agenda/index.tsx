@@ -12,6 +12,7 @@ import {
   Phone,
   Plus,
   RefreshCcw,
+  Filter,
   Trash2,
 } from 'lucide-react';
 
@@ -158,8 +159,6 @@ export const ProsAgendaView = () => {
   } = useAgendaActions({ professionalId: stylist?.id });
 
   const formattedDayLabel = useMemo(() => capitalize(dayLabel), [dayLabel]);
-  const pendingCount = summary.pendientes;
-
   const handlePrevNav = () => {
     if (disablePrevNav) return;
     goToMonth(previousMonthCandidate);
@@ -267,31 +266,20 @@ export const ProsAgendaView = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border/50 bg-card/60 backdrop-blur">
-        <div className="container mx-auto flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-semibold text-foreground">PELUBOT PRO</span>
-            {stylist?.name ? <span className="text-sm text-muted-foreground">— {stylist.name}</span> : null}
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-semibold text-foreground">Agenda</h1>
+            <p className="text-sm text-muted-foreground">
+              Gestiona tus citas diarias y mantén al día la planificación de tu equipo.
+            </p>
           </div>
-
-          <nav className="hidden items-center gap-1 md:flex">
-            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-              Resumen
-            </Button>
-            <Button variant="ghost" className="bg-muted/50 text-foreground font-medium hover:text-foreground">
-              Agenda
-            </Button>
-            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-              Clientes
-            </Button>
-          </nav>
-
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button
               type="button"
               variant="outline"
               className={cn(
-                'gap-2 border-border/60 bg-transparent text-sm text-muted-foreground transition hover:bg-muted/40',
+                'gap-2 border-border/60 bg-transparent text-sm font-semibold text-muted-foreground transition hover:bg-muted/30',
                 isFetching ? 'cursor-wait opacity-80' : ''
               )}
               onClick={() => refetch()}
@@ -308,10 +296,8 @@ export const ProsAgendaView = () => {
               Nueva cita
             </Button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="container mx-auto space-y-6 px-6 py-8">
         {errorMessage ? (
           <Alert variant="destructive" className="border-red-500/50 bg-red-500/15 text-red-100 backdrop-blur">
             <AlertTitle className="font-bold">No pudimos cargar tu agenda</AlertTitle>
@@ -326,7 +312,7 @@ export const ProsAgendaView = () => {
           </div>
         ) : null}
 
-        <section className="grid gap-8 lg:grid-cols-[360px_1fr]">
+        <section className="grid gap-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
           <AgendaCalendarPanel
             selectedDate={selectedDate}
             currentMonth={currentMonth}
@@ -347,7 +333,6 @@ export const ProsAgendaView = () => {
             summary={summary}
             appointments={selectedAppointments}
             isToday={isTodaySelected}
-            pendingCount={pendingCount}
             isFetching={isFetching}
             onCreate={handleCreateClick}
             onAction={handleAppointmentAction}
@@ -433,29 +418,31 @@ const AgendaCalendarPanel = ({
   }, [currentMonth]);
 
   return (
-    <Card className="space-y-6 border border-border/60 bg-card/70 p-6">
+    <Card className="flex h-full flex-col gap-4 border border-border/50 bg-card p-4 shadow-lg">
       <div className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-semibold text-foreground">Calendario</h2>
-          <p className="text-sm text-muted-foreground">Selecciona un día para revisar o añadir citas.</p>
+        <div className="space-y-2 text-center">
+          <h2 className="text-3xl font-semibold text-foreground">Calendario</h2>
+          <p className="text-sm text-muted-foreground">
+            Selecciona un día para revisar o añadir citas.
+          </p>
         </div>
 
-        <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-muted/40 px-2 py-1 text-muted-foreground">
+        <div className="flex items-center justify-between rounded-xl border border-border/50 bg-secondary px-2 py-1 text-muted-foreground">
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground disabled:opacity-40"
+            className="h-9 w-9 text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-40"
             onClick={onPrev}
             disabled={disablePrev}
             aria-label="Mes anterior"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="px-4 text-base font-semibold capitalize tracking-tight text-foreground">{monthLabel}</span>
+          <span className="px-4 text-lg font-semibold capitalize tracking-tight text-foreground">{monthLabel}</span>
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground disabled:opacity-40"
+            className="h-9 w-9 text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-40"
             onClick={onNext}
             disabled={disableNext}
             aria-label="Mes siguiente"
@@ -512,11 +499,15 @@ const AgendaCalendarPanel = ({
         />
       </div>
 
-      <div className="flex items-center justify-between border-t border-border/60 pt-4">
+      <div className="flex items-center justify-between border-t border-border/50 pt-4">
         <label htmlFor="agenda-toggle" className="text-sm font-medium text-foreground">
           Días con citas
         </label>
-        <Switch id="agenda-toggle" checked={highlightBusy} onCheckedChange={setHighlightBusy} />
+        <Switch
+          id="agenda-toggle"
+          checked={highlightBusy}
+          onCheckedChange={setHighlightBusy}
+        />
       </div>
     </Card>
   );
@@ -527,7 +518,6 @@ type AppointmentsListPanelProps = {
   summary: AgendaSummary;
   appointments: Appointment[];
   isToday: boolean;
-  pendingCount: number;
   isFetching: boolean;
   onCreate: () => void;
   onAction: (action: 'reschedule' | 'cancel', appointment: Appointment) => void;
@@ -538,156 +528,188 @@ const AppointmentsListPanel = ({
   summary,
   appointments,
   isToday,
-  pendingCount,
   isFetching,
   onCreate,
   onAction,
-}: AppointmentsListPanelProps) => (
-  <Card className="space-y-6 border border-border/60 bg-card/70 p-6">
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-3xl font-semibold text-foreground capitalize">{dayLabel}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          <span className="text-foreground font-medium">
-            {appointments.length} {appointments.length === 1 ? 'cita' : 'citas'}
-          </span>
-          <Badge variant="secondary" className="gap-1.5 bg-muted text-foreground">
-            <Clock className="h-3 w-3" />
-            {pendingCount}
-          </Badge>
-          {isToday ? (
-            <Badge variant="outline" className="border-primary/40 text-primary">
-              Hoy
-            </Badge>
-          ) : null}
-          {isFetching ? (
-            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Actualizando...
+}: AppointmentsListPanelProps) => {
+  const [filter, setFilter] = useState<'all' | 'confirmada' | 'pendiente' | 'cancelada'>('all');
+
+  const filteredAppointments = useMemo(() => {
+    if (filter === 'all') return appointments;
+    return appointments.filter((appointment) => appointment.status === filter);
+  }, [appointments, filter]);
+
+  const contact = (appointment: Appointment) => contactLabel(appointment);
+
+  const totals = {
+    confirmadas: summary.confirmadas,
+    pendientes: summary.pendientes,
+    canceladas: summary.canceladas,
+  };
+
+  return (
+    <Card className="flex h-full flex-col gap-4 border border-border/50 bg-card p-4 shadow-lg">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border/50 pb-3">
+        <div>
+          <h2 className="text-2xl font-semibold capitalize text-foreground">{dayLabel}</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span className="text-foreground font-medium">
+              {appointments.length} {appointments.length === 1 ? 'cita' : 'citas'}
             </span>
-          ) : null}
+            <span>•</span>
+            <span className="text-emerald-500">{totals.confirmadas} confirmadas</span>
+            <span>•</span>
+            <span className="text-amber-500">{totals.pendientes} pendientes</span>
+            {totals.canceladas > 0 ? (
+              <>
+                <span>•</span>
+                <span className="text-rose-500">{totals.canceladas} canceladas</span>
+              </>
+            ) : null}
+            {isToday ? (
+              <>
+                <span>•</span>
+                <Badge variant="outline" className="border-primary/40 text-primary">
+                  Hoy
+                </Badge>
+              </>
+            ) : null}
+            {isFetching ? (
+              <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Actualizando...
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <Button onClick={onCreate} className="gap-2 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+          <Plus className="h-4 w-4" />
+          Crear cita
+        </Button>
+      </header>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Filter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <div className="flex gap-2">
+          {[
+            { key: 'all', label: 'Todas' },
+            { key: 'confirmada', label: 'Confirmadas' },
+            { key: 'pendiente', label: 'Pendientes' },
+            { key: 'cancelada', label: 'Canceladas' },
+          ].map((item) => (
+            <Button
+              key={item.key}
+              size="sm"
+              variant={filter === item.key ? 'default' : 'outline'}
+              className={cn('h-8 px-3 text-xs', filter === item.key ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : 'bg-transparent hover:bg-secondary/60')}
+              onClick={() => setFilter(item.key as typeof filter)}
+            >
+              {item.label}
+            </Button>
+          ))}
         </div>
       </div>
-      <Button
-        onClick={onCreate}
-        className="gap-2 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-      >
-        <Plus className="h-4 w-4" />
-        Crear cita
-      </Button>
-    </div>
 
-    {appointments.length > 0 ? (
-      <div className="space-y-4">
-        {appointments.map((appointment) => {
-          const contact = contactLabel(appointment);
+      {filteredAppointments.length > 0 ? (
+        <div className="space-y-3 overflow-y-auto pr-1">
+          {filteredAppointments.map((appointment) => {
+            const contactInfo = contact(appointment);
 
-          return (
-            <div
-              key={appointment.id}
-              className={cn(
-                'rounded-2xl border border-border/60 bg-card/80 p-6 transition hover:shadow-md',
-                'border-l-4',
-                STATUS_BORDER_ACCENTS[appointment.status]
-              )}
-            >
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                  <span className="inline-flex items-center gap-2 font-medium text-foreground">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    {timeRangeLabel(appointment)}
-                  </span>
-                  <Badge
-                    className={cn(
-                      'rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide',
-                      STATUS_STYLES[appointment.status]
-                    )}
-                  >
-                    {appointment.status}
-                  </Badge>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-xl font-semibold text-foreground">{appointment.client}</p>
-                  <p className="text-sm text-muted-foreground">{appointment.service}</p>
-                </div>
-
-                {contact ? (
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                    {contact.phone ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Phone className="h-3.5 w-3.5" />
-                        {contact.phone}
+            return (
+              <div
+                key={appointment.id}
+                className={cn(
+                  'border border-border/40 bg-secondary/30 p-4 transition hover:bg-secondary/50',
+                  'border-l-4',
+                  STATUS_BORDER_ACCENTS[appointment.status]
+                )}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <span className="inline-flex items-center gap-2 font-medium text-foreground">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        {timeRangeLabel(appointment)}
                       </span>
+                      <Badge
+                        className={cn(
+                          'rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide',
+                          STATUS_STYLES[appointment.status]
+                        )}
+                      >
+                        {appointment.status.toUpperCase()}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-lg font-semibold text-foreground">{appointment.client}</p>
+                      <p className="text-sm text-muted-foreground">{appointment.service}</p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-3 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-primary"
+                      onClick={() => onAction('reschedule', appointment)}
+                    >
+                      <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                      Reprogramar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-3 text-xs font-medium text-rose-500 transition hover:bg-rose-500/10"
+                      onClick={() => onAction('cancel', appointment)}
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+
+                {contactInfo || appointment.notes ? (
+                  <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+                    {contactInfo ? (
+                      <div className="flex flex-wrap items-center gap-4">
+                        {contactInfo.phone ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5" />
+                            {contactInfo.phone}
+                          </span>
+                        ) : null}
+                        {contactInfo.email ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Mail className="h-3.5 w-3.5" />
+                            {contactInfo.email}
+                          </span>
+                        ) : null}
+                      </div>
                     ) : null}
-                    {contact.email ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5" />
-                        {contact.email}
-                      </span>
+                    {appointment.notes ? (
+                      <p className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2">
+                        Notas: {appointment.notes}
+                      </p>
                     ) : null}
                   </div>
                 ) : null}
-
-                {appointment.notes ? (
-                  <p className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                    Notas: {appointment.notes}
-                  </p>
-                ) : null}
-
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2 px-3 text-xs font-medium text-muted-foreground transition hover:text-primary"
-                    onClick={() => onAction('reschedule', appointment)}
-                  >
-                    <CalendarIcon className="h-4 w-4" />
-                    Reprogramar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2 px-3 text-xs font-medium text-rose-500 transition hover:text-rose-600"
-                    onClick={() => onAction('cancel', appointment)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Cancelar
-                  </Button>
-                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-    ) : (
-      <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 p-10 text-center">
-        <p className="text-4xl">📅</p>
-        <p className="mt-3 text-lg font-semibold text-foreground">No hay citas programadas</p>
-        <p className="text-sm text-muted-foreground">
-          Crea una nueva reserva para este día desde el botón superior.
-        </p>
-      </div>
-    )}
-
-    <div className="grid grid-cols-1 gap-3 border-t border-border/60 pt-4 sm:grid-cols-3">
-      <div className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Confirmadas</p>
-        <p className="mt-2 text-lg font-semibold text-foreground">{summary.confirmadas}</p>
-      </div>
-      <div className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Pendientes</p>
-        <p className="mt-2 text-lg font-semibold text-foreground">{summary.pendientes}</p>
-      </div>
-      <div className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Canceladas</p>
-        <p className="mt-2 text-lg font-semibold text-foreground">{summary.canceladas}</p>
-      </div>
-    </div>
-  </Card>
-);
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-secondary/30 p-10 text-center">
+          <p className="text-4xl">📅</p>
+          <p className="mt-3 text-lg font-semibold text-foreground">No hay citas programadas</p>
+          <p className="text-sm text-muted-foreground">
+            Crea una nueva reserva para este día desde el botón superior.
+          </p>
+        </div>
+      )}
+    </Card>
+  );
+};
 
 type CreateAppointmentDialogProps = {
   open: boolean;

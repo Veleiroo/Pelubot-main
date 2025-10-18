@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useProSession } from '@/store/pro';
 
@@ -28,8 +29,8 @@ export const ProsStatsView = () => {
 
   if (!hasStylist) {
     return (
-      <div className="flex min-h-[280px] items-center justify-center text-sm text-white/70">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+      <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
         Preparando tus estadísticas...
       </div>
     );
@@ -38,15 +39,20 @@ export const ProsStatsView = () => {
   const { data, isLoading, isFetching, refetch } = statsQuery;
 
   return (
-    <section className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold text-white">Estadísticas</h1>
-        <p className="text-sm text-white/60">
-          Controla tus ingresos, fidelización y servicios estrella para tomar decisiones más rápido.
-        </p>
-        {isFetching ? (
-          <p className="text-xs text-white/40">Actualizando datos en tiempo real...</p>
-        ) : null}
+    <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground">Estadísticas</h1>
+          <p className="text-sm text-muted-foreground">
+            Controla tus ingresos, fidelización y servicios estrella para tomar decisiones más rápido.
+          </p>
+          {isFetching ? (
+            <p className="text-xs text-muted-foreground/70">Actualizando datos en tiempo real...</p>
+          ) : null}
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          Refrescar
+        </Button>
       </header>
 
       <SummaryGrid

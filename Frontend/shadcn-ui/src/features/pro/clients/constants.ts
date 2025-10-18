@@ -15,7 +15,7 @@ export const CLIENT_STATUS_BADGE: Record<ProClientStatus, string> = {
 };
 
 export const CLIENT_SEGMENT_ACCENTS = {
-  emerald: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-50',
-  amber: 'border-amber-400/40 bg-amber-400/10 text-amber-50',
-  rose: 'border-rose-400/40 bg-rose-400/10 text-rose-50',
+  emerald: 'border-emerald-300 bg-emerald-50 text-emerald-900',
+  amber: 'border-amber-300 bg-amber-50 text-amber-900',
+  rose: 'border-rose-300 bg-rose-50 text-rose-900',
 } as const;

@@ -1,7 +1,7 @@
-import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { CLIENT_SEGMENT_ACCENTS } from '../constants';
@@ -14,60 +14,53 @@ type SegmentsCardProps = {
 
 const numberFormatter = new Intl.NumberFormat('es-ES');
 
-const TrendIcon = ({ trend }: { trend: ClientSegment['trend'] }) => {
-  const className = 'h-4 w-4';
-  if (trend === 'up') return <TrendingUp className={className} />;
-  if (trend === 'down') return <TrendingDown className={className} />;
-  return <Minus className={className} />;
-};
-
 export const SegmentsCard = ({ segments, isLoading }: SegmentsCardProps) => (
-  <Card className="rounded-2xl border border-white/10 bg-white/[0.06] shadow-sm backdrop-blur">
-    <CardHeader>
-      <CardTitle className="text-lg font-semibold text-white">Segmentos destacados</CardTitle>
-      <CardDescription className="text-sm text-white/60">
+  <Card className="space-y-4 rounded-2xl border border-border/60 bg-card/90 p-5 shadow-lg shadow-black/10">
+    <header>
+      <div className="flex items-center gap-2">
+        <Users className="h-5 w-5 text-primary" aria-hidden="true" />
+        <h2 className="text-lg font-semibold text-foreground">Segmentos destacados</h2>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
         Agrupaciones automáticas según hábitos y valor histórico. Añadiremos filtros y acciones pronto.
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-3">
-      {isLoading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-12 w-full rounded-2xl bg-white/10" />
-          <Skeleton className="h-12 w-full rounded-2xl bg-white/10" />
-          <Skeleton className="h-12 w-full rounded-2xl bg-white/10" />
-        </div>
-      ) : segments.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/70">
-          Todavía no hay segmentos automáticos. Comenzaremos a sugerirlos en cuanto registremos más visitas.
-        </div>
-      ) : (
-        <ul className="space-y-3">
-          {segments.map((segment) => {
-            const accentClass = segment.accent ? CLIENT_SEGMENT_ACCENTS[segment.accent] : 'border-white/10 text-white';
-            return (
-              <li
-                key={segment.id}
-                className={`flex items-center justify-between rounded-2xl border px-4 py-3 backdrop-blur transition hover:border-white/20 hover:bg-white/10 ${accentClass}`}
-              >
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold uppercase tracking-wide">{segment.label}</span>
+      </p>
+    </header>
+    {isLoading ? (
+      <div className="space-y-3">
+        <Skeleton className="h-16 w-full rounded-xl bg-muted/40" />
+        <Skeleton className="h-16 w-full rounded-xl bg-muted/40" />
+        <Skeleton className="h-16 w-full rounded-xl bg-muted/40" />
+      </div>
+    ) : segments.length === 0 ? (
+      <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+        Todavía no hay segmentos automáticos. Comenzaremos a sugerirlos en cuanto registremos más visitas.
+      </div>
+    ) : (
+      <ul className="space-y-3">
+        {segments.map((segment) => {
+          const accentClass = segment.accent ? CLIENT_SEGMENT_ACCENTS[segment.accent] : 'border-border text-foreground';
+          return (
+            <li
+              key={segment.id}
+              className={`space-y-2 rounded-xl border bg-background/80 px-4 py-3 transition hover:border-border hover:bg-background ${accentClass}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wide">{segment.label}</p>
                   {segment.description ? (
-                    <span className="text-xs font-medium text-white/70">{segment.description}</span>
+                    <p className="text-xs text-muted-foreground">{segment.description}</p>
                   ) : null}
                 </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary" className="bg-white/10 text-white">
-                    {numberFormatter.format(segment.count)}
-                  </Badge>
-                  <span className="rounded-full bg-white/10 p-2 text-white/80">
-                    <TrendIcon trend={segment.trend} />
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </CardContent>
+                <Badge variant="outline" className="border-border/60 text-sm font-semibold">
+                  {numberFormatter.format(segment.count)}
+                </Badge>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    )}
   </Card>
 );
+
+export default SegmentsCard;
