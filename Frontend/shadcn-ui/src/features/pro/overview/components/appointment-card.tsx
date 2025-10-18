@@ -3,6 +3,8 @@ import { Calendar, CalendarClock, CheckCircle2, Clock, Phone, XCircle } from 'lu
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 import { formatDate } from '../lib/format';
 import type { AppointmentActionType, OverviewAppointmentEntry } from '../types';
@@ -40,11 +42,11 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
   const badgeClasses = appointment ? STATUS_BADGE_CLASSES[appointment.status] : '';
 
   return (
-    <Card className="rounded-lg border border-border/50 bg-card p-4 shadow-lg">
+    <Card className="rounded-lg border border-border/50 bg-card p-4 shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl">
       <div className="mb-4">
         <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">Próxima cita</p>
         <h2 className="mb-2 text-2xl font-bold text-foreground">
-          {isLoading ? 'Cargando...' : appointment?.client ?? 'Sin citas programadas'}
+          {isLoading ? <Skeleton className="h-6 w-1/2" /> : appointment?.client ?? 'Sin citas programadas'}
         </h2>
         {appointment ? (
           <>
@@ -52,8 +54,8 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
               <Clock className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="font-semibold text-foreground">{appointment.time} h</span>
               <span>•</span>
-              <div className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${badgeClasses}`}>
-                <div className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT_CLASSES[appointment.status]}`} />
+              <div className={cn('flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium', badgeClasses)}>
+                <div className={cn('h-1.5 w-1.5 rounded-full', STATUS_DOT_CLASSES[appointment.status])} />
                 <span>{STATUS_LABELS[appointment.status]}</span>
               </div>
             </div>
@@ -78,6 +80,16 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
               </p>
             ) : null}
           </>
+        ) : isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-3 w-2/3" />
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-3 w-2/5" />
+            </div>
+            <Skeleton className="h-16 w-full" />
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">
             Aprovecha el día libre para organizar tu agenda o contactar con tus clientes recurrentes.
@@ -88,7 +100,7 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
       <div className="flex gap-2">
         <Button
           size="sm"
-          className="flex-1 h-8 gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90 text-xs"
+          className="flex-1 h-8 gap-1.5 bg-accent text-accent-foreground transition hover:bg-accent/90 text-xs"
           disabled={!appointment}
           onClick={() => onAction('attended')}
         >
@@ -98,7 +110,7 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
         <Button
           size="sm"
           variant="outline"
-          className="flex-1 h-8 text-xs"
+          className="flex-1 h-8 text-xs transition hover:bg-secondary/80"
           disabled={!appointment}
           onClick={() => onAction('no-show')}
         >
@@ -108,7 +120,7 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
         <Button
           size="sm"
           variant="outline"
-          className="h-8 text-xs"
+          className="h-8 text-xs transition hover:bg-secondary/80"
           disabled={!appointment}
           onClick={() => onAction('reschedule')}
         >
