@@ -205,7 +205,15 @@ export const ProsAgendaView = () => {
   const handleRescheduleSubmit = async (values: RescheduleFormValues) => {
     const target = rescheduleTarget;
     if (!target) return;
-    const appointmentDate = new Date(`${target.date}T00:00:00`);
+    const appointmentDate = (() => {
+      if (values.newDate) {
+        const parsed = new Date(`${values.newDate}T00:00:00`);
+        if (!Number.isNaN(parsed.getTime())) {
+          return parsed;
+        }
+      }
+      return new Date(`${target.date}T00:00:00`);
+    })();
     try {
       await rescheduleAppointment({
         reservationId: target.id,

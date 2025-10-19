@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -8,17 +8,18 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import type { Service } from '@/lib/api';
 
 import type { Appointment } from '../types';
 
 export type RescheduleFormValues = {
+  newDate: string;
   newTime: string;
   durationMinutes: number;
 };
@@ -52,25 +53,47 @@ export const RescheduleAppointmentDialog = ({
   isSubmitting,
   onSubmit,
 }: RescheduleAppointmentDialogProps) => {
+  const [date, setDate] = useState(appointment?.date ?? '');
   const [time, setTime] = useState(appointment?.time ?? '10:00');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setDate(appointment?.date ?? '');
     setTime(appointment?.time ?? '10:00');
     setError(null);
-  }, [open, appointment?.time]);
+  }, [open, appointment?.date, appointment?.time]);
 
-  if (!appointment) return null;
+  const appointmentDate = useMemo(() => {
+    const base = appointment?.date;
+    if (!base) return null;
+    const parsed = new Date(`${base}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }, [appointment?.date]);
+  const selectedDate = useMemo(() => {
+    if (!date) return null;
+    const parsed = new Date(`${date}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }, [date]);
+  const isSubmitDisabled = !date || !time || isSubmitting;
+
+  if (!appointment || !appointmentDate) return null;
 
   const durationMinutes = appointment.durationMinutes ?? service?.duration_min ?? 45;
-  const appointmentDate = new Date(`${appointment.date}T00:00:00`);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    if (!date) {
+      setError('Selecciona una nueva fecha.');
+      return;
+    }
+    if (!time) {
+      setError('Selecciona un horario disponible.');
+      return;
+    }
     try {
-      await onSubmit({ newTime: time, durationMinutes });
+      await onSubmit({ newDate: date, newTime: time, durationMinutes });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo reprogramar la cita.');
     }
@@ -145,7 +168,11 @@ export const RescheduleAppointmentDialog = ({
                 'Actualizar cita'
               )}
             </Button>
-          </DialogFooter>
+          </div>
+
+          <DialogDescription className="text-[10px] text-white/40 sm:text-xs">
+            Reprogramar enviará una notificación al cliente con la nueva hora.
+          </DialogDescription>
         </form>
       </DialogContent>
     </Dialog>
