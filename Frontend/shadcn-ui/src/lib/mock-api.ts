@@ -143,6 +143,15 @@ const makeReservationsMock = (options?: { daysAhead?: number; includePastMinutes
   const totalDays = pastDays + futureDays + 1;
   const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - pastDays);
 
+  const statusPool: Array<'confirmada' | 'asistida' | 'no_asistida' | 'cancelada'> = [
+    'confirmada',
+    'confirmada',
+    'asistida',
+    'no_asistida',
+    'confirmada',
+    'cancelada',
+  ];
+
   const reservations = Array.from({ length: totalDays }).flatMap((_, index) => {
     const day = new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate() + index);
     const slots = [9, 11, 14, 17].slice(0, (index % 3) + 2);
@@ -151,6 +160,7 @@ const makeReservationsMock = (options?: { daysAhead?: number; includePastMinutes
       const end = new Date(start.getTime() + 45 * 60_000);
       const service = BASE_SERVICES[(index + slotIdx) % BASE_SERVICES.length];
       const idSuffix = `${day.getMonth() + 1}-${day.getDate()}-${slotIdx}`;
+      const status = statusPool[(index + slotIdx) % statusPool.length];
       return {
         id: `res-${idSuffix}`,
         service_id: service.id,
@@ -159,9 +169,10 @@ const makeReservationsMock = (options?: { daysAhead?: number; includePastMinutes
         start: start.toISOString(),
         end: end.toISOString(),
         customer_name: `Cliente ${index + slotIdx + 1}`,
-  customer_email: `cliente${index + slotIdx + 1}@pelubot.mock`,
+        customer_email: `cliente${index + slotIdx + 1}@pelubot.mock`,
         customer_phone: '+34 600 000 000',
         notes: slotIdx % 3 === 0 ? 'Confirmar preferencia de estilo.' : undefined,
+        status,
         created_at: new Date(start.getTime() - 5 * 60_000).toISOString(),
         updated_at: new Date(start.getTime() - 2 * 60_000).toISOString(),
       };

@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { api, ApiError, type StylistPublic } from '@/lib/api';
 import { useProSession } from '@/store/pro';
 
-import { ProHeader } from './ProHeader';
+import { ProsHeader } from './ProsHeader';
 
 export const ProsShell = () => {
   const location = useLocation();
@@ -139,9 +139,16 @@ export const ProsShell = () => {
     return null;
   }
 
+  const stylistDisplayName = session.stylist.display_name ?? session.stylist.name ?? null;
+
   return (
     <div className="relative flex min-h-screen flex-col bg-background text-foreground">
-      <ProHeader />
+      <ProsHeader
+        stylistDisplayName={stylistDisplayName}
+        onCreateAppointment={() => navigate('/pros/agenda', { state: { newAppointment: true } })}
+        onLogout={() => logout.mutate()}
+        isLogoutPending={logout.isPending}
+      />
       <main className="flex-1 py-6 sm:py-8">
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <Outlet />

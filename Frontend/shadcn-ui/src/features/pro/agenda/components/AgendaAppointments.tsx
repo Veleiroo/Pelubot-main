@@ -5,6 +5,7 @@ import { Clock, Mail, Phone, CalendarIcon, Trash2, Plus, Filter } from 'lucide-r
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { STATUS_LABELS } from '../../shared/constants';
 import type { Appointment, AppointmentStatus } from '../../shared/types';
 
 function getServiceTypeColor(serviceId?: string): string {
@@ -19,18 +20,21 @@ function getServiceTypeColor(serviceId?: string): string {
   return 'border-l-border';
 }
 
+const STATUS_DOTS: Record<AppointmentStatus, string> = {
+  confirmada: 'bg-amber-500',
+  asistida: 'bg-emerald-600',
+  no_asistida: 'bg-red-500',
+  cancelada: 'bg-rose-500',
+};
+
 function StatusBadge({ status }: { status: AppointmentStatus }) {
-  const config = {
-    confirmada: { color: 'bg-green-500', label: 'Confirmada' },
-    asistida: { color: 'bg-emerald-600', label: 'Asistida' },
-    no_asistida: { color: 'bg-red-500', label: 'No asistida' },
-    cancelada: { color: 'bg-destructive', label: 'Cancelada' },
-  }[status] || { color: 'bg-muted-foreground', label: status };
+  const color = STATUS_DOTS[status] ?? 'bg-muted-foreground';
+  const label = STATUS_LABELS[status] ?? status;
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/50 border border-border/50 transition-all hover:bg-secondary">
-      <div className={`w-2 h-2 rounded-full ${config.color} animate-pulse`} />
-      <span className="text-xs font-medium capitalize">{config.label}</span>
+      <div className={`w-2 h-2 rounded-full ${color} animate-pulse`} />
+      <span className="text-xs font-medium capitalize">{label}</span>
     </div>
   );
 }
@@ -76,7 +80,7 @@ export function AgendaAppointments({
               {confirmadasCount > 0 && (
                 <>
                   <span>•</span>
-                  <span className="text-green-500 font-medium">{confirmadasCount} confirmadas</span>
+                  <span className="text-amber-600 font-medium">{confirmadasCount} pendientes</span>
                 </>
               )}
               {asistidasCount > 0 && (
@@ -131,7 +135,7 @@ export function AgendaAppointments({
                 filter === 'confirmada' ? 'bg-accent hover:bg-accent/90 h-8' : 'bg-transparent hover:bg-secondary h-8'
               )}
             >
-              Confirmadas
+              Pendientes
             </Button>
             <Button
               size="sm"

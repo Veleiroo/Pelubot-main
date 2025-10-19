@@ -27,7 +27,17 @@ export const ProsOverviewView = () => {
     overviewErrorMessage,
   } = useOverviewData(Boolean(stylist));
 
-  const { createAppointment, markAttended, markNoShow, isCreating, isMarkingAttended, isMarkingNoShow } = useOverviewActions({
+  const {
+    createAppointment,
+    markAttended,
+    markNoShow,
+    cancelAppointment,
+    deleteAppointment,
+    isCreating,
+    isMarkingAttended,
+    isMarkingNoShow,
+    isCancelling,
+  } = useOverviewActions({
     professionalId: stylist?.id,
   });
 
@@ -55,10 +65,22 @@ export const ProsOverviewView = () => {
             title: 'Cita marcada como no asistida',
             description: detail ? `Motivo: ${detail}` : 'El cliente no se presentó a la cita',
           });
+        } else if (action === 'cancel') {
+          await cancelAppointment(appointmentId);
+          toast({
+            title: 'Cita cancelada',
+            description: 'La cita ha sido eliminada de la agenda',
+          });
         } else if (action === 'reschedule') {
           toast({
             title: 'Reprogramación',
             description: 'Abriremos la reprogramación pronto',
+          });
+        } else if (action === 'delete') {
+          await deleteAppointment(appointmentId);
+          toast({
+            title: 'Cita eliminada',
+            description: 'La cita fue eliminada de forma permanente',
           });
         }
       } catch (error) {
@@ -69,7 +91,7 @@ export const ProsOverviewView = () => {
         });
       }
     },
-    [markAttended, markNoShow, toast]
+    [cancelAppointment, deleteAppointment, markAttended, markNoShow, toast]
   );
 
   const handleCreateAppointment = useCallback(() => {
@@ -151,13 +173,9 @@ export const ProsOverviewView = () => {
             summary={summary}
             isLoading={isInitialOverviewLoading}
             errorMessage={overviewErrorMessage}
-            onSelectAppointment={(id) =>
-              toast({
-                title: 'Detalle en construcción',
-                description: `Abriremos la cita ${id} en breve.`,
-              })
-            }
             onCreateAppointment={handleCreateAppointment}
+            onAction={handleAppointmentAction}
+            isProcessingAction={isMarkingAttended || isMarkingNoShow || isCancelling}
           />
         </section>
       </div>

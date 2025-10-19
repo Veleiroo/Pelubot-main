@@ -86,12 +86,35 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      return await api.prosCancelReservation(appointmentId);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      return await api.prosDeleteReservation(appointmentId);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+    },
+  });
+
   return {
     createAppointment: createMutation.mutateAsync,
     markAttended: markAttendedMutation.mutateAsync,
     markNoShow: markNoShowMutation.mutateAsync,
+    cancelAppointment: cancelMutation.mutateAsync,
+    deleteAppointment: deleteMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isMarkingAttended: markAttendedMutation.isPending,
     isMarkingNoShow: markNoShowMutation.isPending,
+    isCancelling: cancelMutation.isPending || deleteMutation.isPending,
   };
 };

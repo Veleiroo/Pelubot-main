@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format, isValid, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -47,7 +48,7 @@ import { useToast } from '@/hooks/use-toast';
 import { api, ApiError, type Service } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useProSession } from '@/store/pro';
-import { STATUS_STYLES } from '../shared/constants';
+import { STATUS_STYLES, STATUS_LABELS } from '../shared/constants';
 import type { AgendaSummary, Appointment } from '../shared/types';
 import { useAgendaActions } from './hooks/useAgendaActions';
 import { useAgendaData } from './hooks/useAgendaData';
@@ -87,11 +88,12 @@ const toErrorMessage = (error: unknown, fallback: string) => {
 const capitalize = (value: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : value);
 
 const STATUS_BORDER_ACCENTS: Record<Appointment['status'], string> = {
-  confirmada: 'border-l-emerald-400',
-  asistida: 'border-l-green-600',
+  confirmada: 'border-l-amber-400',
+  asistida: 'border-l-emerald-500',
   no_asistida: 'border-l-red-400',
   cancelada: 'border-l-rose-400',
 };
+
 
 const timeRangeLabel = (appointment: Appointment) =>
   appointment.endTime ? `${appointment.time} h · ${appointment.endTime} h` : `${appointment.time} h`;
@@ -106,6 +108,8 @@ const contactLabel = (appointment: Appointment) => {
 export const ProsAgendaView = () => {
   const { toast } = useToast();
   const { session } = useProSession();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
@@ -158,6 +162,14 @@ export const ProsAgendaView = () => {
     isRescheduling,
     isCancelling,
   } = useAgendaActions({ professionalId: stylist?.id });
+
+  useEffect(() => {
+    const state = location.state as { newAppointment?: boolean } | undefined;
+    if (state?.newAppointment) {
+      setCreateOpen(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   const formattedDayLabel = useMemo(() => capitalize(dayLabel), [dayLabel]);
   const handlePrevNav = () => {
@@ -559,7 +571,7 @@ const AppointmentsListPanel = ({
               {appointments.length} {appointments.length === 1 ? 'cita' : 'citas'}
             </span>
             <span>•</span>
-            <span className="text-emerald-500">{totals.confirmadas} confirmadas</span>
+            <span className="text-amber-600">{totals.confirmadas} pendientes</span>
             {totals.asistidas > 0 && (
               <>
                 <span>•</span>
@@ -594,7 +606,7 @@ const AppointmentsListPanel = ({
             ) : null}
           </div>
         </div>
-        <Button onClick={onCreate} className="gap-2 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+            <Button onClick={onCreate} className="gap-2 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
           <Plus className="h-4 w-4" />
           Crear cita
         </Button>
@@ -605,7 +617,7 @@ const AppointmentsListPanel = ({
         <div className="flex gap-2">
           {[
             { key: 'all', label: 'Todas' },
-            { key: 'confirmada', label: 'Confirmadas' },
+            { key: 'confirmada', label: 'Pendientes' },
             { key: 'asistida', label: 'Asistidas' },
             { key: 'cancelada', label: 'Canceladas' },
           ].map((item) => (
@@ -649,7 +661,7 @@ const AppointmentsListPanel = ({
                           STATUS_STYLES[appointment.status]
                         )}
                       >
-                        {appointment.status.toUpperCase()}
+                        {STATUS_LABELS[appointment.status].toUpperCase()}
                       </Badge>
                     </div>
                     <div>

@@ -407,6 +407,11 @@ export const api = {
       method: "POST",
     }),
 
+  prosDeleteReservation: (reservationId: string) =>
+    http<ActionResult>(`/pros/reservations/${reservationId}`, {
+      method: "DELETE",
+    }),
+
   prosRescheduleReservation: (reservationId: string, payload: ProsReschedulePayload) =>
     http<ProsRescheduleResponse>(`/pros/reservations/${reservationId}/reschedule`, {
       method: "POST",

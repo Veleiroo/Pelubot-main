@@ -16,21 +16,21 @@ type AppointmentCardProps = {
 };
 
 const STATUS_BADGE_CLASSES: Record<OverviewAppointmentEntry['status'], string> = {
-  confirmada: 'bg-accent/20 border border-accent/30 text-accent',
-  asistida: 'bg-emerald-100 border border-emerald-200 text-emerald-700',
-  no_asistida: 'bg-red-100 border border-red-200 text-red-700',
-  cancelada: 'bg-rose-100 border border-rose-200 text-rose-600',
+  confirmada: 'border border-amber-500/40 bg-amber-500/10 text-amber-600',
+  asistida: 'border border-emerald-500/40 bg-emerald-500/10 text-emerald-600',
+  no_asistida: 'border border-red-500/40 bg-red-500/10 text-red-600',
+  cancelada: 'border border-rose-500/40 bg-rose-500/10 text-rose-600',
 };
 
 const STATUS_DOT_CLASSES: Record<OverviewAppointmentEntry['status'], string> = {
-  confirmada: 'bg-accent',
-  asistida: 'bg-emerald-600',
+  confirmada: 'bg-amber-500',
+  asistida: 'bg-emerald-500',
   no_asistida: 'bg-red-500',
-  cancelada: 'bg-destructive',
+  cancelada: 'bg-rose-500',
 };
 
 const STATUS_LABELS: Record<OverviewAppointmentEntry['status'], string> = {
-  confirmada: 'Confirmada',
+  confirmada: 'Pendiente',
   asistida: 'Asistida',
   no_asistida: 'No asistida',
   cancelada: 'Cancelada',
@@ -45,25 +45,30 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
   const badgeClasses = appointment ? STATUS_BADGE_CLASSES[appointment.status] : '';
 
   return (
-    <Card className="rounded-lg border border-border/50 bg-card p-4 shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl">
+    <Card className="rounded-xl border border-border/50 bg-card p-6 shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl font-sans">
       <div className="mb-4">
-        <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">Próxima cita</p>
-        <h2 className="mb-2 text-2xl font-bold text-foreground">
-          {isLoading ? <Skeleton className="h-6 w-1/2" /> : appointment?.client ?? 'Sin citas programadas'}
+        <p className="mb-2 text-xs uppercase tracking-[0.28em] text-muted-foreground">Próxima cita</p>
+        <h2 className="mb-3 text-3xl font-semibold text-foreground">
+          {isLoading ? <Skeleton className="h-8 w-1/2" /> : appointment?.client ?? 'Sin citas programadas'}
         </h2>
         {appointment ? (
           <>
-            <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="mb-3 flex items-center gap-2 text-base text-muted-foreground">
               <Clock className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="font-semibold text-foreground">{appointment.time} h</span>
               <span>•</span>
-              <div className={cn('flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium', badgeClasses)}>
+              <div
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium shadow-sm backdrop-blur',
+                  badgeClasses
+                )}
+              >
                 <div className={cn('h-1.5 w-1.5 rounded-full', STATUS_DOT_CLASSES[appointment.status])} />
                 <span>{STATUS_LABELS[appointment.status]}</span>
               </div>
             </div>
-            <p className="mb-3 text-sm text-muted-foreground">{appointment.service}</p>
-            <div className="space-y-1.5 text-xs text-muted-foreground">
+            <p className="mb-4 text-base text-muted-foreground">{appointment.service}</p>
+            <div className="space-y-1.5 text-sm text-muted-foreground">
               {appointment.phone ? (
                 <div className="flex items-center gap-2">
                   <Phone className="h-3.5 w-3.5" aria-hidden="true" />
@@ -78,7 +83,7 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
               ) : null}
             </div>
             {appointment.notes ? (
-              <p className="mt-3 border-l-2 border-border pl-2 text-xs italic text-muted-foreground">
+            <p className="mt-3 border-l-2 border-border pl-3 text-sm italic text-muted-foreground">
                 {appointment.notes}
               </p>
             ) : null}
@@ -100,10 +105,10 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
         )}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
-          className="flex-1 h-8 gap-1.5 bg-accent text-accent-foreground transition hover:bg-accent/90 text-xs"
+          className="flex-1 h-9 gap-2 rounded-full px-4 text-sm font-semibold bg-accent text-accent-foreground transition hover:bg-accent/90"
           disabled={!appointment}
           onClick={() => onAction('attended', appointment?.id)}
         >
@@ -113,7 +118,7 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
         <Button
           size="sm"
           variant="outline"
-          className="flex-1 h-8 text-xs transition hover:bg-secondary/80"
+          className="flex-1 h-9 rounded-full px-4 text-sm font-semibold transition hover:bg-secondary/80"
           disabled={!appointment}
           onClick={() => onAction('no-show', appointment?.id)}
         >
@@ -123,7 +128,7 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
         <Button
           size="sm"
           variant="outline"
-          className="h-8 text-xs transition hover:bg-secondary/80"
+          className="flex-1 h-9 rounded-full px-4 text-sm font-semibold transition hover:bg-secondary/80"
           disabled={!appointment}
           onClick={() => onAction('reschedule', appointment?.id)}
         >

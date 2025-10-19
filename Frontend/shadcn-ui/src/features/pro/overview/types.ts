@@ -24,4 +24,4 @@ export type OverviewAppointmentEntry = {
   raw: ProOverviewAppointment;
 };
 
-export type AppointmentActionType = 'attended' | 'no-show' | 'reschedule';
+export type AppointmentActionType = 'attended' | 'no-show' | 'reschedule' | 'cancel' | 'delete';

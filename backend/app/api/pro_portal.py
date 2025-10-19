@@ -47,7 +47,7 @@ from app.services.logic import (
     apply_reschedule,
     create_gcal_reservation,
     get_calendar_for_professional,
-    find_available_slots,
+    delete_gcal_reservation,
 )
 from app.utils.date import now_tz, TZ, validate_target_dt
 from app.utils.security import needs_rehash, verify_password, hash_password
@@ -197,21 +197,25 @@ def stylist_reservations(
     reservations: list[StylistReservationOut] = []
     for row in rows:
         service = SERVICE_BY_ID.get(row.service_id)
+        start_local = _to_local(getattr(row, "start", None))
+        end_local = _to_local(getattr(row, "end", None))
+        created_local = _to_local(getattr(row, "created_at", None))
+        updated_local = _to_local(getattr(row, "updated_at", None))
         reservations.append(
             StylistReservationOut(
                 id=row.id,
                 service_id=row.service_id,
                 service_name=service.name if service else row.service_id,
                 professional_id=row.professional_id,
-                start=row.start,
-                end=row.end,
+                start=start_local or row.start,
+                end=end_local or row.end,
                 status=getattr(row, "status", "confirmada"),
                 customer_name=row.customer_name,
                 customer_email=row.customer_email,
                 customer_phone=row.customer_phone,
                 notes=row.notes,
-                created_at=row.created_at,
-                updated_at=getattr(row, "updated_at", None),
+                created_at=created_local or getattr(row, "created_at", None),
+                updated_at=updated_local or getattr(row, "updated_at", None),
             )
         )
     return StylistReservationsOut(reservations=reservations)
@@ -237,16 +241,6 @@ def stylist_overview(
         if session is not None
         else []
     )
-
-    def _to_local(dt: datetime | None) -> datetime | None:
-        if dt is None:
-            return None
-        if dt.tzinfo is None:
-            try:
-                return dt.replace(tzinfo=TZ)
-            except Exception:
-                return dt
-        return dt.astimezone(TZ)
 
     appointments: list[StylistOverviewAppointment] = []
     counts = {"confirmada": 0, "asistida": 0, "no_asistida": 0, "cancelada": 0}
@@ -646,21 +640,6 @@ def stylist_create_reservation(
     if not customer_phone:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Se requiere un teléfono de contacto")
     
-    # Recalcular disponibilidad garantiza que el slot sigue libre
-    avail = find_available_slots(session, payload.service_id, start.date(), stylist.id)
-    
-    def _naive(dt: datetime) -> datetime:
-        if dt.tzinfo is None:
-            return dt
-        return dt.replace(tzinfo=None)
-    
-    avail_naive = [_naive(dt) for dt in avail]
-    if _naive(start) not in avail_naive:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Ese inicio no está disponible (horario o solapado). Consulta /slots."
-        )
-    
     res_id = str(uuid.uuid4())
     cal_id = get_calendar_for_professional(stylist.id)
     gcal_id = None
@@ -743,7 +722,7 @@ def stylist_create_reservation(
         logger.info("Evento Google Calendar creado: %s", gcal_id)
     except Exception as e:
         logger.warning("No se pudo crear evento en Google Calendar: %s", e)
-    
+
     return ReservationCreateOut(
         ok=True,
         reservation_id=res_id,
@@ -899,16 +878,46 @@ def stylist_mark_no_show(
     # Si se proporciona una razón, añadirla a las notas
     if reason:
         existing_notes = reservation.notes or ""
-        timestamp = now.strftime("%Y-%m-%d %H:%M")
+        timestamp = now_tz().strftime("%Y-%m-%d %H:%M")
         no_show_note = f"\n[{timestamp}] No-show: {reason.strip()}"
         reservation.notes = (existing_notes + no_show_note).strip()
     
     session.add(reservation)
     session.commit()
-    
+
     message = f"Reserva {reservation_id} marcada como no asistida."
     if reason:
         message += f" Motivo registrado: {reason}"
-    
+
     return ActionResult(ok=True, message=message)
 
+
+@router.delete("/reservations/{reservation_id}", response_model=ActionResult)
+def stylist_delete_reservation(
+    reservation_id: str,
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+) -> ActionResult:
+    """Elimina definitivamente una reserva del portal profesional."""
+    reservation = find_reservation(session, reservation_id)
+    if not reservation or reservation.professional_id != stylist.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reserva no encontrada")
+
+    gcal_event_id = getattr(reservation, "google_event_id", None)
+    gcal_calendar_id = getattr(reservation, "google_calendar_id", None)
+
+    try:
+        if gcal_event_id and gcal_calendar_id:
+            try:
+                delete_gcal_reservation(gcal_event_id, gcal_calendar_id)
+            except Exception:
+                logger.warning("No se pudo eliminar el evento de Google Calendar: %s", gcal_event_id)
+
+        session.delete(reservation)
+        session.commit()
+    except Exception as exc:
+        session.rollback()
+        logger.exception("Error eliminando reserva %s", reservation_id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo eliminar la reserva") from exc
+
+    return ActionResult(ok=True, message=f"Reserva {reservation_id} eliminada definitivamente.")

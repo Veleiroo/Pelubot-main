@@ -21,9 +21,6 @@ const sortReservations = (reservations: ProReservation[]) =>
 const upsertReservation = (reservations: ProReservation[], reservation: ProReservation) =>
   sortReservations(reservations.filter((item) => item.id !== reservation.id).concat(reservation));
 
-const removeReservation = (reservations: ProReservation[], reservationId: string) =>
-  reservations.filter((reservation) => reservation.id !== reservationId);
-
 type CreateAppointmentPayload = {
   date: Date;
   time: string;
@@ -61,7 +58,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
       const durationMs = minutesToMs(payload.durationMinutes);
       const endIso = new Date(startDate.getTime() + durationMs).toISOString();
 
-      const response = await api.createReservation({
+      const response = await api.prosCreateReservation({
         service_id: payload.serviceId,
         professional_id: professionalId,
         start: startIso,
@@ -95,6 +92,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         return { reservations: upsertReservation(previous.reservations, reservation) };
       });
       void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });
 
@@ -128,6 +126,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         return { reservations: sortReservations(next) };
       });
       void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });
 
@@ -146,6 +145,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         return { reservations: updated };
       });
       void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });
 
@@ -163,6 +163,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         return { reservations: updated };
       });
       void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });
 
@@ -180,6 +181,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         return { reservations: updated };
       });
       void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });
 
