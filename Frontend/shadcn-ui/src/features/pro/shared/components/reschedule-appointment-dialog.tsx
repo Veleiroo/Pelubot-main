@@ -78,23 +78,23 @@ export const RescheduleAppointmentDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] border-white/10 bg-slate-950/95 text-white sm:max-w-lg">
-        <DialogHeader className="space-y-1.5 text-left sm:space-y-2">
-          <DialogTitle className="text-lg sm:text-xl">Reprogramar cita</DialogTitle>
-          <DialogDescription className="text-xs text-white/70 sm:text-sm">
+      <DialogContent className="max-h-[90vh] max-w-lg border-border bg-card sm:max-h-[85vh]">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold">Reprogramar cita</DialogTitle>
+          <DialogDescription>
             Ajusta la hora para {appointment.client} ({formatRescheduleDialogDate(appointmentDate)}).
           </DialogDescription>
         </DialogHeader>
-        <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
-          <div className="space-y-1.5 sm:space-y-2">
-            <Label htmlFor="new-time" className="text-xs sm:text-sm">
+        <form className="mt-4 space-y-5" onSubmit={handleSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="new-time" className="text-sm font-medium">
               Nueva hora
             </Label>
             <Select value={time} onValueChange={setTime} disabled={isSubmitting}>
-              <SelectTrigger id="new-time" className="border-white/15 bg-white/5 text-white">
+              <SelectTrigger id="new-time" className="border-border bg-secondary/50">
                 <SelectValue placeholder="Selecciona una hora" />
               </SelectTrigger>
-              <SelectContent className="border-white/15 bg-slate-900/95 text-white">
+              <SelectContent className="border-border bg-card">
                 {timeOptions.map((option) => (
                   <SelectItem key={option} value={option}>
                     {option} h
@@ -102,26 +102,28 @@ export const RescheduleAppointmentDialog = ({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[10px] text-white/40 sm:text-xs">Duración estimada: {durationMinutes} minutos.</p>
+            <p className="text-xs text-muted-foreground sm:text-sm">
+              Duración estimada: {durationMinutes} minutos.
+            </p>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-white/80 sm:rounded-2xl sm:p-4 sm:text-sm">
-            <p className="text-sm font-semibold text-white sm:text-base">{appointment.service}</p>
-            <p>{appointment.client}</p>
+          <div className="rounded-xl border border-border bg-secondary/40 p-4 sm:rounded-2xl">
+            <p className="text-base font-semibold text-foreground sm:text-lg">{appointment.service}</p>
+            <p className="text-sm text-muted-foreground">{appointment.client}</p>
             {(appointment.clientPhone || appointment.clientEmail) && (
-              <p className="text-[10px] text-white/60 sm:text-xs">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {[appointment.clientPhone, appointment.clientEmail].filter(Boolean).join(' · ')}
               </p>
             )}
           </div>
 
-          {error && <p className="text-xs text-rose-300 sm:text-sm">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              className="rounded-full border-white/20 text-sm text-white/80 hover:bg-white/10"
+              className="w-full sm:w-auto"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
@@ -129,13 +131,15 @@ export const RescheduleAppointmentDialog = ({
             </Button>
             <Button
               type="submit"
-              className="rounded-full bg-emerald-500 px-4 text-sm font-semibold text-emerald-950 hover:bg-emerald-400 sm:px-5"
+              variant="primaryAction"
+              className="w-full sm:w-auto"
               disabled={isSubmitting}
+              aria-busy={isSubmitting}
             >
               {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Guardando
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Guardando…
                 </span>
               ) : (
                 'Actualizar cita'
