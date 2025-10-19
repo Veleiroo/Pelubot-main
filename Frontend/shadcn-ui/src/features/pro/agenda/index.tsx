@@ -602,7 +602,7 @@ const AppointmentsListPanel = ({
             ) : null}
           </div>
         </div>
-            <Button onClick={onCreate} className="gap-2 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+        <Button onClick={onCreate} variant="primaryAction">
           <Plus className="h-4 w-4" />
           Crear cita
         </Button>
