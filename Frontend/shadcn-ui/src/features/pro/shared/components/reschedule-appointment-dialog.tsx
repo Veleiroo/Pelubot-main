@@ -101,70 +101,52 @@ export const RescheduleAppointmentDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] border-white/10 bg-slate-950/95 text-white sm:max-w-lg">
-        <DialogHeader className="space-y-1.5 text-left sm:space-y-2">
-          <DialogTitle className="text-lg sm:text-xl">Reprogramar cita</DialogTitle>
-          <DialogDescription className="text-xs text-white/70 sm:text-sm">
-            Ajusta la fecha y hora para {appointment.client} (
-            {formatRescheduleDialogDate(selectedDate ?? appointmentDate)}).
+      <DialogContent className="max-h-[90vh] max-w-lg border-border bg-card sm:max-h-[85vh]">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold">Reprogramar cita</DialogTitle>
+          <DialogDescription>
+            Ajusta la hora para {appointment.client} ({formatRescheduleDialogDate(appointmentDate)}).
           </DialogDescription>
         </DialogHeader>
-        <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
-          <div className="space-y-1.5 sm:space-y-2">
-            <Label htmlFor="new-date" className="text-xs sm:text-sm">
-              Nueva fecha
+        <form className="mt-4 space-y-5" onSubmit={handleSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="new-time" className="text-sm font-medium">
+              Nueva hora
             </Label>
-            <Input
-              id="new-date"
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              disabled={isSubmitting}
-              className="border-white/15 bg-white/5 text-white"
-            />
+            <Select value={time} onValueChange={setTime} disabled={isSubmitting}>
+              <SelectTrigger id="new-time" className="border-border bg-secondary/50">
+                <SelectValue placeholder="Selecciona una hora" />
+              </SelectTrigger>
+              <SelectContent className="border-border bg-card">
+                {timeOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option} h
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground sm:text-sm">
+              Duración estimada: {durationMinutes} minutos.
+            </p>
           </div>
 
-          <div className="space-y-1.5 sm:space-y-2">
-            <Label className="text-xs sm:text-sm">Horario disponible</Label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {timeOptions.map((option) => (
-                <Button
-                  key={option}
-                  type="button"
-                  size="sm"
-                  variant={time === option ? 'default' : 'outline'}
-                  disabled={isSubmitting}
-                  onClick={() => setTime(option)}
-                  className={cn(
-                    'text-xs transition',
-                    time === option
-                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                      : 'bg-transparent hover:bg-secondary/60'
-                  )}
-                >
-                  {option} h
-                </Button>
-              ))}
-            </div>
-            <p className="text-[10px] text-white/40 sm:text-xs">Duración estimada: {durationMinutes} minutos.</p>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-white/80 sm:rounded-2xl sm:p-4 sm:text-sm">
-            <p className="text-sm font-semibold text-white sm:text-base">{appointment.service}</p>
-            <p>{appointment.client}</p>
+          <div className="rounded-xl border border-border bg-secondary/40 p-4 sm:rounded-2xl">
+            <p className="text-base font-semibold text-foreground sm:text-lg">{appointment.service}</p>
+            <p className="text-sm text-muted-foreground">{appointment.client}</p>
             {(appointment.clientPhone || appointment.clientEmail) && (
-              <p className="text-[10px] text-white/60 sm:text-xs">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {[appointment.clientPhone, appointment.clientEmail].filter(Boolean).join(' · ')}
               </p>
             )}
           </div>
 
-          {error && <p className="text-xs text-rose-300 sm:text-sm">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
               className="w-full sm:w-auto"
@@ -174,14 +156,14 @@ export const RescheduleAppointmentDialog = ({
             <Button
               type="submit"
               variant="primaryAction"
-              disabled={isSubmitDisabled}
-              aria-busy={isSubmitting}
               className="w-full sm:w-auto"
+              disabled={isSubmitting}
+              aria-busy={isSubmitting}
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  Actualizando…
+                  Guardando…
                 </span>
               ) : (
                 <span>Actualizar cita</span>
