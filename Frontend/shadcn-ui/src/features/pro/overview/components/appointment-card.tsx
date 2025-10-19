@@ -16,9 +16,10 @@ type AppointmentCardProps = {
   appointment: OverviewAppointmentEntry | null | undefined;
   isLoading: boolean;
   onAction: (action: AppointmentActionType, appointmentId?: string, detail?: string) => Promise<void> | void;
+  isRescheduling?: boolean;
 };
 
-export const AppointmentCard = ({ appointment, isLoading, onAction }: AppointmentCardProps) => {
+export const AppointmentCard = ({ appointment, isLoading, onAction, isRescheduling = false }: AppointmentCardProps) => {
   const lastVisitLabel = useMemo(() => {
     if (!appointment?.lastVisit) return null;
     return formatDate(appointment.lastVisit);
@@ -134,10 +135,14 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
           size="sm"
           variant="outline"
           className="flex-1 min-w-[120px]"
-          disabled={!appointment || Boolean(actionInFlight)}
+          disabled={!appointment || Boolean(actionInFlight) || isRescheduling}
           onClick={() => void runAction('reschedule')}
         >
-          {isBusy('reschedule') ? <Loader2 className="size-4 animate-spin" /> : <CalendarClock className="h-3.5 w-3.5" />}
+          {isBusy('reschedule') || isRescheduling ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <CalendarClock className="h-3.5 w-3.5" />
+          )}
           <span>Mover</span>
         </Button>
       </div>

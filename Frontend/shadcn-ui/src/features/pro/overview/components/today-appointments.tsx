@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, Clock, Loader2, Plus, Trash2, XCircle } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Clock, Loader2, Plus, Trash2, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -18,6 +18,7 @@ type TodayAppointmentsProps = {
   onCreateAppointment: () => void;
   onAction: (action: AppointmentActionType, appointmentId: string, detail?: string) => Promise<void>;
   isProcessingAction?: boolean;
+  isRescheduling?: boolean;
 };
 
 export const TodayAppointments = ({
@@ -28,6 +29,7 @@ export const TodayAppointments = ({
   onCreateAppointment,
   onAction,
   isProcessingAction = false,
+  isRescheduling = false,
 }: TodayAppointmentsProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionInFlight, setActionInFlight] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export const TodayAppointments = ({
   };
 
   const handleAction = async (action: AppointmentActionType, appointmentId: string, detail?: string) => {
-    if (isProcessingAction) return;
+    if (isProcessingAction || isRescheduling) return;
     try {
       setActionInFlight(appointmentId);
       setActionInFlightType(action);
@@ -173,6 +175,20 @@ export const TodayAppointments = ({
                             <span>Asistida</span>
                           </Button>
                           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="min-w-[130px]"
+                              disabled={isBusy || isRescheduling}
+                              onClick={() => void handleAction('reschedule', appointment.id)}
+                            >
+                              {busyAction === 'reschedule' || isRescheduling ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <CalendarClock className="h-3.5 w-3.5" />
+                              )}
+                              <span>Mover</span>
+                            </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild disabled={isBusy}>
                                 <Button size="sm" variant="outline" className="min-w-[130px] justify-between">
