@@ -80,7 +80,7 @@ export const ProsOverviewView = () => {
   return (
     <>
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <section className="grid gap-6 lg:grid-cols-[400px_1fr]">
+        <section className="grid gap-6 xl:grid-cols-[minmax(350px,400px)_1fr]">
           <div className="space-y-6">
             <AppointmentCard
               appointment={upcomingAppointment}

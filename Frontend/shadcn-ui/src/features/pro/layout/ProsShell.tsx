@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { api, ApiError, type StylistPublic } from '@/lib/api';
 import { useProSession } from '@/store/pro';
 
-import ProsHeader from './ProsHeader';
+import { ProHeader } from './ProHeader';
 
 export const ProsShell = () => {
   const location = useLocation();
@@ -141,19 +141,9 @@ export const ProsShell = () => {
 
   return (
     <div className="relative flex min-h-screen flex-col bg-background text-foreground">
-      <ProsHeader
-        stylistDisplayName={session?.stylist?.display_name ?? session?.stylist?.name ?? null}
-        onCreateAppointment={() =>
-          toast({
-            title: 'Crear cita',
-            description: 'El calendario completo estará disponible pronto.',
-          })
-        }
-        onLogout={() => logout.mutate()}
-        isLogoutPending={logout.isPending}
-      />
+      <ProHeader />
       <main className="flex-1 py-6 sm:py-8">
-        <div className="container px-4 sm:px-6">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <Outlet />
         </div>
       </main>

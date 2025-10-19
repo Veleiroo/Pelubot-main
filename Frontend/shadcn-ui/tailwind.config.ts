@@ -53,6 +53,10 @@ const config: Config = {
         input: "var(--input)",
         ring: "var(--ring)",
       },
+      fontFamily: {
+        sans: ["'Geist Mono Variable'", "ui-monospace", "monospace"],
+        mono: ["'Geist Mono Variable'", "ui-monospace", "monospace"],
+      },
       borderRadius: {
         xl: "1rem",
         "2xl": "1.25rem",

@@ -10,6 +10,9 @@ from sqlalchemy.types import DateTime
 from sqlalchemy import Index, UniqueConstraint, CheckConstraint, event, Column, String, JSON
 from app.utils.date import validate_target_dt, TZ
 
+# Tipos de estado de reserva
+ReservationStatus = Literal["confirmada", "asistida", "no_asistida", "cancelada"]
+
 class Service(BaseModel):
     """Servicio ofrecido (ej.: corte, coloración)."""
     id: str
@@ -222,6 +225,7 @@ class Reservation(BaseModel):
     professional_id: str
     start: datetime
     end: datetime
+    status: ReservationStatus = "confirmada"
     google_event_id: Optional[str] = None
     google_calendar_id: Optional[str] = None
     customer_name: Optional[str] = None
@@ -341,6 +345,7 @@ class ReservationIn(BaseModel):
 class ReservationDB(SQLModel, table=True):
     __table_args__ = (
         Index('ix_res_prof_start_end', 'professional_id', 'start', 'end'),
+        Index('ix_res_status', 'status'),
         UniqueConstraint('google_calendar_id', 'google_event_id', name='uq_gcal_event_per_calendar'),
         CheckConstraint('end > start', name='ck_end_after_start'),
         {"extend_existing": True},
@@ -350,6 +355,7 @@ class ReservationDB(SQLModel, table=True):
     professional_id: str = SQLField(index=True)
     start: datetime = SQLField(sa_type=DateTime(timezone=True), index=True)
     end: datetime = SQLField(sa_type=DateTime(timezone=True))
+    status: str = SQLField(default="confirmada", index=True, description="Estado: confirmada, asistida, no_asistida, cancelada")
     google_event_id: Optional[str] = SQLField(default=None, nullable=True, index=True)
     google_calendar_id: Optional[str] = SQLField(default=None, nullable=True, index=True)
     customer_name: Optional[str] = SQLField(default=None, nullable=True)

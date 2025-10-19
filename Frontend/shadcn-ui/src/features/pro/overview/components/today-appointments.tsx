@@ -17,7 +17,7 @@ type TodayAppointmentsProps = {
 };
 
 const STATUS_LABEL: Record<OverviewAppointmentEntry['status'], { label: string; dot: string; text: string }> = {
-  confirmada: { label: 'Confirmada', dot: 'bg-accent', text: 'text-accent' },
+  confirmada: { label: 'Confirmada', dot: 'bg-green-500', text: 'text-green-500' },
   pendiente: { label: 'Pendiente', dot: 'bg-yellow-500', text: 'text-yellow-500' },
   cancelada: { label: 'Cancelada', dot: 'bg-destructive', text: 'text-destructive' },
 };
@@ -49,7 +49,7 @@ export const TodayAppointments = ({
               {appointments.length} {appointments.length === 1 ? 'cita' : 'citas'}
             </span>
             <span>•</span>
-            <span className="text-accent">{counts.confirmadas} confirmadas</span>
+            <span className="text-green-500">{counts.confirmadas} confirmadas</span>
             <span>•</span>
             <span className="text-yellow-500">{counts.pendientes} pendientes</span>
             {counts.canceladas ? (

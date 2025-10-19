@@ -1,4 +1,4 @@
-import ProsAgendaView from '@/features/pro/agenda';
+import ProsAgendaView from '@/features/pro/agenda/AgendaView';
 
 const ProsAgenda = () => <ProsAgendaView />;
 

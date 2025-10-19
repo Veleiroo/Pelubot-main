@@ -8,7 +8,7 @@ type DailySummaryProps = {
 };
 
 const SUMMARY_ITEMS: Array<{ key: keyof OverviewSummary; label: string; color: string }> = [
-  { key: 'confirmadas', label: 'Confirmadas', color: 'bg-accent' },
+  { key: 'confirmadas', label: 'Confirmadas', color: 'bg-green-500' },
   { key: 'pendientes', label: 'Pendientes', color: 'bg-yellow-500' },
   { key: 'canceladas', label: 'Canceladas', color: 'bg-destructive' },
 ];
