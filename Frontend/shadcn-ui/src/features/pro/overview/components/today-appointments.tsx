@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
+import { AppointmentStatusPill } from '../../shared/components/appointment-status-pill';
 import type { AppointmentActionType, OverviewAppointmentEntry, OverviewSummary } from '../types';
 
 type TodayAppointmentsProps = {
@@ -15,13 +16,6 @@ type TodayAppointmentsProps = {
   onCreateAppointment: () => void;
   onAction: (action: AppointmentActionType, appointmentId: string, detail?: string) => Promise<void>;
   isProcessingAction?: boolean;
-};
-
-const STATUS_LABEL: Record<OverviewAppointmentEntry['status'], { label: string; dot: string; text: string }> = {
-  confirmada: { label: 'Pendiente', dot: 'bg-amber-500', text: 'text-amber-500' },
-  asistida: { label: 'Asistida', dot: 'bg-emerald-600', text: 'text-emerald-600' },
-  no_asistida: { label: 'No asistida', dot: 'bg-red-500', text: 'text-red-500' },
-  cancelada: { label: 'Cancelada', dot: 'bg-rose-500', text: 'text-rose-500' },
 };
 
 export const TodayAppointments = ({
@@ -129,7 +123,6 @@ export const TodayAppointments = ({
             </div>
           ) : (
             appointments.map((appointment, index) => {
-              const config = STATUS_LABEL[appointment.status];
               const isExpanded = expandedId === appointment.id;
               const isBusy = isProcessingAction || actionInFlight === appointment.id;
               return (
@@ -161,10 +154,7 @@ export const TodayAppointments = ({
                         <p className="mt-1 text-xs italic text-muted-foreground/80">{appointment.notes}</p>
                       ) : null}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className={cn('h-1.5 w-1.5 rounded-full', config.dot)} />
-                      <span className={cn('text-xs font-medium', config.text)}>{config.label}</span>
-                    </div>
+                    <AppointmentStatusPill status={appointment.status} />
                   </div>
 
                   {isExpanded && (

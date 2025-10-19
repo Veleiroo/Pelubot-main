@@ -48,7 +48,7 @@ import { useToast } from '@/hooks/use-toast';
 import { api, ApiError, type Service } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useProSession } from '@/store/pro';
-import { STATUS_STYLES, STATUS_LABELS } from '../shared/constants';
+import { AppointmentStatusPill } from '../shared/components/appointment-status-pill';
 import type { AgendaSummary, Appointment } from '../shared/types';
 import { useAgendaActions } from './hooks/useAgendaActions';
 import { useAgendaData } from './hooks/useAgendaData';
@@ -655,14 +655,11 @@ const AppointmentsListPanel = ({
                         <Clock className="h-4 w-4 text-muted-foreground" />
                         {timeRangeLabel(appointment)}
                       </span>
-                      <Badge
-                        className={cn(
-                          'rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide',
-                          STATUS_STYLES[appointment.status]
-                        )}
-                      >
-                        {STATUS_LABELS[appointment.status].toUpperCase()}
-                      </Badge>
+                      <AppointmentStatusPill
+                        status={appointment.status}
+                        className="text-[11px]"
+                        labelClassName="font-semibold"
+                      />
                     </div>
                     <div>
                       <p className="text-lg font-semibold text-foreground">{appointment.client}</p>
