@@ -424,6 +424,7 @@ def create_reservation(
             ReservationDB.professional_id == payload.professional_id,
             ReservationDB.start < end,
             ReservationDB.end > start,
+            ReservationDB.status != "cancelada",
         )
         if session.exec(q).first():
             session.rollback()

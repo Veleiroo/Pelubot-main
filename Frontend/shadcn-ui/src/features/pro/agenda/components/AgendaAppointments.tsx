@@ -22,7 +22,8 @@ function getServiceTypeColor(serviceId?: string): string {
 function StatusBadge({ status }: { status: AppointmentStatus }) {
   const config = {
     confirmada: { color: 'bg-green-500', label: 'Confirmada' },
-    pendiente: { color: 'bg-yellow-500', label: 'Pendiente' },
+    asistida: { color: 'bg-emerald-600', label: 'Asistida' },
+    no_asistida: { color: 'bg-red-500', label: 'No asistida' },
     cancelada: { color: 'bg-destructive', label: 'Cancelada' },
   }[status] || { color: 'bg-muted-foreground', label: status };
 
@@ -57,7 +58,8 @@ export function AgendaAppointments({
   });
 
   const confirmadasCount = appointments.filter((a) => a.status === 'confirmada').length;
-  const pendientesCount = appointments.filter((a) => a.status === 'pendiente').length;
+  const asistidasCount = appointments.filter((a) => a.status === 'asistida').length;
+  const noAsistidasCount = appointments.filter((a) => a.status === 'no_asistida').length;
   const canceladasCount = appointments.filter((a) => a.status === 'cancelada').length;
 
   const formattedDate = format(selectedDate, "EEEE d 'de' MMMM", { locale: es });
@@ -77,10 +79,16 @@ export function AgendaAppointments({
                   <span className="text-green-500 font-medium">{confirmadasCount} confirmadas</span>
                 </>
               )}
-              {pendientesCount > 0 && (
+              {asistidasCount > 0 && (
                 <>
                   <span>•</span>
-                  <span className="text-yellow-500 font-medium">{pendientesCount} pendientes</span>
+                  <span className="text-emerald-600 font-medium">{asistidasCount} asistidas</span>
+                </>
+              )}
+              {noAsistidasCount > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-red-500 font-medium">{noAsistidasCount} no asistidas</span>
                 </>
               )}
               {canceladasCount > 0 && (
@@ -127,13 +135,13 @@ export function AgendaAppointments({
             </Button>
             <Button
               size="sm"
-              variant={filter === 'pendiente' ? 'default' : 'outline'}
-              onClick={() => setFilter('pendiente')}
+              variant={filter === 'asistida' ? 'default' : 'outline'}
+              onClick={() => setFilter('asistida')}
               className={cn(
-                filter === 'pendiente' ? 'bg-accent hover:bg-accent/90 h-8' : 'bg-transparent hover:bg-secondary h-8'
+                filter === 'asistida' ? 'bg-accent hover:bg-accent/90 h-8' : 'bg-transparent hover:bg-secondary h-8'
               )}
             >
-              Pendientes
+              Asistidas
             </Button>
           </div>
         </div>

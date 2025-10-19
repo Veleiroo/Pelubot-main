@@ -1,4 +1,4 @@
-export type AppointmentStatus = 'confirmada' | 'pendiente' | 'cancelada';
+export type AppointmentStatus = 'confirmada' | 'asistida' | 'no_asistida' | 'cancelada';
 
 export type Appointment = {
   id: string;
@@ -18,7 +18,8 @@ export type Appointment = {
 export type AgendaSummary = {
   total: number;
   confirmadas: number;
-  pendientes: number;
+  asistidas: number;
+  no_asistidas: number;
   canceladas: number;
 };
 

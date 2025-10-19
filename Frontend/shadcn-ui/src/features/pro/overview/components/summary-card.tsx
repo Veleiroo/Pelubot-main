@@ -39,15 +39,21 @@ export const SummaryCard = ({ summary, isLoading }: SummaryCardProps) => {
             </div>
             <div className="space-y-1.5 text-[11px] text-white/80">
               <div className="flex items-center justify-between">
-                <span>Confirmadas</span>
-                <span className="inline-flex items-center rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] font-medium text-emerald-200 ring-1 ring-emerald-400/30 tabular-nums">
+                <span>Pendientes</span>
+                <span className="inline-flex items-center rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-medium text-amber-200 ring-1 ring-amber-400/30 tabular-nums">
                   {summary.confirmadas}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Pendientes</span>
-                <span className="inline-flex items-center rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-medium text-amber-200 ring-1 ring-amber-400/30 tabular-nums">
-                  {summary.pendientes}
+                <span>Asistidas</span>
+                <span className="inline-flex items-center rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] font-medium text-emerald-200 ring-1 ring-emerald-400/30 tabular-nums">
+                  {summary.asistidas}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>No asistidas</span>
+                <span className="inline-flex items-center rounded-full bg-red-400/15 px-2 py-0.5 text-[10px] font-medium text-red-200 ring-1 ring-red-400/30 tabular-nums">
+                  {summary.no_asistidas}
                 </span>
               </div>
               <div className="flex items-center justify-between">

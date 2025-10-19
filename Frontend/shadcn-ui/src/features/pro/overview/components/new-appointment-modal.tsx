@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Calendar,
   Clock,
@@ -16,17 +17,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-
-type ServiceOption = {
-  name: string;
-  duration: string;
-};
+import { api, type Service } from '@/lib/api';
 
 export type NewAppointmentFormValues = {
   client: string;
+  clientPhone: string;
+  clientEmail?: string;
   date: string;
   time: string;
-  service: string;
+  serviceId: string;
+  serviceName: string;
+  durationMinutes: number;
   notes: string;
 };
 
@@ -57,16 +58,10 @@ const AVAILABLE_SLOTS = [
   '16:30',
   '17:00',
   '17:30',
-];
-
-const SERVICE_OPTIONS: ServiceOption[] = [
-  { name: 'Corte de cabello clásico', duration: '45 min' },
-  { name: 'Corte y peinado', duration: '60 min' },
-  { name: 'Coloración completa', duration: '120 min' },
-  { name: 'Coloración parcial', duration: '90 min' },
-  { name: 'Tratamiento hidratante', duration: '45 min' },
-  { name: 'Arreglo de barba premium', duration: '30 min' },
-  { name: 'Recogido evento', duration: '90 min' },
+  '18:00',
+  '18:30',
+  '19:00',
+  '19:30',
 ];
 
 const formatSuggestedDate = (value?: string | null) => {
@@ -86,19 +81,34 @@ export const NewAppointmentModal = ({
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [selectedClient, setSelectedClient] = useState('');
-  const [selectedService, setSelectedService] = useState('');
+  const [selectedClientPhone, setSelectedClientPhone] = useState('');
+  const [selectedClientEmail, setSelectedClientEmail] = useState('');
+  const [selectedServiceId, setSelectedServiceId] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Cargar servicios reales del backend
+  const { data: services = [], isLoading: isLoadingServices } = useQuery({
+    queryKey: ['services'],
+    queryFn: api.getServices,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+  });
+
+  const selectedService = services.find(s => s.id === selectedServiceId);
 
   const formattedSuggestedDate = useMemo(() => formatSuggestedDate(suggestedDate), [suggestedDate]);
 
   useEffect(() => {
     if (open) {
       setSelectedDate(formattedSuggestedDate);
-      setSelectedService(suggestedService ?? '');
+      setSelectedServiceId(suggestedService ?? '');
+      setSelectedClientPhone('');
+      setSelectedClientEmail('');
     } else {
       setSelectedTime('');
       setSelectedClient('');
-      setSelectedService('');
+      setSelectedClientPhone('');
+      setSelectedClientEmail('');
+      setSelectedServiceId('');
       setSelectedDate('');
       setNotes('');
     }
@@ -106,15 +116,20 @@ export const NewAppointmentModal = ({
 
   const handleClose = () => onOpenChange(false);
 
-  const isConfirmDisabled = !selectedClient || !selectedDate || !selectedTime || !selectedService;
+  const isConfirmDisabled = !selectedClient || !selectedClientPhone || !selectedDate || !selectedTime || !selectedServiceId || !selectedService;
 
   const handleConfirm = () => {
-    if (isConfirmDisabled) return;
+    if (isConfirmDisabled || !selectedService) return;
+    
     onConfirm?.({
       client: selectedClient,
+      clientPhone: selectedClientPhone,
+      clientEmail: selectedClientEmail || undefined,
       date: selectedDate,
       time: selectedTime,
-      service: selectedService,
+      serviceId: selectedServiceId,
+      serviceName: selectedService.name,
+      durationMinutes: selectedService.duration_min,
       notes,
     });
     onOpenChange(false);
@@ -134,21 +149,55 @@ export const NewAppointmentModal = ({
           <div className="space-y-2">
             <Label htmlFor="client" className="flex items-center gap-2 text-sm font-medium">
               <User className="h-4 w-4" aria-hidden="true" />
-              Cliente
+              Nombre del cliente *
             </Label>
             <Input
               id="client"
-              placeholder="Buscar cliente o añadir nuevo..."
+              placeholder="Nombre completo del cliente"
               value={selectedClient}
               onChange={(event) => setSelectedClient(event.target.value)}
               className="border-border bg-secondary/50"
+              required
             />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="client-phone" className="flex items-center gap-2 text-sm font-medium">
+                <Phone className="h-4 w-4" aria-hidden="true" />
+                Teléfono *
+              </Label>
+              <Input
+                id="client-phone"
+                type="tel"
+                placeholder="+34 600 000 000"
+                value={selectedClientPhone}
+                onChange={(event) => setSelectedClientPhone(event.target.value)}
+                className="border-border bg-secondary/50"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="client-email" className="flex items-center gap-2 text-sm font-medium">
+                <Mail className="h-4 w-4" aria-hidden="true" />
+                Email
+              </Label>
+              <Input
+                id="client-email"
+                type="email"
+                placeholder="cliente@ejemplo.com"
+                value={selectedClientEmail}
+                onChange={(event) => setSelectedClientEmail(event.target.value)}
+                className="border-border bg-secondary/50"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="date" className="flex items-center gap-2 text-sm font-medium">
               <Calendar className="h-4 w-4" aria-hidden="true" />
-              Fecha
+              Fecha *
             </Label>
             <Input
               id="date"
@@ -156,6 +205,7 @@ export const NewAppointmentModal = ({
               value={selectedDate}
               onChange={(event) => setSelectedDate(event.target.value)}
               className="border-border bg-secondary/50"
+              required
             />
           </div>
 
@@ -186,50 +236,43 @@ export const NewAppointmentModal = ({
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm font-medium">
               <Scissors className="h-4 w-4" aria-hidden="true" />
-              Servicio
+              Servicio *
             </Label>
-            <div className="space-y-2">
-              {SERVICE_OPTIONS.map((service) => (
-                <Card
-                  key={service.name}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedService(service.name)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      setSelectedService(service.name);
-                    }
-                  }}
-                  className={cn(
-                    'cursor-pointer border-border bg-secondary/50 p-3 transition-all hover:bg-secondary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-accent',
-                    selectedService === service.name && 'border-accent bg-accent/20'
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{service.name}</span>
-                    <span className="text-xs text-muted-foreground">{service.duration}</span>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          {selectedClient ? (
-            <Card className="border-border bg-secondary/50 p-4">
-              <h4 className="mb-3 text-sm font-semibold">Información de contacto</h4>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" aria-hidden="true" />
-                  <span>+34 600 000 000</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" aria-hidden="true" />
-                  <span>cliente@pelubot.mock</span>
-                </div>
+            {isLoadingServices ? (
+              <div className="text-sm text-muted-foreground">Cargando servicios...</div>
+            ) : services.length === 0 ? (
+              <div className="text-sm text-destructive">No hay servicios disponibles</div>
+            ) : (
+              <div className="space-y-2">
+                {services.map((service) => (
+                  <Card
+                    key={service.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedServiceId(service.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedServiceId(service.id);
+                      }
+                    }}
+                    className={cn(
+                      'cursor-pointer border-border bg-secondary/50 p-3 transition-all hover:bg-secondary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-accent',
+                      selectedServiceId === service.id && 'border-accent bg-accent/20'
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{service.name}</span>
+                        <span className="text-xs text-muted-foreground">{service.price_eur}€</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{service.duration_min} min</span>
+                    </div>
+                  </Card>
+                ))}
               </div>
-            </Card>
-          ) : null}
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes" className="text-sm font-medium">
@@ -251,7 +294,7 @@ export const NewAppointmentModal = ({
               disabled={isConfirmDisabled}
               onClick={handleConfirm}
             >
-              Confirmar cita
+              Crear cita
             </Button>
             <Button
               type="button"

@@ -10,26 +10,29 @@ import { formatDate } from '../lib/format';
 import type { AppointmentActionType, OverviewAppointmentEntry } from '../types';
 
 type AppointmentCardProps = {
-  appointment: OverviewAppointmentEntry | null;
+  appointment: OverviewAppointmentEntry | null | undefined;
   isLoading: boolean;
-  onAction: (action: AppointmentActionType, detail?: string) => void;
+  onAction: (action: AppointmentActionType, appointmentId?: string, detail?: string) => void;
 };
 
 const STATUS_BADGE_CLASSES: Record<OverviewAppointmentEntry['status'], string> = {
   confirmada: 'bg-accent/20 border border-accent/30 text-accent',
-  pendiente: 'bg-yellow-100 border border-yellow-200 text-yellow-700',
+  asistida: 'bg-emerald-100 border border-emerald-200 text-emerald-700',
+  no_asistida: 'bg-red-100 border border-red-200 text-red-700',
   cancelada: 'bg-rose-100 border border-rose-200 text-rose-600',
 };
 
 const STATUS_DOT_CLASSES: Record<OverviewAppointmentEntry['status'], string> = {
   confirmada: 'bg-accent',
-  pendiente: 'bg-yellow-500',
+  asistida: 'bg-emerald-600',
+  no_asistida: 'bg-red-500',
   cancelada: 'bg-destructive',
 };
 
 const STATUS_LABELS: Record<OverviewAppointmentEntry['status'], string> = {
   confirmada: 'Confirmada',
-  pendiente: 'Pendiente',
+  asistida: 'Asistida',
+  no_asistida: 'No asistida',
   cancelada: 'Cancelada',
 };
 
@@ -102,7 +105,7 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
           size="sm"
           className="flex-1 h-8 gap-1.5 bg-accent text-accent-foreground transition hover:bg-accent/90 text-xs"
           disabled={!appointment}
-          onClick={() => onAction('attended')}
+          onClick={() => onAction('attended', appointment?.id)}
         >
           <CheckCircle2 className="h-3.5 w-3.5" />
           Asistida
@@ -112,7 +115,7 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
           variant="outline"
           className="flex-1 h-8 text-xs transition hover:bg-secondary/80"
           disabled={!appointment}
-          onClick={() => onAction('no-show')}
+          onClick={() => onAction('no-show', appointment?.id)}
         >
           <XCircle className="h-3.5 w-3.5" />
           No asistió
@@ -122,7 +125,7 @@ export const AppointmentCard = ({ appointment, isLoading, onAction }: Appointmen
           variant="outline"
           className="h-8 text-xs transition hover:bg-secondary/80"
           disabled={!appointment}
-          onClick={() => onAction('reschedule')}
+          onClick={() => onAction('reschedule', appointment?.id)}
         >
           <CalendarClock className="h-3.5 w-3.5" />
           Mover

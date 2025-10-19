@@ -8,9 +8,9 @@ type DailySummaryProps = {
 };
 
 const SUMMARY_ITEMS: Array<{ key: keyof OverviewSummary; label: string; color: string }> = [
-  { key: 'confirmadas', label: 'Confirmadas', color: 'bg-green-500' },
-  { key: 'pendientes', label: 'Pendientes', color: 'bg-yellow-500' },
-  { key: 'canceladas', label: 'Canceladas', color: 'bg-destructive' },
+  { key: 'confirmadas', label: 'Pendientes', color: 'bg-amber-500' },
+  { key: 'asistidas', label: 'Asistidas', color: 'bg-emerald-600' },
+  { key: 'no_asistidas', label: 'No asistidas', color: 'bg-red-500' },
 ];
 
 export const DailySummary = ({ summary, isLoading }: DailySummaryProps) => (

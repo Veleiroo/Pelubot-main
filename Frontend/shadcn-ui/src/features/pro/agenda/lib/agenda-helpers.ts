@@ -32,13 +32,15 @@ export const summarizeAppointments = (appointments: Appointment[]): AgendaSummar
   const summary: AgendaSummary = {
     total: appointments.length,
     confirmadas: 0,
-    pendientes: 0,
+    asistidas: 0,
+    no_asistidas: 0,
     canceladas: 0,
   };
 
   for (const appointment of appointments) {
     if (appointment.status === 'confirmada') summary.confirmadas += 1;
-    else if (appointment.status === 'pendiente') summary.pendientes += 1;
+    else if (appointment.status === 'asistida') summary.asistidas += 1;
+    else if (appointment.status === 'no_asistida') summary.no_asistidas += 1;
     else if (appointment.status === 'cancelada') summary.canceladas += 1;
   }
 

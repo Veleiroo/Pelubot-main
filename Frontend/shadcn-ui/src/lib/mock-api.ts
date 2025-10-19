@@ -76,7 +76,7 @@ const makeOverviewMock = () => {
       end: plusMinutes(180).toISOString(),
       service_id: 'coloracion',
       service_name: 'Coloración parcial',
-      status: 'pendiente' as const,
+      status: 'confirmada' as const,
       client_name: 'Marta López',
     },
     {
@@ -85,7 +85,7 @@ const makeOverviewMock = () => {
       end: plusMinutes(300).toISOString(),
       service_id: 'tratamiento',
       service_name: 'Tratamiento hidratante',
-      status: 'confirmada' as const,
+      status: 'asistida' as const,
       client_name: 'Andrea Vidal',
     },
     {
@@ -94,15 +94,26 @@ const makeOverviewMock = () => {
       end: plusMinutes(420).toISOString(),
       service_id: 'recogido',
       service_name: 'Recogido evento',
-      status: 'cancelada' as const,
+      status: 'no_asistida' as const,
       client_name: 'Sara Núñez',
+      notes: 'No llegó a la cita',
+    },
+    {
+      id: 'apt-205',
+      start: plusMinutes(480).toISOString(),
+      end: plusMinutes(540).toISOString(),
+      service_id: 'corte_cabello',
+      service_name: 'Corte básico',
+      status: 'cancelada' as const,
+      client_name: 'Isabel Ruiz',
     },
   ];
 
   const summary = {
     total: appointments.length,
     confirmadas: appointments.filter((a) => a.status === 'confirmada').length,
-    pendientes: appointments.filter((a) => a.status === 'pendiente').length,
+    asistidas: appointments.filter((a) => a.status === 'asistida').length,
+    no_asistidas: appointments.filter((a) => a.status === 'no_asistida').length,
     canceladas: appointments.filter((a) => a.status === 'cancelada').length,
   };
 

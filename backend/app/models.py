@@ -115,6 +115,7 @@ class StylistReservationOut(BaseModel):
     professional_id: str
     start: datetime
     end: datetime
+    status: ReservationStatus = "confirmada"
     customer_name: Optional[str] = None
     customer_email: Optional[EmailStr] = None
     customer_phone: Optional[str] = None
@@ -130,7 +131,8 @@ class StylistReservationsOut(BaseModel):
 class StylistOverviewSummary(BaseModel):
     total: int
     confirmadas: int
-    pendientes: int
+    asistidas: int
+    no_asistidas: int
     canceladas: int
 
 
@@ -140,7 +142,7 @@ class StylistOverviewAppointment(BaseModel):
     end: Optional[datetime] = None
     service_id: Optional[str] = None
     service_name: Optional[str] = None
-    status: Literal["confirmada", "pendiente", "cancelada"] = "confirmada"
+    status: ReservationStatus = "confirmada"
     client_name: Optional[str] = None
     client_email: Optional[EmailStr] = None
     client_phone: Optional[str] = None

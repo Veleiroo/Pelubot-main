@@ -18,7 +18,8 @@ type TodayAppointmentsProps = {
 
 const STATUS_LABEL: Record<OverviewAppointmentEntry['status'], { label: string; dot: string; text: string }> = {
   confirmada: { label: 'Confirmada', dot: 'bg-green-500', text: 'text-green-500' },
-  pendiente: { label: 'Pendiente', dot: 'bg-yellow-500', text: 'text-yellow-500' },
+  asistida: { label: 'Asistida', dot: 'bg-emerald-600', text: 'text-emerald-600' },
+  no_asistida: { label: 'No asistida', dot: 'bg-red-500', text: 'text-red-500' },
   cancelada: { label: 'Cancelada', dot: 'bg-destructive', text: 'text-destructive' },
 };
 
@@ -33,7 +34,8 @@ export const TodayAppointments = ({
   const counts = useMemo(
     () => ({
       confirmadas: summary.confirmadas,
-      pendientes: summary.pendientes,
+      asistidas: summary.asistidas,
+      no_asistidas: summary.no_asistidas,
       canceladas: summary.canceladas,
     }),
     [summary]
@@ -49,15 +51,25 @@ export const TodayAppointments = ({
               {appointments.length} {appointments.length === 1 ? 'cita' : 'citas'}
             </span>
             <span>•</span>
-            <span className="text-green-500">{counts.confirmadas} confirmadas</span>
-            <span>•</span>
-            <span className="text-yellow-500">{counts.pendientes} pendientes</span>
-            {counts.canceladas ? (
+            <span className="text-amber-500">{counts.confirmadas} pendientes</span>
+            {counts.asistidas > 0 && (
+              <>
+                <span>•</span>
+                <span className="text-emerald-600">{counts.asistidas} asistidas</span>
+              </>
+            )}
+            {counts.no_asistidas > 0 && (
+              <>
+                <span>•</span>
+                <span className="text-red-500">{counts.no_asistidas} no asistidas</span>
+              </>
+            )}
+            {counts.canceladas > 0 && (
               <>
                 <span>•</span>
                 <span className="text-destructive">{counts.canceladas} canceladas</span>
               </>
-            ) : null}
+            )}
           </div>
         </div>
         <Button size="sm" onClick={onCreateAppointment} className="h-8 text-xs">

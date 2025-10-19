@@ -7,7 +7,8 @@ import type {
 export type OverviewSummary = ProOverview['summary'] | {
   total: number;
   confirmadas: number;
-  pendientes: number;
+  asistidas: number;
+  no_asistidas: number;
   canceladas: number;
 };
 

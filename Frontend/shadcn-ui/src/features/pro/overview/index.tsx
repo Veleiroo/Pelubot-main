@@ -9,6 +9,7 @@ import { DailySummary } from './components/daily-summary';
 import { NewAppointmentModal, type NewAppointmentFormValues } from './components/new-appointment-modal';
 import { TodayAppointments } from './components/today-appointments';
 import { useOverviewData } from './hooks/useOverviewData';
+import { useOverviewActions } from './hooks/useOverviewActions';
 import type { AppointmentActionType } from './types';
 
 export const ProsOverviewView = () => {
@@ -26,19 +27,49 @@ export const ProsOverviewView = () => {
     overviewErrorMessage,
   } = useOverviewData(Boolean(stylist));
 
+  const { createAppointment, markAttended, markNoShow, isCreating, isMarkingAttended, isMarkingNoShow } = useOverviewActions({
+    professionalId: stylist?.id,
+  });
+
   const handleAppointmentAction = useCallback(
-    (action: AppointmentActionType, detail?: string) => {
-      const labels: Record<AppointmentActionType, string> = {
-        attended: 'Marcada como asistida',
-        'no-show': 'Marcada como no asistida',
-        reschedule: 'Abriremos la reprogramación pronto',
-      };
-      toast({
-        title: labels[action],
-        description: detail ?? 'Prototipo temporal: los cambios se guardarán en una próxima iteración.',
-      });
+    async (action: AppointmentActionType, appointmentId?: string, detail?: string) => {
+      if (!appointmentId) {
+        toast({
+          title: 'Error',
+          description: 'No se pudo identificar la cita',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      try {
+        if (action === 'attended') {
+          await markAttended(appointmentId);
+          toast({
+            title: 'Cita marcada como asistida',
+            description: 'El cliente ha sido marcado como atendido',
+          });
+        } else if (action === 'no-show') {
+          await markNoShow({ appointmentId, reason: detail });
+          toast({
+            title: 'Cita marcada como no asistida',
+            description: detail ? `Motivo: ${detail}` : 'El cliente no se presentó a la cita',
+          });
+        } else if (action === 'reschedule') {
+          toast({
+            title: 'Reprogramación',
+            description: 'Abriremos la reprogramación pronto',
+          });
+        }
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'No se pudo completar la acción',
+          variant: 'destructive',
+        });
+      }
     },
-    [toast]
+    [markAttended, markNoShow, toast]
   );
 
   const handleCreateAppointment = useCallback(() => {
@@ -50,22 +81,48 @@ export const ProsOverviewView = () => {
   }, []);
 
   const handleConfirmNewAppointment = useCallback(
-    ({ client, date, time, service }: NewAppointmentFormValues) => {
-      const schedule = new Date(`${date}T${time}`);
-      const dateLabel = Number.isNaN(schedule.getTime())
-        ? `${date} a las ${time} h`
-        : `${new Intl.DateTimeFormat('es-ES', {
+    async ({ client, clientPhone, clientEmail, date, time, serviceId, serviceName, durationMinutes, notes }: NewAppointmentFormValues) => {
+      try {
+        // Construir fecha/hora ISO
+        const startDate = new Date(`${date}T${time}:00`);
+        if (Number.isNaN(startDate.getTime())) {
+          throw new Error('Fecha u hora inválida');
+        }
+
+        const startISO = startDate.toISOString();
+        const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+        const endISO = endDate.toISOString();
+
+        await createAppointment({
+          serviceId,
+          serviceName,
+          startISO,
+          endISO,
+          clientName: client,
+          clientPhone,
+          clientEmail,
+          notes: notes || undefined,
+        });
+
+        setIsNewAppointmentOpen(false); // Cerrar el modal tras éxito
+        
+        toast({
+          title: 'Cita creada exitosamente',
+          description: `Cita para ${client} el ${new Intl.DateTimeFormat('es-ES', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
-          }).format(schedule)} a las ${time} h`;
-
-      toast({
-        title: 'Cita creada',
-        description: `Registraremos la cita para ${client} (${service}) el ${dateLabel}.`,
-      });
+          }).format(startDate)} a las ${time} h`,
+        });
+      } catch (error) {
+        toast({
+          title: 'Error al crear la cita',
+          description: error instanceof Error ? error.message : 'No se pudo crear la cita',
+          variant: 'destructive',
+        });
+      }
     },
-    [toast]
+    [createAppointment, toast]
   );
 
   if (!stylist) {

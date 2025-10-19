@@ -11,11 +11,12 @@ const buildFallbackSummary = (appointments: OverviewAppointmentEntry[]): Overvie
     (acc, appointment) => {
       acc.total += 1;
       if (appointment.status === 'confirmada') acc.confirmadas += 1;
-      if (appointment.status === 'pendiente') acc.pendientes += 1;
+      if (appointment.status === 'asistida') acc.asistidas += 1;
+      if (appointment.status === 'no_asistida') acc.no_asistidas += 1;
       if (appointment.status === 'cancelada') acc.canceladas += 1;
       return acc;
     },
-    { total: 0, confirmadas: 0, pendientes: 0, canceladas: 0 }
+    { total: 0, confirmadas: 0, asistidas: 0, no_asistidas: 0, canceladas: 0 }
   );
 };
 

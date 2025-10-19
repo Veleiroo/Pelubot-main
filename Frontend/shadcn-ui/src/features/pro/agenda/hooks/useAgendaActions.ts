@@ -66,7 +66,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         professional_id: professionalId,
         start: startIso,
         customer_name: payload.clientName,
-        ...(payload.clientPhone ? { customer_phone: payload.clientPhone } : {}),
+        customer_phone: payload.clientPhone || '',
         ...(payload.clientEmail ? { customer_email: payload.clientEmail } : {}),
         ...(payload.notes ? { notes: payload.notes } : {}),
       });
@@ -78,6 +78,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         professional_id: professionalId,
         start: startIso,
         end: endIso,
+        status: 'confirmada',
         customer_name: payload.clientName,
         customer_phone: payload.clientPhone,
         customer_email: payload.clientEmail,
@@ -138,7 +139,45 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
     onSuccess: ({ reservationId }) => {
       queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
         if (!previous) return previous;
-        return { reservations: removeReservation(previous.reservations, reservationId) };
+        // Actualizar el status a 'cancelada' en lugar de eliminar
+        const updated = previous.reservations.map((r) =>
+          r.id === reservationId ? { ...r, status: 'cancelada' as const } : r
+        );
+        return { reservations: updated };
+      });
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+    },
+  });
+
+  const markAttendedMutation = useMutation({
+    mutationFn: async (reservationId: string) => {
+      const response = await api.prosMarkAttended(reservationId);
+      return { response, reservationId };
+    },
+    onSuccess: ({ reservationId }) => {
+      queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
+        if (!previous) return previous;
+        const updated = previous.reservations.map((r) =>
+          r.id === reservationId ? { ...r, status: 'asistida' as const } : r
+        );
+        return { reservations: updated };
+      });
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+    },
+  });
+
+  const markNoShowMutation = useMutation({
+    mutationFn: async ({ reservationId, reason }: { reservationId: string; reason?: string }) => {
+      const response = await api.prosMarkNoShow(reservationId, reason);
+      return { response, reservationId };
+    },
+    onSuccess: ({ reservationId }) => {
+      queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
+        if (!previous) return previous;
+        const updated = previous.reservations.map((r) =>
+          r.id === reservationId ? { ...r, status: 'no_asistida' as const } : r
+        );
+        return { reservations: updated };
       });
       void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
     },
@@ -148,8 +187,12 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
     createAppointment: createMutation.mutateAsync,
     rescheduleAppointment: rescheduleMutation.mutateAsync,
     cancelAppointment: cancelMutation.mutateAsync,
+    markAttended: markAttendedMutation.mutateAsync,
+    markNoShow: markNoShowMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isRescheduling: rescheduleMutation.isPending,
     isCancelling: cancelMutation.isPending,
+    isMarkingAttended: markAttendedMutation.isPending,
+    isMarkingNoShow: markNoShowMutation.isPending,
   };
 };

@@ -1,6 +1,8 @@
 """Endpoints de autenticación y sesión para el portal de estilistas."""
 from __future__ import annotations
 
+import logging
+import uuid
 from datetime import datetime, timezone, timedelta, date
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Body
@@ -23,6 +25,9 @@ from app.models import (
     StylistReservationsOut,
     StylistReservationOut,
     ReservationDB,
+    ReservationIn,
+    ReservationCreateOut,
+    Reservation,
     RescheduleIn,
     RescheduleOut,
     StylistRescheduleIn,
@@ -36,12 +41,20 @@ from app.models import (
     StylistStatsRetentionBucket,
     StylistStatsInsight,
 )
-from app.services.logic import find_reservation, cancel_reservation, apply_reschedule
+from app.services.logic import (
+    find_reservation,
+    cancel_reservation,
+    apply_reschedule,
+    create_gcal_reservation,
+    get_calendar_for_professional,
+    find_available_slots,
+)
 from app.utils.date import now_tz, TZ, validate_target_dt
 from app.utils.security import needs_rehash, verify_password, hash_password
-from app.core.metrics import RESERVATIONS_CANCELLED, RESERVATIONS_RESCHEDULED
+from app.core.metrics import RESERVATIONS_CANCELLED, RESERVATIONS_RESCHEDULED, RESERVATIONS_CREATED
 from app.data import SERVICE_BY_ID
 
+logger = logging.getLogger("pelubot.api.pro_portal")
 router = APIRouter(prefix="/pros", tags=["pros"])
 
 
@@ -192,6 +205,7 @@ def stylist_reservations(
                 professional_id=row.professional_id,
                 start=row.start,
                 end=row.end,
+                status=getattr(row, "status", "confirmada"),
                 customer_name=row.customer_name,
                 customer_email=row.customer_email,
                 customer_phone=row.customer_phone,
@@ -235,7 +249,7 @@ def stylist_overview(
         return dt.astimezone(TZ)
 
     appointments: list[StylistOverviewAppointment] = []
-    counts = {"confirmada": 0, "pendiente": 0, "cancelada": 0}
+    counts = {"confirmada": 0, "asistida": 0, "no_asistida": 0, "cancelada": 0}
     upcoming: StylistOverviewAppointment | None = None
 
     last_visits: dict[str, date] = {}
@@ -272,8 +286,9 @@ def stylist_overview(
         if start_local is None:
             continue
         end_local = _to_local(row.end)
-        status = "confirmada" if start_local <= now else "pendiente"
-        counts[status] += 1
+        # Usar el status de la DB directamente
+        status = getattr(row, "status", "confirmada")
+        counts[status] = counts.get(status, 0) + 1
         service = SERVICE_BY_ID.get(row.service_id)
         appointment = StylistOverviewAppointment(
             id=row.id,
@@ -296,7 +311,8 @@ def stylist_overview(
     summary = StylistOverviewSummary(
         total=len(appointments),
         confirmadas=counts["confirmada"],
-        pendientes=counts["pendiente"],
+        asistidas=counts["asistida"],
+        no_asistidas=counts["no_asistida"],
         canceladas=counts["cancelada"],
     )
 
@@ -584,6 +600,158 @@ def stylist_stats(
     )
 
 
+@router.post("/reservations", response_model=ReservationCreateOut)
+def stylist_create_reservation(
+    payload: ReservationIn,
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+) -> ReservationCreateOut:
+    """Permite a un profesional crear una reserva directamente desde su portal."""
+    
+    # Verificar que el profesional está creando la cita para sí mismo
+    if payload.professional_id != stylist.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo puedes crear citas para ti mismo"
+        )
+    
+    # Verificar que el servicio existe
+    if payload.service_id not in SERVICE_BY_ID:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servicio no encontrado")
+    
+    # Verificar que el profesional ofrece ese servicio
+    if payload.service_id not in (stylist.services or []):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No ofreces este servicio"
+        )
+    
+    # Validar la fecha/hora
+    start = payload.start
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=TZ)
+    
+    try:
+        validate_target_dt(start)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+    service = SERVICE_BY_ID[payload.service_id]
+    end = start + timedelta(minutes=service.duration_min)
+    customer_name = payload.customer_name.strip()
+    customer_phone = payload.customer_phone.strip()
+    customer_email = str(payload.customer_email).strip() if payload.customer_email else None
+    notes = payload.notes.strip() if payload.notes else None
+    
+    if not customer_phone:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Se requiere un teléfono de contacto")
+    
+    # Recalcular disponibilidad garantiza que el slot sigue libre
+    avail = find_available_slots(session, payload.service_id, start.date(), stylist.id)
+    
+    def _naive(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt
+        return dt.replace(tzinfo=None)
+    
+    avail_naive = [_naive(dt) for dt in avail]
+    if _naive(start) not in avail_naive:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ese inicio no está disponible (horario o solapado). Consulta /slots."
+        )
+    
+    res_id = str(uuid.uuid4())
+    cal_id = get_calendar_for_professional(stylist.id)
+    gcal_id = None
+
+    # Bloquear la tabla para evitar condiciones de carrera en SQLite
+    try:
+        if str(engine.url).startswith("sqlite"):
+            try:
+                session.exec(_sql_text("BEGIN IMMEDIATE"))
+            except Exception:
+                pass
+        
+        # Verificar que no haya overlaps
+        q = select(ReservationDB).where(
+            ReservationDB.professional_id == stylist.id,
+            ReservationDB.start < end,
+            ReservationDB.end > start,
+            ReservationDB.status != "cancelada",
+        )
+        if session.exec(q).first():
+            session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ya tienes una cita en esa hora."
+            )
+        
+        row = ReservationDB(
+            id=res_id,
+            service_id=payload.service_id,
+            professional_id=stylist.id,
+            start=start,
+            end=end,
+            google_event_id=None,
+            google_calendar_id=cal_id,
+            customer_name=customer_name,
+            customer_email=customer_email,
+            customer_phone=customer_phone,
+            notes=notes,
+        )
+        session.add(row)
+        session.commit()
+        
+        try:
+            RESERVATIONS_CREATED.inc()
+        except Exception:
+            pass
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.exception("Error creando reserva desde portal pro")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No se pudo guardar la reserva: {e}"
+        )
+
+    # Sincronizar con Google Calendar (opcional, no falla si no funciona)
+    try:
+        gcal_event = create_gcal_reservation(
+            Reservation(
+                id=res_id,
+                service_id=payload.service_id,
+                professional_id=stylist.id,
+                start=start,
+                end=end,
+                customer_name=customer_name,
+                customer_email=customer_email,
+                customer_phone=customer_phone,
+                notes=notes,
+            ),
+            calendar_id=cal_id,
+        )
+        gcal_id = gcal_event.get("id")
+        r_upd = session.get(ReservationDB, res_id)
+        if r_upd:
+            r_upd.google_event_id = gcal_id
+            r_upd.google_calendar_id = cal_id
+            session.add(r_upd)
+            session.commit()
+        logger.info("Evento Google Calendar creado: %s", gcal_id)
+    except Exception as e:
+        logger.warning("No se pudo crear evento en Google Calendar: %s", e)
+    
+    return ReservationCreateOut(
+        ok=True,
+        reservation_id=res_id,
+        message=f"Reserva {res_id} creada. Cliente: {customer_name}, {service.name} el {start.strftime('%d/%m/%Y %H:%M')}",
+        google_event_id=gcal_id,
+    )
+
+
 @router.post("/reservations/{reservation_id}/cancel", response_model=ActionResult)
 def stylist_cancel_reservation(
     reservation_id: str,
@@ -691,3 +859,56 @@ def stylist_reschedule_reservation(
         start=updated.start.isoformat() if hasattr(updated.start, "isoformat") else None,
         end=updated.end.isoformat() if hasattr(updated.end, "isoformat") else None,
     )
+
+
+@router.post("/reservations/{reservation_id}/mark-attended", response_model=ActionResult)
+def stylist_mark_attended(
+    reservation_id: str,
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+) -> ActionResult:
+    """Marca una reserva como asistida (el cliente vino y fue atendido)."""
+    reservation = find_reservation(session, reservation_id)
+    if not reservation or reservation.professional_id != stylist.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reserva no encontrada")
+    
+    # Sin restricciones: el profesional puede marcar cualquier cita como asistida
+    # (incluso canceladas, por si hubo un error)
+    reservation.status = "asistida"
+    session.add(reservation)
+    session.commit()
+    
+    return ActionResult(ok=True, message=f"Reserva {reservation_id} marcada como asistida.")
+
+
+@router.post("/reservations/{reservation_id}/mark-no-show", response_model=ActionResult)
+def stylist_mark_no_show(
+    reservation_id: str,
+    reason: str = Body(None, embed=True),
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+) -> ActionResult:
+    """Marca una reserva como no asistida (el cliente no se presentó - no-show)."""
+    reservation = find_reservation(session, reservation_id)
+    if not reservation or reservation.professional_id != stylist.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reserva no encontrada")
+    
+    # Sin restricciones: el profesional decide cuándo marcar no-show
+    reservation.status = "no_asistida"
+    
+    # Si se proporciona una razón, añadirla a las notas
+    if reason:
+        existing_notes = reservation.notes or ""
+        timestamp = now.strftime("%Y-%m-%d %H:%M")
+        no_show_note = f"\n[{timestamp}] No-show: {reason.strip()}"
+        reservation.notes = (existing_notes + no_show_note).strip()
+    
+    session.add(reservation)
+    session.commit()
+    
+    message = f"Reserva {reservation_id} marcada como no asistida."
+    if reason:
+        message += f" Motivo registrado: {reason}"
+    
+    return ActionResult(ok=True, message=message)
+

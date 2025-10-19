@@ -29,10 +29,15 @@ def get_calendar_for_professional(pro_id: str) -> str:
     return PRO_CALENDAR.get(pro_id) or DEFAULT_CALENDAR_ID
 
 def _reservations_for_prof_on_date(session: Session, pro_id: str, on_date: date) -> List[ReservationDB]:
-    """Reservas del profesional que solapan el día."""
+    """Reservas activas del profesional que solapan el día (excluye canceladas)."""
     day_start = datetime.combine(on_date, time(0, 0))
     day_end = datetime.combine(on_date, time(23, 59, 59))
-    stmt = select(ReservationDB).where(ReservationDB.professional_id == pro_id, ReservationDB.start < day_end, ReservationDB.end > day_start)
+    stmt = select(ReservationDB).where(
+        ReservationDB.professional_id == pro_id,
+        ReservationDB.start < day_end,
+        ReservationDB.end > day_start,
+        ReservationDB.status != "cancelada"
+    )
     return list(session.exec(stmt))
 
 def find_reservation(session: Session, reservation_id: str) -> Optional[ReservationDB]:
@@ -40,11 +45,12 @@ def find_reservation(session: Session, reservation_id: str) -> Optional[Reservat
     return session.get(ReservationDB, reservation_id)
 
 def cancel_reservation(session: Session, reservation_id: str) -> bool:
-    """Elimina la reserva y confirma si existía."""
+    """Marca la reserva como cancelada en lugar de eliminarla (para mantener historial)."""
     r = session.get(ReservationDB, reservation_id)
     if not r:
         return False
-    session.delete(r)
+    r.status = "cancelada"
+    session.add(r)
     session.commit()
     return True
 
@@ -278,6 +284,7 @@ def apply_reschedule(session: Session, payload: RescheduleIn) -> Tuple[bool, str
             ReservationDB.professional_id == new_pro,
             ReservationDB.start < datetime.combine(start_dt.date(), time(23, 59, 59)),
             ReservationDB.end > datetime.combine(start_dt.date(), time(0, 0)),
+            ReservationDB.status != "cancelada",
         )
     ).all()
     for x in rows_same_day:
@@ -299,6 +306,7 @@ def apply_reschedule(session: Session, payload: RescheduleIn) -> Tuple[bool, str
         ReservationDB.id != r.id,
         ReservationDB.start < end_aw,
         ReservationDB.end > start_aw,
+        ReservationDB.status != "cancelada",
     )
     if session.exec(q).first():
         return False, f"El profesional {PRO_BY_ID[new_pro].name} ya tiene esa hora ocupada.", None

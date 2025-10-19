@@ -6,18 +6,13 @@ import { api, ApiError, type ProReservationsResponse, type ProReservation } from
 
 import type { Appointment, AppointmentStatus } from '../../shared/types';
 
-const toAppointmentStatus = (start: Date, now: Date): AppointmentStatus => {
-  if (start.getTime() <= now.getTime()) return 'confirmada';
-  return 'pendiente';
-};
-
-const mapReservation = (reservation: ProReservation, now: Date): Appointment | null => {
+const mapReservation = (reservation: ProReservation): Appointment | null => {
   if (!reservation.start) return null;
   const start = parseISO(reservation.start);
   if (!isValid(start)) return null;
 
   const end = reservation.end ? parseISO(reservation.end) : null;
-  const status = toAppointmentStatus(start, now);
+  const status = reservation.status as AppointmentStatus;
   const client = reservation.customer_name?.trim() || 'Cliente por confirmar';
   const service = reservation.service_name?.trim() || reservation.service_id || 'Servicio por confirmar';
   const durationMinutes = end && isValid(end) ? Math.max(0, differenceInMinutes(end, start)) : undefined;
@@ -60,9 +55,8 @@ export const useAgendaData = (
   const appointments = useMemo<Appointment[]>(() => {
     const payload = reservationsQuery.data;
     if (!payload?.reservations?.length) return [];
-    const now = new Date();
     const mapped = payload.reservations
-      .map((reservation) => mapReservation(reservation, now))
+      .map((reservation) => mapReservation(reservation))
       .filter((appointment): appointment is Appointment => Boolean(appointment));
     return mapped;
   }, [reservationsQuery.data]);

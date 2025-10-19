@@ -22,8 +22,16 @@ VITE_ENABLE_DEBUG=true
 # VITE_API_KEY=tu_api_key
 # Opcional: fuerza peticiones a Google Calendar desde el frontend
 # VITE_USE_GCAL=true
+# Opcional: muestra páginas futuras (Clientes/Estadísticas) para demos
+VITE_ENABLE_FUTURE_FEATURES=true
 ```
 El backend controla si las reservas son públicas mediante la variable `PUBLIC_RESERVATIONS_ENABLED`. No se envía API key en el bundle.
+
+### Páginas Futuras (Demo Mode)
+Para mostrar las páginas de **Clientes** y **Estadísticas** en modo demostración (ideal para presentaciones a clientes):
+- Activar: `VITE_ENABLE_FUTURE_FEATURES=true`
+- Desactivar: Comentar o eliminar la variable (recomendado en producción)
+- Ver documentación completa en [`FUTURE_FEATURES.md`](./FUTURE_FEATURES.md)
 
 ## Scripts
 ```

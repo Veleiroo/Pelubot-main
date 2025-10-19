@@ -35,7 +35,8 @@ const API_KEY = String(import.meta.env?.VITE_API_KEY ?? '').trim();
 
 export type Service = { id: string; name: string; duration_min: number; price_eur: number };
 export type Professional = { id: string; name: string; services?: string[] };
-export type ProAppointmentStatus = 'confirmada' | 'pendiente' | 'cancelada';
+export type ReservationStatus = 'confirmada' | 'asistida' | 'no_asistida' | 'cancelada';
+export type ProAppointmentStatus = 'confirmada' | 'asistida' | 'no_asistida' | 'cancelada';
 export type ProOverviewAppointment = {
   id: string;
   start: string;
@@ -52,7 +53,8 @@ export type ProOverviewAppointment = {
 export type ProOverviewSummary = {
   total: number;
   confirmadas: number;
-  pendientes: number;
+  asistidas: number;
+  no_asistidas: number;
   canceladas: number;
 };
 export type ProOverview = {
@@ -70,6 +72,7 @@ export type ProReservation = {
   professional_id: string;
   start: string;
   end: string;
+  status: ReservationStatus;
   customer_name?: string | null;
   customer_email?: string | null;
   customer_phone?: string | null;
@@ -379,6 +382,13 @@ export const api = {
   prosMe: () => http<{ stylist: StylistPublic; session_expires_at: string }>("/pros/me"),
 
   prosOverview: () => http<ProOverview>("/pros/overview"),
+  
+  prosCreateReservation: (payload: ReservationCreatePayload) =>
+    http<ReservationCreateOut>("/pros/reservations", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  
   prosReservations: (params?: { daysAhead?: number; includePastMinutes?: number }) => {
     const search = new URLSearchParams();
     if (typeof params?.daysAhead === 'number') {
@@ -401,6 +411,17 @@ export const api = {
     http<ProsRescheduleResponse>(`/pros/reservations/${reservationId}/reschedule`, {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+
+  prosMarkAttended: (reservationId: string) =>
+    http<ActionResult>(`/pros/reservations/${reservationId}/mark-attended`, {
+      method: "POST",
+    }),
+
+  prosMarkNoShow: (reservationId: string, reason?: string) =>
+    http<ActionResult>(`/pros/reservations/${reservationId}/mark-no-show`, {
+      method: "POST",
+      body: reason ? JSON.stringify({ reason }) : undefined,
     }),
 
   prosClients: () => http<ProClientsResponse>("/pros/clients"),

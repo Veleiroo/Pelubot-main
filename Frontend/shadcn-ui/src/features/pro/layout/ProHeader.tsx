@@ -3,13 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, LogOut, Scissors } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useProSession } from '@/store/pro';
-
-const navItems = [
-  { href: '/pros', label: 'Resumen' },
-  { href: '/pros/agenda', label: 'Agenda' },
-  { href: '/pros/clientes', label: 'Clientes' },
-  { href: '/pros/estadisticas', label: 'Estadísticas' },
-];
+import { PROS_NAV_ITEMS } from './nav';
 
 export function ProHeader() {
   const location = useLocation();
@@ -41,18 +35,20 @@ export function ProHeader() {
 
           {/* Navigation - centered */}
           <nav className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
-            {navItems.map((item) => (
+            {PROS_NAV_ITEMS.map((item) => (
               <Link
-                key={item.href}
-                to={item.href}
+                key={item.to}
+                to={item.to}
                 className={cn(
                   'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                  location.pathname === item.href
+                  location.pathname === item.to
                     ? 'bg-secondary text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50',
+                  item.soon && 'opacity-60'
                 )}
               >
                 {item.label}
+                {item.soon && <span className="ml-1.5 text-xs">(Próximamente)</span>}
               </Link>
             ))}
           </nav>
