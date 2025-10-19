@@ -482,7 +482,7 @@ const AgendaCalendarPanel = ({
               'after:absolute after:bottom-2 after:left-1/2 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-primary/80 after:content-[""]',
             today: 'border border-primary/50 text-primary',
             selected:
-              'bg-primary text-primary-foreground shadow-[0_8px_20px_rgba(47,129,237,0.35)] hover:bg-primary rounded-full',
+              'rounded-full bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
             outside: 'pointer-events-none text-muted-foreground/40',
             disabled: 'pointer-events-none opacity-40',
           }}
@@ -500,9 +500,9 @@ const AgendaCalendarPanel = ({
             week: 'grid grid-cols-7 gap-1',
             day: 'flex items-center justify-center',
             day_button:
-              'relative inline-flex h-11 w-11 items-center justify-center rounded-full text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/20 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+              'relative inline-flex h-11 w-11 items-center justify-center rounded-full text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
             day_selected:
-              'bg-primary text-primary-foreground font-semibold shadow-[0_8px_20px_rgba(47,129,237,0.35)] hover:bg-primary rounded-full',
+              'rounded-full bg-primary text-primary-foreground font-semibold hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
             day_today: 'border border-primary/50 text-primary',
             day_outside: 'pointer-events-none text-muted-foreground/40',
             day_disabled: 'pointer-events-none opacity-40',
