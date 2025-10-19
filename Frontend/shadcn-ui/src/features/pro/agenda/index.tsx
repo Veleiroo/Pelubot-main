@@ -43,27 +43,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { api, ApiError, type Service } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useProSession } from '@/store/pro';
 import { AppointmentStatusPill } from '../shared/components/appointment-status-pill';
+import { NewAppointmentModal, type NewAppointmentFormValues } from '../overview/components/new-appointment-modal';
 import type { AgendaSummary, Appointment } from '../shared/types';
 import { useAgendaActions } from './hooks/useAgendaActions';
 import { useAgendaData } from './hooks/useAgendaData';
 import { useAgendaState } from './hooks/useAgendaState';
-
-type CreateFormValues = {
-  serviceId: string;
-  serviceName: string;
-  durationMinutes: number;
-  time: string;
-  clientName: string;
-  clientPhone?: string;
-  clientEmail?: string;
-  notes?: string;
-};
 
 type RescheduleFormValues = {
   newTime: string;
@@ -116,7 +105,7 @@ export const ProsAgendaView = () => {
 
   const stylist = session?.stylist;
 
-  const { data: servicesData } = useQuery({
+  const { data: servicesData, isLoading: isLoadingServices } = useQuery({
     queryKey: ['services'],
     queryFn: api.getServices,
     staleTime: 300_000,
@@ -152,13 +141,10 @@ export const ProsAgendaView = () => {
     return servicesData.filter((service) => allowed.includes(service.id));
   }, [servicesData, stylist?.services]);
 
-  const defaultServiceId = availableServices[0]?.id ?? null;
-
   const {
     createAppointment,
     rescheduleAppointment,
     cancelAppointment,
-    isCreating,
     isRescheduling,
     isCancelling,
   } = useAgendaActions({ professionalId: stylist?.id });
@@ -191,7 +177,7 @@ export const ProsAgendaView = () => {
   };
 
   const handleCreateClick = () => {
-    if (availableServices.length === 0) {
+    if (!isLoadingServices && availableServices.length === 0) {
       toast({
         title: 'No hay servicios configurados',
         description: 'Configura al menos un servicio para poder crear nuevas citas.',
@@ -202,18 +188,30 @@ export const ProsAgendaView = () => {
     setCreateOpen(true);
   };
 
-  const handleCreateSubmit = async (values: CreateFormValues) => {
-    const targetDate = selectedDate ?? new Date();
+  const handleCreateConfirm = async (values: NewAppointmentFormValues) => {
+    const targetDate = (() => {
+      if (values.date) {
+        const parsed = new Date(`${values.date}T00:00:00`);
+        if (!Number.isNaN(parsed.getTime())) return parsed;
+      }
+      return selectedDate ?? new Date();
+    })();
     try {
       await createAppointment({
         date: targetDate,
-        ...values,
+        time: values.time,
+        serviceId: values.serviceId,
+        serviceName: values.serviceName,
+        durationMinutes: values.durationMinutes,
+        clientName: values.client,
+        clientPhone: values.clientPhone,
+        clientEmail: values.clientEmail,
+        notes: values.notes,
       });
       toast({
         title: 'Cita creada',
-        description: `${values.clientName} tiene cita el ${formatDialogDate(targetDate)} a las ${values.time} h.`,
+        description: `${values.client} tiene cita el ${formatDialogDate(targetDate)} a las ${values.time} h.`,
       });
-      setCreateOpen(false);
     } catch (error) {
       const message = toErrorMessage(error, 'No se pudo crear la cita. Inténtalo de nuevo.');
       toast({ title: 'No se pudo crear la cita', description: message, variant: 'destructive' });
@@ -353,15 +351,13 @@ export const ProsAgendaView = () => {
         </section>
       </div>
 
-      <CreateAppointmentDialog
+      <NewAppointmentModal
         open={createOpen}
         onOpenChange={setCreateOpen}
-        date={selectedDate ?? new Date()}
+        suggestedDate={selectedDate ?? new Date()}
         services={availableServices}
-        defaultServiceId={defaultServiceId}
-        timeOptions={TIME_OPTIONS}
-        isSubmitting={isCreating}
-        onSubmit={handleCreateSubmit}
+        servicesLoading={isLoadingServices}
+        onConfirm={handleCreateConfirm}
       />
 
       <RescheduleAppointmentDialog
@@ -729,214 +725,6 @@ const AppointmentsListPanel = ({
         </div>
       )}
     </Card>
-  );
-};
-
-type CreateAppointmentDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  date: Date;
-  services: Service[];
-  defaultServiceId: string | null;
-  timeOptions: string[];
-  isSubmitting: boolean;
-  onSubmit: (values: CreateFormValues) => Promise<void>;
-};
-
-const CreateAppointmentDialog = ({
-  open,
-  onOpenChange,
-  date,
-  services,
-  defaultServiceId,
-  timeOptions,
-  isSubmitting,
-  onSubmit,
-}: CreateAppointmentDialogProps) => {
-  const [serviceId, setServiceId] = useState<string>(defaultServiceId ?? '');
-  const [time, setTime] = useState('10:00');
-  const [clientName, setClientName] = useState('');
-  const [clientPhone, setClientPhone] = useState('');
-  const [clientEmail, setClientEmail] = useState('');
-  const [notes, setNotes] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setServiceId(defaultServiceId ?? services[0]?.id ?? '');
-    setTime('10:00');
-    setClientName('');
-    setClientPhone('');
-    setClientEmail('');
-    setNotes('');
-    setError(null);
-  }, [open, defaultServiceId, services]);
-
-  const selectedService = services.find((service) => service.id === serviceId) ?? services[0];
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedService) {
-      setError('Selecciona un servicio para programar la cita.');
-      return;
-    }
-    if (clientName.trim().length < 2) {
-      setError('Introduce el nombre de la persona para registrar la cita.');
-      return;
-    }
-
-    setError(null);
-    try {
-      await onSubmit({
-        serviceId: selectedService.id,
-        serviceName: selectedService.name,
-        durationMinutes: selectedService.duration_min,
-        time,
-        clientName: clientName.trim(),
-        clientPhone: clientPhone.trim() || undefined,
-        clientEmail: clientEmail.trim() || undefined,
-        notes: notes.trim() || undefined,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear la cita.');
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] border-white/10 bg-slate-950/95 text-white sm:max-w-lg">
-        <DialogHeader className="space-y-1.5 sm:space-y-2">
-          <DialogTitle className="text-lg sm:text-xl">Crear cita</DialogTitle>
-          <DialogDescription className="text-xs text-white/70 sm:text-sm">
-            Registra una nueva cita para el {formatDialogDate(date)}.
-          </DialogDescription>
-        </DialogHeader>
-        <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
-          <div className="space-y-1.5 sm:space-y-2">
-            <Label htmlFor="service" className="text-xs sm:text-sm">
-              Servicio
-            </Label>
-            <Select value={serviceId} onValueChange={setServiceId} disabled={services.length === 0 || isSubmitting}>
-              <SelectTrigger id="service" className="border-white/15 bg-white/5 text-white">
-                <SelectValue placeholder="Selecciona un servicio" />
-              </SelectTrigger>
-              <SelectContent className="border-white/15 bg-slate-900/95 text-white">
-                {services.map((service) => (
-                  <SelectItem key={service.id} value={service.id}>
-                    {service.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label htmlFor="time" className="text-xs sm:text-sm">
-                Hora de inicio
-              </Label>
-              <Select value={time} onValueChange={setTime} disabled={isSubmitting}>
-                <SelectTrigger id="time" className="border-white/15 bg-white/5 text-white">
-                  <SelectValue placeholder="Elige una hora" />
-                </SelectTrigger>
-                <SelectContent className="border-white/15 bg-slate-900/95 text-white">
-                  {timeOptions.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option} h
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label htmlFor="client-name" className="text-xs sm:text-sm">
-                Nombre de la persona
-              </Label>
-              <Input
-                id="client-name"
-                value={clientName}
-                onChange={(event) => setClientName(event.target.value)}
-                placeholder="Nombre y apellidos"
-                className="border-white/15 bg-white/5 text-white placeholder:text-white/40"
-                disabled={isSubmitting}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label htmlFor="client-phone" className="text-xs sm:text-sm">
-                Teléfono de contacto
-              </Label>
-              <Input
-                id="client-phone"
-                value={clientPhone}
-                onChange={(event) => setClientPhone(event.target.value)}
-                placeholder="+34 600 000 000"
-                className="border-white/15 bg-white/5 text-white placeholder:text-white/40"
-                disabled={isSubmitting}
-              />
-            </div>
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label htmlFor="client-email" className="text-xs sm:text-sm">
-                Correo electrónico (opcional)
-              </Label>
-              <Input
-                id="client-email"
-                type="email"
-                value={clientEmail}
-                onChange={(event) => setClientEmail(event.target.value)}
-                placeholder="cliente@correo.com"
-                className="border-white/15 bg-white/5 text-white placeholder:text-white/40"
-                disabled={isSubmitting}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5 sm:space-y-2">
-            <Label htmlFor="notes" className="text-xs sm:text-sm">
-              Notas internas
-            </Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="Preferencias o recordatorios para el equipo"
-              className="min-h-[80px] border-white/15 bg-white/5 text-sm text-white placeholder:text-white/40 sm:min-h-[96px]"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          {error && <p className="text-xs text-rose-300 sm:text-sm">{error}</p>}
-
-          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full border-white/20 text-sm text-white/80 hover:bg-white/10"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              className="rounded-full bg-emerald-500 px-4 text-sm font-semibold text-emerald-950 hover:bg-emerald-400 sm:px-5"
-              disabled={isSubmitting || services.length === 0}
-            >
-              {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Guardando
-                </span>
-              ) : (
-                'Guardar cita'
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 };
 

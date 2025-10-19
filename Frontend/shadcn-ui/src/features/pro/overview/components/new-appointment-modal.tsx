@@ -34,9 +34,11 @@ export type NewAppointmentFormValues = {
 type NewAppointmentModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  suggestedDate?: string | null;
+  suggestedDate?: string | Date | null;
   suggestedService?: string | null;
-  onConfirm?: (values: NewAppointmentFormValues) => void;
+  services?: Service[];
+  servicesLoading?: boolean;
+  onConfirm?: (values: NewAppointmentFormValues) => void | Promise<void>;
 };
 
 const AVAILABLE_SLOTS = [
@@ -64,9 +66,12 @@ const AVAILABLE_SLOTS = [
   '19:30',
 ];
 
-const formatSuggestedDate = (value?: string | null) => {
+const isPromiseLike = (value: unknown): value is PromiseLike<unknown> =>
+  value !== null && typeof value === 'object' && typeof (value as PromiseLike<unknown>).then === 'function';
+
+const formatSuggestedDate = (value?: string | Date | null) => {
   if (!value) return '';
-  const parsed = new Date(value);
+  const parsed = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(parsed.getTime())) return '';
   return parsed.toISOString().slice(0, 10);
 };
@@ -76,6 +81,8 @@ export const NewAppointmentModal = ({
   onOpenChange,
   suggestedDate,
   suggestedService,
+  services: providedServices,
+  servicesLoading,
   onConfirm,
 }: NewAppointmentModalProps) => {
   const [selectedDate, setSelectedDate] = useState('');
@@ -85,13 +92,19 @@ export const NewAppointmentModal = ({
   const [selectedClientEmail, setSelectedClientEmail] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Cargar servicios reales del backend
-  const { data: services = [], isLoading: isLoadingServices } = useQuery({
+  const shouldFetchServices = typeof providedServices === 'undefined';
+  const { data: fetchedServices = [], isLoading: isFetchingServices } = useQuery({
     queryKey: ['services'],
     queryFn: api.getServices,
     staleTime: 5 * 60 * 1000, // 5 minutos
+    enabled: shouldFetchServices,
   });
+
+  const services = providedServices ?? fetchedServices;
+  const isLoadingServices = servicesLoading ?? (shouldFetchServices ? isFetchingServices : false);
 
   const selectedService = services.find(s => s.id === selectedServiceId);
 
@@ -100,7 +113,11 @@ export const NewAppointmentModal = ({
   useEffect(() => {
     if (open) {
       setSelectedDate(formattedSuggestedDate);
-      setSelectedServiceId(suggestedService ?? '');
+      setSelectedServiceId(current => {
+        if (suggestedService) return suggestedService;
+        if (current) return current;
+        return services[0]?.id ?? '';
+      });
       setSelectedClientPhone('');
       setSelectedClientEmail('');
     } else {
@@ -111,17 +128,25 @@ export const NewAppointmentModal = ({
       setSelectedServiceId('');
       setSelectedDate('');
       setNotes('');
+      setIsSubmitting(false);
     }
-  }, [open, formattedSuggestedDate, suggestedService]);
+  }, [open, formattedSuggestedDate, suggestedService, services]);
 
   const handleClose = () => onOpenChange(false);
 
-  const isConfirmDisabled = !selectedClient || !selectedClientPhone || !selectedDate || !selectedTime || !selectedServiceId || !selectedService;
+  const isConfirmDisabled =
+    !selectedClient ||
+    !selectedClientPhone ||
+    !selectedDate ||
+    !selectedTime ||
+    !selectedServiceId ||
+    !selectedService ||
+    isSubmitting;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (isConfirmDisabled || !selectedService) return;
-    
-    onConfirm?.({
+
+    const payload: NewAppointmentFormValues = {
       client: selectedClient,
       clientPhone: selectedClientPhone,
       clientEmail: selectedClientEmail || undefined,
@@ -131,8 +156,26 @@ export const NewAppointmentModal = ({
       serviceName: selectedService.name,
       durationMinutes: selectedService.duration_min,
       notes,
-    });
-    onOpenChange(false);
+    };
+
+    if (!onConfirm) {
+      onOpenChange(false);
+      return;
+    }
+
+    try {
+      const result = onConfirm(payload);
+      if (isPromiseLike(result)) {
+        setIsSubmitting(true);
+        await result;
+      }
+      onOpenChange(false);
+    } catch (error) {
+      setIsSubmitting(false);
+      return;
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
