@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Calendar,
   Clock,
+  Loader2,
   Mail,
   Phone,
   Scissors,
@@ -333,16 +334,25 @@ export const NewAppointmentModal = ({
           <div className="flex flex-col gap-3 pt-4 sm:flex-row">
             <Button
               type="button"
-              className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
+              variant="primaryAction"
+              className="flex-1"
               disabled={isConfirmDisabled}
+              aria-busy={isSubmitting}
               onClick={handleConfirm}
             >
-              Crear cita
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Creando…
+                </span>
+              ) : (
+                'Crear cita'
+              )}
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="flex-1 bg-transparent hover:bg-secondary"
+              className="flex-1"
               onClick={handleClose}
             >
               <X className="mr-2 h-4 w-4" aria-hidden="true" />
