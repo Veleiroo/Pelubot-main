@@ -3,9 +3,11 @@ import { CalendarClock, FileText, Loader2, Phone } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 
-import { NO_SHOW_REASONS, STATUS_TONE } from '../constants';
+import { NO_SHOW_REASONS, STATUS_RING_STYLES } from '../constants';
+import { STATUS_ACCENTS, STATUS_LABELS } from '../../shared/constants';
 import { formatDate } from '../lib/format';
 import type { AppointmentActionType, OverviewAppointmentEntry } from '../types';
 
@@ -50,25 +52,22 @@ interface UpcomingCardProps {
   appointment: OverviewAppointmentEntry | null;
   isLoading: boolean;
   errorMessage: string | null;
-  onAction: (action: AppointmentActionType, detail?: string) => void;
+  onAction: (action: AppointmentActionType, detail?: string) => Promise<void> | void;
 }
 
 export const UpcomingCard = ({ appointment, isLoading, errorMessage, onAction }: UpcomingCardProps) => {
-  const [showNoShowSelect, setShowNoShowSelect] = useState(false);
-  const [noShowReason, setNoShowReason] = useState<string | null>(null);
+  const [actionInFlight, setActionInFlight] = useState<AppointmentActionType | null>(null);
 
   const metadataItems = useMemo(() => buildMetadataItems(appointment), [appointment]);
+  const statusBadgeTone = appointment ? STATUS_RING_STYLES[appointment.status] : '';
 
-  const handleToggleNoShow = () => {
-    setShowNoShowSelect((prev) => !prev);
-    setNoShowReason(null);
-  };
-
-  const handleSelectReason = (value: string) => {
-    const reasonLabel = NO_SHOW_REASONS.find((item) => item.value === value)?.label ?? value;
-    setNoShowReason(value);
-    setShowNoShowSelect(false);
-    onAction('no-show', `Motivo seleccionado: ${reasonLabel}`);
+  const runAction = async (action: AppointmentActionType, detail?: string) => {
+    setActionInFlight(action);
+    try {
+      await Promise.resolve(onAction(action, detail));
+    } finally {
+      setActionInFlight(null);
+    }
   };
 
   return (
@@ -90,7 +89,18 @@ export const UpcomingCard = ({ appointment, isLoading, errorMessage, onAction }:
                 <div className="flex flex-wrap items-center gap-2 text-sm tabular-nums">
                   <span>{appointment.time} h</span>
                   <span className="hidden text-white/40 sm:inline">•</span>
-                  <span className={`capitalize ${STATUS_TONE[appointment.status]}`}>{appointment.status}</span>
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset backdrop-blur',
+                      statusBadgeTone
+                    )}
+                  >
+                    <span
+                      className={cn('h-1.5 w-1.5 rounded-full', STATUS_ACCENTS[appointment.status].dot)}
+                      aria-hidden="true"
+                    />
+                    <span className="capitalize">{STATUS_LABELS[appointment.status]}</span>
+                  </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="truncate" title={appointment.service}>
@@ -110,49 +120,48 @@ export const UpcomingCard = ({ appointment, isLoading, errorMessage, onAction }:
               ) : null}
             </div>
 
-            <div className="flex w-full flex-col gap-2 md:h-full md:w-[200px] md:justify-center md:self-center">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap md:h-full md:w-[220px] md:flex-col md:justify-center md:self-center">
               <Button
                 variant="outline"
-                className="h-9 w-full rounded-full border-emerald-400/60 px-4 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/10"
-                onClick={() => {
-                  setShowNoShowSelect(false);
-                  onAction('attended');
-                }}
+                size="sm"
+                className="min-w-[140px]"
+                disabled={Boolean(actionInFlight)}
+                onClick={() => void runAction('attended')}
               >
-                Marcar como asistida
+                {actionInFlight === 'attended' ? <Loader2 className="size-4 animate-spin" /> : null}
+                <span>{actionInFlight === 'attended' ? 'Marcando…' : 'Marcar como asistida'}</span>
               </Button>
-              <div className="flex w-full flex-col gap-1.5">
-                <Button
-                  variant="outline"
-                  className="h-9 w-full rounded-full border-rose-400/60 px-4 text-sm font-semibold text-rose-200 hover:bg-rose-500/10"
-                  onClick={handleToggleNoShow}
-                >
-                  No asistió
-                </Button>
-                {showNoShowSelect ? (
-                  <Select value={noShowReason ?? undefined} onValueChange={handleSelectReason}>
-                    <SelectTrigger className="h-9 w-full rounded-full border border-white/15 bg-white/5 text-left text-sm font-medium text-white/80 hover:bg-white/10">
-                      <SelectValue placeholder="Selecciona motivo" />
-                    </SelectTrigger>
-                    <SelectContent align="end" className="min-w-[220px] md:min-w-[260px]">
-                      {NO_SHOW_REASONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : null}
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild disabled={Boolean(actionInFlight)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-w-[140px] justify-between border-rose-400/60 text-rose-200 hover:bg-rose-500/10"
+                  >
+                    <span className="flex items-center gap-2">
+                      {actionInFlight === 'no-show' ? <Loader2 className="size-4 animate-spin" /> : null}
+                      No asistió
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuItem onSelect={() => void runAction('no-show')}>Marcar sin motivo</DropdownMenuItem>
+                  {NO_SHOW_REASONS.map((option) => (
+                    <DropdownMenuItem key={option.value} onSelect={() => void runAction('no-show', option.label)}>
+                      {option.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="outline"
-                className="h-9 w-full rounded-full border-white/25 px-4 text-sm font-semibold text-white/80 hover:bg-white/10"
-                onClick={() => {
-                  setShowNoShowSelect(false);
-                  onAction('reschedule');
-                }}
+                size="sm"
+                className="min-w-[140px]"
+                disabled={Boolean(actionInFlight)}
+                onClick={() => void runAction('reschedule')}
               >
-                Mover cita
+                {actionInFlight === 'reschedule' ? <Loader2 className="size-4 animate-spin" /> : null}
+                <span>{actionInFlight === 'reschedule' ? 'Abriendo…' : 'Mover cita'}</span>
               </Button>
             </div>
           </>

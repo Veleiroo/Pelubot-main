@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, Clock, Plus, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, Loader2, Plus, Trash2, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
 import { AppointmentStatusPill } from '../../shared/components/appointment-status-pill';
+import { NO_SHOW_REASONS } from '../constants';
 import type { AppointmentActionType, OverviewAppointmentEntry, OverviewSummary } from '../types';
 
 type TodayAppointmentsProps = {
@@ -29,6 +31,7 @@ export const TodayAppointments = ({
 }: TodayAppointmentsProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionInFlight, setActionInFlight] = useState<string | null>(null);
+  const [actionInFlightType, setActionInFlightType] = useState<AppointmentActionType | null>(null);
 
   const counts = useMemo(
     () => ({
@@ -51,19 +54,16 @@ export const TodayAppointments = ({
     }
   };
 
-  const handleAction = async (action: AppointmentActionType, appointmentId: string) => {
+  const handleAction = async (action: AppointmentActionType, appointmentId: string, detail?: string) => {
     if (isProcessingAction) return;
     try {
       setActionInFlight(appointmentId);
-      let detail: string | undefined;
-      if (action === 'no-show') {
-        const reason = window.prompt('Motivo del no-show (opcional)');
-        detail = reason ? reason.trim() || undefined : undefined;
-      }
+      setActionInFlightType(action);
       await onAction(action, appointmentId, detail);
       setExpandedId(null);
     } finally {
       setActionInFlight(null);
+      setActionInFlightType(null);
     }
   };
 
@@ -72,30 +72,30 @@ export const TodayAppointments = ({
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-semibold text-foreground">Citas de hoy</h2>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-base text-muted-foreground">
-            <span>
-              {appointments.length} {appointments.length === 1 ? 'cita' : 'citas'}
+          <div className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground sm:text-sm">
+            <span className="font-medium text-foreground">
+              {appointments.length} {appointments.length === 1 ? 'cita programada' : 'citas programadas'}
             </span>
-            <span>•</span>
-            <span className="text-amber-500">{counts.confirmadas} pendientes</span>
-            {counts.asistidas > 0 && (
-              <>
-                <span>•</span>
-                <span className="text-emerald-600">{counts.asistidas} asistidas</span>
-              </>
-            )}
-            {counts.no_asistidas > 0 && (
-              <>
-                <span>•</span>
-                <span className="text-red-500">{counts.no_asistidas} no asistidas</span>
-              </>
-            )}
-            {counts.canceladas > 0 && (
-              <>
-                <span>•</span>
-                <span className="text-destructive">{counts.canceladas} canceladas</span>
-              </>
-            )}
+            <div className="flex flex-wrap gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-400/10 px-2 py-0.5 text-[11px] font-medium text-amber-500">
+                {counts.confirmadas} pendientes
+              </span>
+              {counts.asistidas > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-500">
+                  {counts.asistidas} asistidas
+                </span>
+              ) : null}
+              {counts.no_asistidas > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-red-400/10 px-2 py-0.5 text-[11px] font-medium text-red-500">
+                  {counts.no_asistidas} no asistidas
+                </span>
+              ) : null}
+              {counts.canceladas > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-rose-400/10 px-2 py-0.5 text-[11px] font-medium text-rose-500">
+                  {counts.canceladas} canceladas
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
         <Button variant="primaryAction" onClick={onCreateAppointment}>
@@ -125,10 +125,11 @@ export const TodayAppointments = ({
             appointments.map((appointment, index) => {
               const isExpanded = expandedId === appointment.id;
               const isBusy = isProcessingAction || actionInFlight === appointment.id;
+              const busyAction = actionInFlight === appointment.id ? actionInFlightType : null;
               return (
                 <div
                   key={appointment.id}
-                    className={cn(
+                  className={cn(
                     'w-full rounded-lg border border-border/30 bg-secondary/30 p-4 transition-all duration-200',
                     'hover:-translate-y-0.5 hover:bg-secondary/50',
                     isExpanded ? 'ring-2 ring-accent' : '',
@@ -158,53 +159,74 @@ export const TodayAppointments = ({
                   </div>
 
                   {isExpanded && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <div className="mt-3 flex flex-wrap items-center gap-2 sm:gap-3">
                       {appointment.status !== 'cancelada' && (
                         <>
                           <Button
                             size="sm"
-                            className="inline-flex h-9 items-center gap-2 rounded-full px-4 text-sm font-semibold bg-emerald-500 text-emerald-950 shadow-sm hover:bg-emerald-400"
+                            variant="primaryAction"
+                            className="min-w-[130px]"
                             disabled={isBusy}
-                            onClick={() => handleAction('attended', appointment.id)}
+                            onClick={() => void handleAction('attended', appointment.id)}
                           >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            Asistida
+                            {busyAction === 'attended' ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                            <span>Asistida</span>
                           </Button>
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild disabled={isBusy}>
+                                <Button size="sm" variant="outline" className="min-w-[130px] justify-between">
+                                  <span className="flex items-center gap-2">
+                                    {busyAction === 'no-show' ? (
+                                      <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    )}
+                                    No asistió
+                                  </span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-60">
+                                <DropdownMenuItem onSelect={() => void handleAction('no-show', appointment.id)}>
+                                  Marcar sin motivo
+                                </DropdownMenuItem>
+                                {NO_SHOW_REASONS.map((option) => (
+                                  <DropdownMenuItem
+                                    key={option.value}
+                                    onSelect={() => void handleAction('no-show', appointment.id, option.label)}
+                                  >
+                                    {option.label}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="inline-flex h-9 items-center gap-2 rounded-full border-amber-400/70 px-4 text-sm font-semibold text-amber-500 hover:bg-amber-500/10"
+                              className="min-w-[130px] border-destructive/60 text-destructive"
                               disabled={isBusy}
-                              onClick={() => handleAction('no-show', appointment.id)}
+                              onClick={() => void handleAction('cancel', appointment.id)}
                             >
-                              <XCircle className="h-3.5 w-3.5" />
-                              No asistió
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="inline-flex h-9 items-center gap-2 rounded-full border-destructive/70 px-4 text-sm font-semibold text-destructive hover:bg-destructive/10"
-                              disabled={isBusy}
-                              onClick={() => handleAction('cancel', appointment.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Cancelar
+                              {busyAction === 'cancel' ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                              <span>Cancelar</span>
                             </Button>
                           </div>
                         </>
                       )}
                       <Button
                         size="sm"
-                        className="inline-flex h-9 items-center gap-2 rounded-full bg-red-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+                        variant="outline"
+                        className="min-w-[130px] border-destructive/60 text-destructive hover:bg-destructive/10"
                         disabled={isBusy}
-                        onClick={() => handleAction('delete', appointment.id)}
+                        onClick={() => void handleAction('delete', appointment.id)}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Eliminar
+                        {busyAction === 'delete' ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        <span>Eliminar</span>
                       </Button>
                       {isBusy && (
-                        <span className="text-[11px] text-muted-foreground">Procesando acción…</span>
+                        <span className="text-[11px] text-muted-foreground" aria-live="polite">
+                          Procesando acción…
+                        </span>
                       )}
                     </div>
                   )}
