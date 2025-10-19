@@ -149,6 +149,7 @@ export const RescheduleAppointmentDialog = ({
               className="w-full sm:w-auto"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
+              className="w-full sm:w-auto"
             >
               Cancelar
             </Button>
@@ -165,7 +166,7 @@ export const RescheduleAppointmentDialog = ({
                   Guardando…
                 </span>
               ) : (
-                'Actualizar cita'
+                <span>Actualizar cita</span>
               )}
             </Button>
           </div>
