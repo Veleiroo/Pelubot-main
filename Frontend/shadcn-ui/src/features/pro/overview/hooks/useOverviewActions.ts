@@ -1,5 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { format } from 'date-fns';
+
+import { useToast } from '@/hooks/use-toast';
 import { api, type ProReservation, type ProReservationsResponse } from '@/lib/api';
+import { formatRescheduleDialogDate } from '../../shared/components/reschedule-appointment-dialog';
 
 type CreateAppointmentPayload = {
   serviceId: string;
@@ -18,6 +22,7 @@ type OverviewActionsOptions = {
 
 export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) => {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const createMutation = useMutation({
     mutationFn: async (payload: CreateAppointmentPayload) => {
@@ -96,6 +101,37 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
     },
   });
 
+  type RescheduleAppointmentPayload = {
+    reservationId: string;
+    date: Date;
+    newTime: string;
+    durationMinutes?: number;
+    clientName?: string;
+  };
+
+  const rescheduleMutation = useMutation({
+    mutationFn: async (payload: RescheduleAppointmentPayload) => {
+      const response = await api.prosRescheduleReservation(payload.reservationId, {
+        new_date: format(payload.date, 'yyyy-MM-dd'),
+        new_time: payload.newTime,
+      });
+
+      return { response, payload };
+    },
+    onSuccess: ({ payload }) => {
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
+      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+
+      const label = formatRescheduleDialogDate(payload.date);
+      const subject = payload.clientName ?? 'La cita';
+
+      toast({
+        title: 'Cita reprogramada',
+        description: `${subject} ahora está programado el ${label} a las ${payload.newTime} h.`,
+      });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (appointmentId: string) => {
       return await api.prosDeleteReservation(appointmentId);
@@ -110,11 +146,13 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
     createAppointment: createMutation.mutateAsync,
     markAttended: markAttendedMutation.mutateAsync,
     markNoShow: markNoShowMutation.mutateAsync,
+    rescheduleAppointment: rescheduleMutation.mutateAsync,
     cancelAppointment: cancelMutation.mutateAsync,
     deleteAppointment: deleteMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isMarkingAttended: markAttendedMutation.isPending,
     isMarkingNoShow: markNoShowMutation.isPending,
+    isRescheduling: rescheduleMutation.isPending,
     isCancelling: cancelMutation.isPending || deleteMutation.isPending,
   };
 };

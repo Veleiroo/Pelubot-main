@@ -1,8 +1,16 @@
 import { useCallback, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 import { useToast } from '@/hooks/use-toast';
 import { useProSession } from '@/store/pro';
+
+import {
+  RescheduleAppointmentDialog,
+  RESCHEDULE_TIME_OPTIONS,
+  type RescheduleFormValues,
+} from '../shared/components/reschedule-appointment-dialog';
+import type { Appointment } from '../shared/types';
 
 import { AppointmentCard } from './components/appointment-card';
 import { DailySummary } from './components/daily-summary';
@@ -17,6 +25,7 @@ export const ProsOverviewView = () => {
   const { session } = useProSession();
 
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
 
   const stylist = session?.stylist;
   const {
@@ -33,10 +42,12 @@ export const ProsOverviewView = () => {
     markNoShow,
     cancelAppointment,
     deleteAppointment,
+    rescheduleAppointment,
     isCreating,
     isMarkingAttended,
     isMarkingNoShow,
     isCancelling,
+    isRescheduling,
   } = useOverviewActions({
     professionalId: stylist?.id,
   });
@@ -72,9 +83,53 @@ export const ProsOverviewView = () => {
             description: 'La cita ha sido eliminada de la agenda',
           });
         } else if (action === 'reschedule') {
-          toast({
-            title: 'Reprogramación',
-            description: 'Abriremos la reprogramación pronto',
+          const entry =
+            todayAppointments.find((item) => item.id === appointmentId) ??
+            (upcomingAppointment?.id === appointmentId ? upcomingAppointment : null);
+
+          if (!entry) {
+            toast({
+              title: 'Error',
+              description: 'No encontramos la cita para reprogramar',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          const startDate = new Date(entry.raw.start);
+          if (Number.isNaN(startDate.getTime())) {
+            toast({
+              title: 'Error',
+              description: 'La hora actual de la cita es inválida',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          let endTime: string | undefined;
+          let durationMinutes: number | undefined;
+
+          if (entry.raw.end) {
+            const endDate = new Date(entry.raw.end);
+            if (!Number.isNaN(endDate.getTime()) && endDate.getTime() > startDate.getTime()) {
+              endTime = format(endDate, 'HH:mm');
+              durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+            }
+          }
+
+          setRescheduleTarget({
+            id: entry.id,
+            date: format(startDate, 'yyyy-MM-dd'),
+            time: format(startDate, 'HH:mm'),
+            endTime,
+            client: entry.client,
+            clientPhone: entry.raw.client_phone ?? undefined,
+            clientEmail: entry.raw.client_email ?? undefined,
+            service: entry.service,
+            serviceId: entry.raw.service_id ?? undefined,
+            status: entry.status,
+            durationMinutes: durationMinutes && durationMinutes > 0 ? durationMinutes : undefined,
+            notes: entry.raw.notes ?? undefined,
           });
         } else if (action === 'delete') {
           await deleteAppointment(appointmentId);
@@ -91,7 +146,15 @@ export const ProsOverviewView = () => {
         });
       }
     },
-    [cancelAppointment, deleteAppointment, markAttended, markNoShow, toast]
+    [
+      cancelAppointment,
+      deleteAppointment,
+      markAttended,
+      markNoShow,
+      toast,
+      todayAppointments,
+      upcomingAppointment,
+    ]
   );
 
   const handleCreateAppointment = useCallback(() => {
@@ -101,6 +164,35 @@ export const ProsOverviewView = () => {
   const handleNewAppointmentModalChange = useCallback((open: boolean) => {
     setIsNewAppointmentOpen(open);
   }, []);
+
+  const handleRescheduleConfirm = useCallback(
+    async ({ newTime, durationMinutes }: RescheduleFormValues) => {
+      if (!rescheduleTarget) return;
+
+      const appointmentDate = new Date(`${rescheduleTarget.date}T00:00:00`);
+
+      try {
+        await rescheduleAppointment({
+          reservationId: rescheduleTarget.id,
+          date: appointmentDate,
+          newTime,
+          durationMinutes,
+          clientName: rescheduleTarget.client,
+        });
+        setRescheduleTarget(null);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'No se pudo reprogramar la cita. Inténtalo de nuevo.';
+        toast({
+          title: 'No se pudo reprogramar',
+          description: message,
+          variant: 'destructive',
+        });
+        throw new Error(message);
+      }
+    },
+    [rescheduleAppointment, rescheduleTarget, toast]
+  );
 
   const handleConfirmNewAppointment = useCallback(
     async ({ client, clientPhone, clientEmail, date, time, serviceId, serviceName, durationMinutes, notes }: NewAppointmentFormValues) => {
@@ -165,6 +257,7 @@ export const ProsOverviewView = () => {
               appointment={upcomingAppointment}
               isLoading={isInitialOverviewLoading}
               onAction={handleAppointmentAction}
+              isRescheduling={isRescheduling}
             />
             <DailySummary summary={summary} isLoading={isInitialOverviewLoading} />
           </div>
@@ -176,6 +269,7 @@ export const ProsOverviewView = () => {
             onCreateAppointment={handleCreateAppointment}
             onAction={handleAppointmentAction}
             isProcessingAction={isMarkingAttended || isMarkingNoShow || isCancelling}
+            isRescheduling={isRescheduling}
           />
         </section>
       </div>
@@ -186,6 +280,19 @@ export const ProsOverviewView = () => {
         suggestedDate={upcomingAppointment?.raw.start ?? null}
         suggestedService={upcomingAppointment?.service ?? null}
         onConfirm={handleConfirmNewAppointment}
+      />
+
+      <RescheduleAppointmentDialog
+        open={Boolean(rescheduleTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRescheduleTarget(null);
+          }
+        }}
+        appointment={rescheduleTarget}
+        timeOptions={RESCHEDULE_TIME_OPTIONS}
+        isSubmitting={isRescheduling}
+        onSubmit={handleRescheduleConfirm}
       />
     </>
   );
