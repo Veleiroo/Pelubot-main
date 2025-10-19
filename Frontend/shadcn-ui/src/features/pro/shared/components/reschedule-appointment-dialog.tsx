@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -8,17 +8,18 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import type { Service } from '@/lib/api';
 
 import type { Appointment } from '../types';
 
 export type RescheduleFormValues = {
+  newDate: string;
   newTime: string;
   durationMinutes: number;
 };
@@ -52,25 +53,47 @@ export const RescheduleAppointmentDialog = ({
   isSubmitting,
   onSubmit,
 }: RescheduleAppointmentDialogProps) => {
+  const [date, setDate] = useState(appointment?.date ?? '');
   const [time, setTime] = useState(appointment?.time ?? '10:00');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setDate(appointment?.date ?? '');
     setTime(appointment?.time ?? '10:00');
     setError(null);
-  }, [open, appointment?.time]);
+  }, [open, appointment?.date, appointment?.time]);
 
-  if (!appointment) return null;
+  const appointmentDate = useMemo(() => {
+    const base = appointment?.date;
+    if (!base) return null;
+    const parsed = new Date(`${base}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }, [appointment?.date]);
+  const selectedDate = useMemo(() => {
+    if (!date) return null;
+    const parsed = new Date(`${date}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }, [date]);
+  const isSubmitDisabled = !date || !time || isSubmitting;
+
+  if (!appointment || !appointmentDate) return null;
 
   const durationMinutes = appointment.durationMinutes ?? service?.duration_min ?? 45;
-  const appointmentDate = new Date(`${appointment.date}T00:00:00`);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    if (!date) {
+      setError('Selecciona una nueva fecha.');
+      return;
+    }
+    if (!time) {
+      setError('Selecciona un horario disponible.');
+      return;
+    }
     try {
-      await onSubmit({ newTime: time, durationMinutes });
+      await onSubmit({ newDate: date, newTime: time, durationMinutes });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo reprogramar la cita.');
     }
@@ -82,26 +105,46 @@ export const RescheduleAppointmentDialog = ({
         <DialogHeader className="space-y-1.5 text-left sm:space-y-2">
           <DialogTitle className="text-lg sm:text-xl">Reprogramar cita</DialogTitle>
           <DialogDescription className="text-xs text-white/70 sm:text-sm">
-            Ajusta la hora para {appointment.client} ({formatRescheduleDialogDate(appointmentDate)}).
+            Ajusta la fecha y hora para {appointment.client} (
+            {formatRescheduleDialogDate(selectedDate ?? appointmentDate)}).
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
           <div className="space-y-1.5 sm:space-y-2">
-            <Label htmlFor="new-time" className="text-xs sm:text-sm">
-              Nueva hora
+            <Label htmlFor="new-date" className="text-xs sm:text-sm">
+              Nueva fecha
             </Label>
-            <Select value={time} onValueChange={setTime} disabled={isSubmitting}>
-              <SelectTrigger id="new-time" className="border-white/15 bg-white/5 text-white">
-                <SelectValue placeholder="Selecciona una hora" />
-              </SelectTrigger>
-              <SelectContent className="border-white/15 bg-slate-900/95 text-white">
-                {timeOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option} h
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              id="new-date"
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              disabled={isSubmitting}
+              className="border-white/15 bg-white/5 text-white"
+            />
+          </div>
+
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label className="text-xs sm:text-sm">Horario disponible</Label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {timeOptions.map((option) => (
+                <Button
+                  key={option}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  onClick={() => setTime(option)}
+                  className={cn(
+                    'rounded-full border-white/20 bg-transparent text-xs text-white transition hover:bg-white/10',
+                    time === option &&
+                      'border-emerald-400 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30'
+                  )}
+                >
+                  {option} h
+                </Button>
+              ))}
+            </div>
             <p className="text-[10px] text-white/40 sm:text-xs">Duración estimada: {durationMinutes} minutos.</p>
           </div>
 
@@ -117,7 +160,7 @@ export const RescheduleAppointmentDialog = ({
 
           {error && <p className="text-xs text-rose-300 sm:text-sm">{error}</p>}
 
-          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
@@ -130,7 +173,8 @@ export const RescheduleAppointmentDialog = ({
             <Button
               type="submit"
               className="rounded-full bg-emerald-500 px-4 text-sm font-semibold text-emerald-950 hover:bg-emerald-400 sm:px-5"
-              disabled={isSubmitting}
+              disabled={isSubmitDisabled}
+              aria-busy={isSubmitting}
             >
               {isSubmitting ? (
                 <span className="flex items-center gap-2">
@@ -141,7 +185,11 @@ export const RescheduleAppointmentDialog = ({
                 'Actualizar cita'
               )}
             </Button>
-          </DialogFooter>
+          </div>
+
+          <DialogDescription className="text-[10px] text-white/40 sm:text-xs">
+            Reprogramar enviará una notificación al cliente con la nueva hora.
+          </DialogDescription>
         </form>
       </DialogContent>
     </Dialog>
