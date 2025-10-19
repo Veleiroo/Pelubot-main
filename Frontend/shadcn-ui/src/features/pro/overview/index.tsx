@@ -166,10 +166,18 @@ export const ProsOverviewView = () => {
   }, []);
 
   const handleRescheduleConfirm = useCallback(
-    async ({ newTime, durationMinutes }: RescheduleFormValues) => {
+    async ({ newDate, newTime, durationMinutes }: RescheduleFormValues) => {
       if (!rescheduleTarget) return;
 
-      const appointmentDate = new Date(`${rescheduleTarget.date}T00:00:00`);
+      const appointmentDate = (() => {
+        if (newDate) {
+          const parsed = new Date(`${newDate}T00:00:00`);
+          if (!Number.isNaN(parsed.getTime())) {
+            return parsed;
+          }
+        }
+        return new Date(`${rescheduleTarget.date}T00:00:00`);
+      })();
 
       try {
         await rescheduleAppointment({
