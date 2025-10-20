@@ -48,6 +48,7 @@ from app.services.logic import (
     create_gcal_reservation,
     get_calendar_for_professional,
     delete_gcal_reservation,
+    patch_gcal_reservation,
 )
 from app.utils.date import now_tz, TZ, validate_target_dt
 from app.utils.security import needs_rehash, verify_password, hash_password
@@ -817,13 +818,27 @@ def stylist_reschedule_reservation(
     if not ok or not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
-    if updated.google_event_id:
-        updated.google_event_id = None
-        updated.google_calendar_id = None
-        session.add(updated)
-        session.commit()
-        session.refresh(updated)
-        msg = f"{msg} Sincronización con Google Calendar deshabilitada para reprogramaciones."
+    gcal_message: str | None = None
+    if updated.google_event_id and updated.google_calendar_id:
+        tz_name = getattr(TZ, "key", str(TZ))
+        try:
+            patch_gcal_reservation(
+                updated.google_event_id,
+                updated.start,
+                updated.end,
+                updated.google_calendar_id,
+                tz=tz_name,
+            )
+            gcal_message = "Evento sincronizado con Google Calendar."
+        except Exception as exc:
+            logger.warning(
+                "No se pudo actualizar el evento de Google Calendar (id=%s cal=%s): %s",
+                updated.google_event_id,
+                updated.google_calendar_id,
+                exc,
+            )
+            gcal_message = "La cita se reprogramó, pero no pudimos actualizar Google Calendar. Revísalo manualmente."
+    session.refresh(updated)
 
     try:
         RESERVATIONS_RESCHEDULED.inc()
@@ -831,6 +846,8 @@ def stylist_reschedule_reservation(
         pass
 
     message_out = msg if isinstance(msg, str) else "Reserva reprogramada"
+    if gcal_message:
+        message_out = f"{message_out} {gcal_message}"
     return RescheduleOut(
         ok=True,
         message=message_out,

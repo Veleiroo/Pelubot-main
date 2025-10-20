@@ -29,6 +29,7 @@ from app.services.logic import (
     sync_from_gcal_range,
     reconcile_db_to_gcal_range,
     detect_conflicts_range,
+    patch_gcal_reservation,
 )
 from app.db import get_session, engine
 from app.utils.date import validate_target_dt, TZ, now_tz, MAX_AHEAD_DAYS
@@ -256,16 +257,31 @@ def reschedule_post(
     ok, msg, r = apply_reschedule(session, payload)
     if not ok or not r:
         raise HTTPException(status_code=400, detail=msg)
+    gcal_message: Optional[str] = None
+    if r.google_event_id and r.google_calendar_id:
+        tz_name = getattr(TZ, "key", str(TZ))
+        try:
+            patch_gcal_reservation(
+                r.google_event_id,
+                r.start,
+                r.end,
+                r.google_calendar_id,
+                tz=tz_name,
+            )
+            gcal_message = "Evento sincronizado con Google Calendar."
+        except Exception as exc:
+            logger.warning(
+                "No se pudo actualizar evento Google Calendar (id=%s cal=%s): %s",
+                r.google_event_id,
+                r.google_calendar_id,
+                exc,
+            )
+            gcal_message = "Revisa Google Calendar: no se pudo actualizar el evento automáticamente."
+    session.refresh(r)
     message_out = msg if (isinstance(msg, str) and "Reprogramada" in msg) else f"Reprogramada: {msg}"
-    gcal_notice: str | None = None
-    if r.google_event_id:
-        gcal_notice = "Sincronización con Google Calendar deshabilitada para reprogramaciones."
-        r.google_event_id = None
-        r.google_calendar_id = None
-        session.add(r); session.commit(); session.refresh(r)
+    if gcal_message:
+        message_out = f"{message_out} {gcal_message}"
     logger.info("Reservation rescheduled: id=%s start=%s end=%s pro=%s", r.id, r.start.isoformat(), r.end.isoformat(), r.professional_id)
-    if gcal_notice:
-        message_out = f"{message_out} {gcal_notice}"
     return RescheduleOut(ok=True, message=message_out, reservation_id=r.id, start=r.start.isoformat(), end=r.end.isoformat())
 
 @router.post("/reservations/reschedule", response_model=RescheduleOut)

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Calendar, Clock, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -70,11 +71,16 @@ export const RescheduleAppointmentDialog = ({
     const parsed = new Date(`${base}T00:00:00`);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }, [appointment?.date]);
-  const selectedDate = useMemo(() => {
+  const selectedDateObj = useMemo(() => {
     if (!date) return null;
     const parsed = new Date(`${date}T00:00:00`);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }, [date]);
+  const previewDateLabel = useMemo(() => {
+    if (!appointmentDate) return '';
+    return formatRescheduleDialogDate(selectedDateObj ?? appointmentDate);
+  }, [appointmentDate, selectedDateObj]);
+  const previewTimeLabel = appointment ? time || appointment.time : time;
   const isSubmitDisabled = !date || !time || isSubmitting;
 
   if (!appointment || !appointmentDate) return null;
@@ -105,29 +111,61 @@ export const RescheduleAppointmentDialog = ({
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">Reprogramar cita</DialogTitle>
           <DialogDescription>
-            Ajusta la hora para {appointment.client} ({formatRescheduleDialogDate(appointmentDate)}).
+            Selecciona nueva fecha y horario para {appointment.client}. Actualmente programada el{' '}
+            {formatRescheduleDialogDate(appointmentDate)} a las {appointment.time} h.
           </DialogDescription>
         </DialogHeader>
         <form className="mt-4 space-y-5" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="new-time" className="text-sm font-medium">
-              Nueva hora
-            </Label>
-            <Select value={time} onValueChange={setTime} disabled={isSubmitting}>
-              <SelectTrigger id="new-time" className="border-border bg-secondary/50">
-                <SelectValue placeholder="Selecciona una hora" />
-              </SelectTrigger>
-              <SelectContent className="border-border bg-card">
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,200px)_1fr]">
+            <div className="space-y-2">
+              <Label htmlFor="new-date" className="flex items-center gap-2 text-sm font-medium">
+                <Calendar className="h-4 w-4" aria-hidden="true" />
+                Nueva fecha
+              </Label>
+              <Input
+                id="new-date"
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                className="border-border bg-secondary/50"
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <Clock className="h-4 w-4" aria-hidden="true" />
+                Nuevo horario
+              </Label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {timeOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option} h
-                  </SelectItem>
+                  <Button
+                    key={option}
+                    type="button"
+                    size="sm"
+                    variant={time === option ? 'default' : 'outline'}
+                    onClick={() => setTime(option)}
+                    disabled={isSubmitting}
+                    className={cn(
+                      'bg-secondary/50 text-xs transition',
+                      time === option
+                        ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                        : 'hover:bg-secondary'
+                    )}
+                  >
+                    {option}
+                  </Button>
                 ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground sm:text-sm">
-              Duración estimada: {durationMinutes} minutos.
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border/40 bg-secondary/30 p-3 text-xs text-muted-foreground sm:text-sm">
+            <p>
+              Nueva cita:{' '}
+              <span className="font-semibold text-foreground">{previewDateLabel}</span> a las{' '}
+              <span className="font-semibold text-foreground">{previewTimeLabel} h</span>
             </p>
+            <p className="mt-1">Duración estimada: {durationMinutes} minutos.</p>
           </div>
 
           <div className="rounded-xl border border-border bg-secondary/40 p-4 sm:rounded-2xl">
@@ -146,7 +184,6 @@ export const RescheduleAppointmentDialog = ({
             <Button
               type="button"
               variant="outline"
-              className="w-full sm:w-auto"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
               className="w-full sm:w-auto"
@@ -169,7 +206,7 @@ export const RescheduleAppointmentDialog = ({
                 <span>Actualizar cita</span>
               )}
             </Button>
-          </div>
+          </DialogFooter>
 
           <DialogDescription className="text-[10px] text-white/40 sm:text-xs">
             Reprogramar enviará una notificación al cliente con la nueva hora.
