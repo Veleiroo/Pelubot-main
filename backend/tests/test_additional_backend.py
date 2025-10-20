@@ -3,6 +3,10 @@
 import os
 from datetime import date, timedelta
 
+from sqlmodel import Session
+
+from app.models import ReservationDB
+
 API_KEY = "test-api-key"
 os.environ["API_KEY"] = API_KEY
 
@@ -194,6 +198,17 @@ def test_delete_cancel_and_double_cancel(app_client):
     # cancelar por DELETE
     r_del = app_client.delete(f"/reservations/{res_id}", headers={"X-API-Key": API_KEY})
     assert r_del.status_code == 200
-    # segunda vez -> 404
+    data = r_del.json()
+    assert data["ok"] is True
+    assert "cancelada" in data["message"].lower()
+    with Session(app_client.app.state.test_engine) as session:
+        stored = session.get(ReservationDB, res_id)
+        assert stored is not None
+        assert stored.status == "cancelada"
+
+    # segunda vez sigue respondiendo 200 pero no muta más
     r_del2 = app_client.delete(f"/reservations/{res_id}", headers={"X-API-Key": API_KEY})
-    assert r_del2.status_code == 404
+    assert r_del2.status_code == 200
+    data2 = r_del2.json()
+    assert data2["ok"] is True
+    assert "cancelada" in data2["message"].lower()

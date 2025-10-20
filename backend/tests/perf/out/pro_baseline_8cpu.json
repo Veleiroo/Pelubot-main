@@ -1,0 +1,177 @@
+{
+    "setup_data": {
+        "cookie": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZWluaXMiLCJ0eXBlIjoic3R5bGlzdF9zZXNzaW9uIiwiaWF0IjoxNzYwOTY0MTg5LCJleHAiOjE3NjEwMDczODl9.TXSn4tCsoW0CpUcU-TYu6D2bNg0fItCV7A2k_Dv7aik",
+        "stylistId": "deinis"
+    },
+    "root_group": {
+        "groups": {
+            "setup": {
+                "name": "setup",
+                "path": "::setup",
+                "id": "5c0f8025f7e0b6654089e5b00e950f1a",
+                "groups": {},
+                "checks": {
+                        "login 200": {
+                            "path": "::setup::login 200",
+                            "id": "647055af8ffe21e58084ae4b140cdda0",
+                            "passes": 1,
+                            "fails": 0,
+                            "name": "login 200"
+                        },
+                        "session cookie presente": {
+                            "name": "session cookie presente",
+                            "path": "::setup::session cookie presente",
+                            "id": "f6753f27f3ab61bb6fdc85024f9cf7f1",
+                            "passes": 1,
+                            "fails": 0
+                        }
+                    }
+            }
+        },
+        "checks": {
+            "GET http://localhost:8776/pros/overview status": {
+                "name": "GET http://localhost:8776/pros/overview status",
+                "path": "::GET http://localhost:8776/pros/overview status",
+                "id": "ab4fb0361bb0d0d35b1ec5c86dd17281",
+                "passes": 1,
+                "fails": 0
+            },
+            "GET http://localhost:8776/pros/reservations?days_ahead=7 status": {
+                "name": "GET http://localhost:8776/pros/reservations?days_ahead=7 status",
+                "path": "::GET http://localhost:8776/pros/reservations?days_ahead=7 status",
+                "id": "bd9e6dea187e52b2e258732bcb0531b8",
+                "passes": 1,
+                "fails": 0
+            }
+        },
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "metrics": {
+        "http_req_blocked": {
+            "p(90)": 0.3818056,
+            "p(95)": 0.3845988,
+            "avg": 0.2530096666666667,
+            "min": 0.012177,
+            "med": 0.35946,
+            "max": 0.387392
+        },
+        "iteration_duration": {
+            "avg": 966.957899,
+            "min": 966.957899,
+            "med": 966.957899,
+            "max": 966.957899,
+            "p(90)": 966.957899,
+            "p(95)": 966.957899
+        },
+        "http_req_tls_handshaking": {
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_receiving": {
+            "med": 0.959066,
+            "max": 40.65661,
+            "p(90)": 32.7171012,
+            "p(95)": 36.686855599999994,
+            "avg": 14.039180333333334,
+            "min": 0.501865
+        },
+        "iterations": {
+            "count": 1,
+            "rate": 0.7521931828265481
+        },
+        "http_req_duration": {
+            "avg": 143.85688100000002,
+            "min": 18.296642,
+            "med": 53.157872,
+            "max": 360.116129,
+            "p(90)": 298.7244776,
+            "p(95)": 329.4203033
+        },
+        "vus_max": {
+            "min": 1,
+            "max": 1,
+            "value": 1
+        },
+        "vus": {
+            "value": 1,
+            "min": 1,
+            "max": 1
+        },
+        "http_req_duration{expected_response:true}": {
+            "avg": 143.85688100000002,
+            "min": 18.296642,
+            "med": 53.157872,
+            "max": 360.116129,
+            "p(90)": 298.7244776,
+            "p(95)": 329.4203033
+        },
+        "http_req_sending": {
+            "p(90)": 0.0850912,
+            "p(95)": 0.0864671,
+            "avg": 0.06976166666666667,
+            "min": 0.047358,
+            "med": 0.074084,
+            "max": 0.087843
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 3,
+            "value": 0
+        },
+        "overview_latency": {
+            "p(95)": 18.296642,
+            "avg": 18.296642,
+            "min": 18.296642,
+            "med": 18.296642,
+            "max": 18.296642,
+            "p(90)": 18.296642
+        },
+        "data_received": {
+            "count": 1637,
+            "rate": 1231.3402402870593
+        },
+        "reservations_latency": {
+            "avg": 53.157872,
+            "min": 53.157872,
+            "med": 53.157872,
+            "max": 53.157872,
+            "p(90)": 53.157872,
+            "p(95)": 53.157872
+        },
+        "http_reqs": {
+            "count": 3,
+            "rate": 2.2565795484796443
+        },
+        "data_sent": {
+            "count": 763,
+            "rate": 573.9233984966562
+        },
+        "http_req_connecting": {
+            "max": 0.232604,
+            "p(90)": 0.2137322,
+            "p(95)": 0.22316809999999998,
+            "avg": 0.12361633333333333,
+            "min": 0,
+            "med": 0.138245
+        },
+        "http_req_waiting": {
+            "p(90)": 291.0738352,
+            "p(95)": 325.3001281,
+            "avg": 129.747939,
+            "min": 12.453904,
+            "med": 17.263492,
+            "max": 359.526421
+        },
+        "checks": {
+            "passes": 4,
+            "fails": 0,
+            "value": 1
+        }
+    }
+}

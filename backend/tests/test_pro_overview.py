@@ -88,8 +88,9 @@ def test_pro_overview_returns_summary(app_client, monkeypatch):
 
     assert body["summary"] == {
         "total": 2,
-        "confirmadas": 1,
-        "pendientes": 1,
+        "confirmadas": 2,
+        "asistidas": 0,
+        "no_asistidas": 0,
         "canceladas": 0,
     }
     assert len(body["appointments"]) == 2
