@@ -27,6 +27,7 @@ from sqlmodel import Session
 from datetime import date, timedelta
 from app.db import engine
 from app.services.logic import sync_from_gcal_range
+from app.services.calendar_queue import start_worker, stop_worker
 
 from app.core.logging_config import setup_logging
 from app.core.middleware import RequestIDMiddleware
@@ -41,6 +42,7 @@ async def lifespan(app: FastAPI):
     setup_logging()
     create_db_and_tables()
 
+    worker_started = False
     try:
         if os.getenv("AUTO_SYNC_FROM_GCAL", "false").lower() in ("1","true","yes","si","sí","y"):
             days = int(os.getenv("AUTO_SYNC_FROM_GCAL_DAYS", "7"))
@@ -52,10 +54,24 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
+    try:
+        disable_worker = os.getenv("PELUBOT_DISABLE_GCAL_WORKER", "").lower() in {"1", "true", "yes", "si", "sí"}
+        if not disable_worker and not os.getenv("PYTEST_CURRENT_TEST"):
+            start_worker()
+            worker_started = True
+    except Exception:
+        pass
+
     if not API_KEY or API_KEY == "changeme":
         logging.getLogger("pelubot.main").warning("API_KEY no configurada o usando valor por defecto; define una clave segura en .env")
 
     yield
+
+    if worker_started:
+        try:
+            stop_worker()
+        except Exception:
+            pass
 
 
 def create_app() -> FastAPI:
