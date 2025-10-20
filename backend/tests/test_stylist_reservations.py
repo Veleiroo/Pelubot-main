@@ -19,7 +19,7 @@ def _seed_stylist(engine, **overrides) -> StylistDB:
         "display_name": "Deinis",
         "email": "deinis@example.com",
         "services": ["corte_cabello"],
-    "password_hash": hash_password("1234"),
+        "password_hash": hash_password("1234"),
         "is_active": True,
     }
     data.update(overrides)
@@ -74,7 +74,9 @@ def test_stylist_cancel_reservation_removes_booking(app_client: TestClient):
     assert "cancelada" in body["message"].lower()
 
     with Session(engine) as session:
-        assert session.get(ReservationDB, reservation.id) is None
+        stored = session.get(ReservationDB, reservation.id)
+        assert stored is not None
+        assert stored.status == "cancelada"
 
 
 def test_stylist_cannot_cancel_other_professional_reservation(app_client: TestClient):
@@ -124,8 +126,8 @@ def test_stylist_reschedule_updates_reservation(app_client: TestClient):
         stored = session.get(ReservationDB, reservation.id)
         assert stored is not None
         assert stored.start.hour == 12
-        assert stored.google_event_id is None
-        assert stored.google_calendar_id is None
+        assert stored.google_event_id == "gcal-123"
+        assert stored.google_calendar_id == "primary"
 
 
 def test_stylist_reschedule_forbidden_for_other_professional(app_client: TestClient):

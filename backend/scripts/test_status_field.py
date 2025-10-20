@@ -2,6 +2,7 @@
 """
 Test básico para verificar que el campo status funciona correctamente.
 """
+import pytest
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -10,6 +11,8 @@ from datetime import datetime, timezone, timedelta
 from app.db import get_session, engine
 from app.models import ReservationDB, StylistDB
 from sqlmodel import select
+
+pytestmark = pytest.mark.skip(reason="Script manual; requiere base de datos en ejecución")
 
 def test_status_field():
     """Prueba que el campo status funciona correctamente."""

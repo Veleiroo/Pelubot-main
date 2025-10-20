@@ -5,8 +5,9 @@ import logging
 import uuid
 from datetime import datetime, timezone, timedelta, date
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Body
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Body, BackgroundTasks
 from sqlalchemy import or_, text as _sql_text
+from sqlalchemy.exc import InvalidRequestError
 from sqlmodel import Session, select
 
 from app.core.auth import (
@@ -45,11 +46,20 @@ from app.services.logic import (
     find_reservation,
     cancel_reservation,
     apply_reschedule,
-    create_gcal_reservation,
     get_calendar_for_professional,
-    delete_gcal_reservation,
-    patch_gcal_reservation,
 )
+from app.integrations.gcal_background import (
+    queue_create_event,
+    queue_patch_event,
+    queue_delete_event,
+)
+
+
+def _session_engine(session: Session):
+    bind = session.get_bind()
+    if hasattr(bind, "engine"):
+        return bind.engine
+    return bind
 from app.utils.date import now_tz, TZ, validate_target_dt
 from app.utils.security import needs_rehash, verify_password, hash_password
 from app.core.metrics import RESERVATIONS_CANCELLED, RESERVATIONS_RESCHEDULED, RESERVATIONS_CREATED
@@ -598,6 +608,7 @@ def stylist_stats(
 @router.post("/reservations", response_model=ReservationCreateOut)
 def stylist_create_reservation(
     payload: ReservationIn,
+    background_tasks: BackgroundTasks,
     stylist: StylistDB = Depends(get_current_stylist),
     session: Session = Depends(get_session),
 ) -> ReservationCreateOut:
@@ -643,7 +654,6 @@ def stylist_create_reservation(
     
     res_id = str(uuid.uuid4())
     cal_id = get_calendar_for_professional(stylist.id)
-    gcal_id = None
 
     # Bloquear la tabla para evitar condiciones de carrera en SQLite
     try:
@@ -697,44 +707,20 @@ def stylist_create_reservation(
             detail=f"No se pudo guardar la reserva: {e}"
         )
 
-    # Sincronizar con Google Calendar (opcional, no falla si no funciona)
-    try:
-        gcal_event = create_gcal_reservation(
-            Reservation(
-                id=res_id,
-                service_id=payload.service_id,
-                professional_id=stylist.id,
-                start=start,
-                end=end,
-                customer_name=customer_name,
-                customer_email=customer_email,
-                customer_phone=customer_phone,
-                notes=notes,
-            ),
-            calendar_id=cal_id,
-        )
-        gcal_id = gcal_event.get("id")
-        r_upd = session.get(ReservationDB, res_id)
-        if r_upd:
-            r_upd.google_event_id = gcal_id
-            r_upd.google_calendar_id = cal_id
-            session.add(r_upd)
-            session.commit()
-        logger.info("Evento Google Calendar creado: %s", gcal_id)
-    except Exception as e:
-        logger.warning("No se pudo crear evento en Google Calendar: %s", e)
+    queue_create_event(background_tasks, res_id, _session_engine(session))
 
     return ReservationCreateOut(
         ok=True,
         reservation_id=res_id,
-        message=f"Reserva {res_id} creada. Cliente: {customer_name}, {service.name} el {start.strftime('%d/%m/%Y %H:%M')}",
-        google_event_id=gcal_id,
+        message=f"Reserva {res_id} creada. Cliente: {customer_name}, {service.name} el {start.strftime('%d/%m/%Y %H:%M')}. Sincronización con Google Calendar en background.",
+        google_event_id=None,
     )
 
 
 @router.post("/reservations/{reservation_id}/cancel", response_model=ActionResult)
 def stylist_cancel_reservation(
     reservation_id: str,
+    background_tasks: BackgroundTasks,
     stylist: StylistDB = Depends(get_current_stylist),
     session: Session = Depends(get_session),
 ) -> ActionResult:
@@ -749,12 +735,14 @@ def stylist_cancel_reservation(
         RESERVATIONS_CANCELLED.inc()
     except Exception:
         pass
-    return ActionResult(ok=True, message=f"Reserva {reservation_id} cancelada.")
+    queue_delete_event(background_tasks, reservation_id, _session_engine(session))
+    return ActionResult(ok=True, message=f"Reserva {reservation_id} cancelada. Sincronización con Google Calendar en background.")
 
 
 @router.post("/reservations/{reservation_id}/reschedule", response_model=RescheduleOut)
 def stylist_reschedule_reservation(
     reservation_id: str,
+    background_tasks: BackgroundTasks,
     payload: StylistRescheduleIn = Body(...),
     stylist: StylistDB = Depends(get_current_stylist),
     session: Session = Depends(get_session),
@@ -819,26 +807,20 @@ def stylist_reschedule_reservation(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
     gcal_message: str | None = None
+    engine_override = _session_engine(session)
     if updated.google_event_id and updated.google_calendar_id:
-        tz_name = getattr(TZ, "key", str(TZ))
-        try:
-            patch_gcal_reservation(
-                updated.google_event_id,
-                updated.start,
-                updated.end,
-                updated.google_calendar_id,
-                tz=tz_name,
-            )
-            gcal_message = "Evento sincronizado con Google Calendar."
-        except Exception as exc:
-            logger.warning(
-                "No se pudo actualizar el evento de Google Calendar (id=%s cal=%s): %s",
-                updated.google_event_id,
-                updated.google_calendar_id,
-                exc,
-            )
-            gcal_message = "La cita se reprogramó, pero no pudimos actualizar Google Calendar. Revísalo manualmente."
-    session.refresh(updated)
+        queue_patch_event(background_tasks, updated.id, engine_override)
+        gcal_message = "Reprogramación sincronizada con Google Calendar en background."
+    else:
+        queue_create_event(background_tasks, updated.id, engine_override)
+        gcal_message = "Reprogramación sincronizada con Google Calendar en background (nuevo evento)."
+    try:
+        session.refresh(updated)
+    except InvalidRequestError:
+        refreshed = session.get(ReservationDB, reservation_id)
+        if refreshed is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="La reserva ya no existe tras reprogramar")
+        updated = refreshed
 
     try:
         RESERVATIONS_RESCHEDULED.inc()

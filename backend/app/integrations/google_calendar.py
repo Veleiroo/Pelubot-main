@@ -20,6 +20,11 @@ import base64
 import json
 import os
 from datetime import datetime, timedelta, timezone
+import logging
+import threading
+import time
+import httplib2
+
 try:
     from zoneinfo import ZoneInfo
 except Exception:
@@ -27,8 +32,23 @@ except Exception:
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
-# Caché sencilla del cliente de Calendar en proceso
-_CACHED_SVC: dict[str, Any] = {"svc": None}
+logger = logging.getLogger("pelubot.integrations.google_calendar")
+
+# Cliente de Calendar aislado por hilo (evita compartir conexiones entre workers)
+_thread_local = threading.local()
+
+def _get_cached_service() -> Optional[Any]:
+    return getattr(_thread_local, "svc", None)
+
+def _set_cached_service(svc: Any | None) -> None:
+    if svc is None and hasattr(_thread_local, "svc"):
+        delattr(_thread_local, "svc")
+        return
+    _thread_local.svc = svc
+
+GCAL_HTTP_TIMEOUT = float(os.getenv("GCAL_HTTP_TIMEOUT", "8"))
+GCAL_HTTP_RETRIES = int(os.getenv("GCAL_HTTP_RETRIES", "1"))
+GCAL_HTTP_RETRY_WAIT = float(os.getenv("GCAL_HTTP_RETRY_WAIT", "0.6"))
 
 def iso_datetime(dt_or_str, tz: str = "Europe/Madrid") -> str:
     """
@@ -222,6 +242,31 @@ class FakeCalendarService:
                 return _FakeEventsOp({"items": []})
         return _CL()
 
+def _build_http_client() -> httplib2.Http:
+    """Crea cliente HTTP con timeout configurable."""
+    return httplib2.Http(timeout=GCAL_HTTP_TIMEOUT, disable_ssl_certificate_validation=False)
+
+def _reset_thread_client() -> None:
+    """Elimina el cliente cacheado para forzar reconstrucción tras fallo."""
+    _set_cached_service(None)
+
+def _call_with_retry(op: callable, action: str) -> Any:
+    """Ejecuta la llamada al API con retry ligero y reseteo de cliente."""
+    attempts = GCAL_HTTP_RETRIES + 1
+    last_exc: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return op()
+        except Exception as exc:
+            last_exc = exc
+            logger.warning("Google Calendar %s falló (intento %s/%s): %s", action, attempt, attempts, exc)
+            _reset_thread_client()
+            if attempt < attempts:
+                time.sleep(GCAL_HTTP_RETRY_WAIT)
+                continue
+            break
+    raise RuntimeError(f"Error {action}: {last_exc}") from last_exc
+
 def build_calendar() -> Any:
     """
     Crea el cliente de Calendar priorizando Service Account y fallback OAuth.
@@ -229,27 +274,24 @@ def build_calendar() -> Any:
     """
     if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("PELUBOT_FAKE_GCAL") == "1":
         return FakeCalendarService()
-    # Usa el cliente en caché si existe
-    try:
-        cached = _CACHED_SVC.get("svc")
-        if cached is not None:
-            return cached
-    except Exception:
-        pass
+    cached = _get_cached_service()
+    if cached is not None:
+        return cached
     try:
         sa = _load_sa_creds()
         if sa:
-            svc = build("calendar", "v3", credentials=sa)
-            _CACHED_SVC["svc"] = svc
+            svc = build("calendar", "v3", credentials=sa, http=_build_http_client(), cache_discovery=False)
+            _set_cached_service(svc)
             return svc
         oa = _load_user_creds()
         if oa:
-            svc = build("calendar", "v3", credentials=oa)
-            _CACHED_SVC["svc"] = svc
+            svc = build("calendar", "v3", credentials=oa, http=_build_http_client(), cache_discovery=False)
+            _set_cached_service(svc)
             return svc
     except Exception as e:
         if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("PELUBOT_FAKE_GCAL") == "1":
             return FakeCalendarService()
+        _reset_thread_client()
         raise RuntimeError(f"Error al crear cliente de Google Calendar: {e}")
     if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("PELUBOT_FAKE_GCAL") == "1":
         return FakeCalendarService()
@@ -301,7 +343,7 @@ def create_event(service: Any, calendar_id: str, start_dt, end_dt, summary: str,
     if color_id:
         body["colorId"] = color_id
     try:
-        return service.events().insert(calendarId=calendar_id, body=body).execute()
+        return _call_with_retry(lambda: service.events().insert(calendarId=calendar_id, body=body).execute(), "creando evento")
     except Exception as e:
         raise RuntimeError(f"Error creando evento: {e}")
 
@@ -312,14 +354,14 @@ def patch_event(service: Any, calendar_id: str, event_id: str, start_dt, end_dt,
         "end": {"dateTime": iso_datetime(end_dt, tz), "timeZone": tz},
     }
     try:
-        return service.events().patch(calendarId=calendar_id, eventId=event_id, body=body).execute()
+        return _call_with_retry(lambda: service.events().patch(calendarId=calendar_id, eventId=event_id, body=body).execute(), "modificando evento")
     except Exception as e:
         raise RuntimeError(f"Error modificando evento: {e}")
 
 def delete_event(service: Any, calendar_id: str, event_id: str) -> None:
     """Elimina un evento concreto, propagando el error si ocurre."""
     try:
-        service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
+        _call_with_retry(lambda: service.events().delete(calendarId=calendar_id, eventId=event_id).execute(), "eliminando evento")
     except Exception as e:
         raise RuntimeError(f"Error eliminando evento: {e}")
 

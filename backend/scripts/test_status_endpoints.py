@@ -3,9 +3,12 @@
 Test para verificar los nuevos endpoints de estado de reservas.
 Requiere que el servidor esté corriendo en localhost:8000
 """
+import pytest
 import requests
 import json
 from datetime import datetime, timedelta, timezone
+
+pytestmark = pytest.mark.skip(reason="Script manual; requiere servidor externo en localhost:8000")
 
 BASE_URL = "http://localhost:8000"
 
