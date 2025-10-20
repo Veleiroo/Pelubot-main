@@ -95,6 +95,12 @@ def create_db_and_tables() -> None:
                 conn.exec_driver_sql(
                     "CREATE UNIQUE INDEX IF NOT EXISTS ux_stylist_email ON stylistdb (email);"
                 )
+                conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_calendar_jobs_status_available ON calendar_sync_jobs (status, available_at);"
+                )
+                conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_calendar_jobs_reservation ON calendar_sync_jobs (reservation_id);"
+                )
                 # Trigger updated_at: actualiza solo si no lo ha actualizado ya la capa ORM
                 # Evita bucle usando condición sobre OLD/NEW
                 conn.exec_driver_sql(

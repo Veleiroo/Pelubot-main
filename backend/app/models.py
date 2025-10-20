@@ -279,6 +279,8 @@ class ActionResult(BaseModel):
 class ReservationCreateOut(ActionResult):
     reservation_id: str
     google_event_id: Optional[str] = None
+    sync_status: Literal["queued", "synced", "skipped", "failed"] = "queued"
+    sync_job_id: Optional[int] = None
 
 class RescheduleIn(BaseModel):
     """Solicitud de reprogramación de reserva."""
@@ -295,6 +297,8 @@ class RescheduleOut(BaseModel):
     reservation_id: Optional[str] = None
     start: Optional[str] = None
     end: Optional[str] = None
+    google_sync_status: Optional[str] = None
+    sync_job_id: Optional[int] = None
 
 class ReservationIn(BaseModel):
     """Entrada para crear reserva (end es opcional; se calcula en backend)."""
@@ -378,6 +382,51 @@ def _set_updated_at(mapper, connection, target):  # type: ignore[override]
 
 @event.listens_for(StylistDB, 'before_update', propagate=True)
 def _set_stylist_updated_at(mapper, connection, target):  # type: ignore[override]
+    try:
+        target.updated_at = datetime.now(timezone.utc)
+    except Exception:
+        pass
+
+
+class CalendarSyncJobDB(SQLModel, table=True):
+    """Trabajo encolado para sincronizar cambios con Google Calendar."""
+
+    __tablename__ = "calendar_sync_jobs"
+    id: Optional[int] = SQLField(default=None, primary_key=True)
+    reservation_id: str = SQLField(index=True, nullable=False)
+    action: str = SQLField(index=True, description="Acción a ejecutar: create/update/delete")
+    status: str = SQLField(default="pending", index=True, description="pending, processing, completed, failed")
+    payload: dict = SQLField(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False, default=dict),
+        description="Datos adicionales necesarios para procesar la acción",
+    )
+    attempts: int = SQLField(default=0, nullable=False)
+    last_error: Optional[str] = SQLField(default=None, sa_column=Column(String, nullable=True))
+    available_at: datetime = SQLField(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+        index=True,
+    )
+    created_at: datetime = SQLField(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+        nullable=False,
+    )
+    updated_at: datetime = SQLField(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+        nullable=False,
+    )
+    completed_at: Optional[datetime] = SQLField(
+        default=None,
+        sa_type=DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+@event.listens_for(CalendarSyncJobDB, 'before_update', propagate=True)
+def _set_calendar_job_updated(mapper, connection, target):  # type: ignore[override]
     try:
         target.updated_at = datetime.now(timezone.utc)
     except Exception:

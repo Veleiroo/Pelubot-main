@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta, date
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Body
 from sqlalchemy import or_, text as _sql_text
@@ -45,11 +46,9 @@ from app.services.logic import (
     find_reservation,
     cancel_reservation,
     apply_reschedule,
-    create_gcal_reservation,
     get_calendar_for_professional,
-    delete_gcal_reservation,
-    patch_gcal_reservation,
 )
+from app.services.calendar_queue import enqueue_calendar_job, CalendarSyncAction
 from app.utils.date import now_tz, TZ, validate_target_dt
 from app.utils.security import needs_rehash, verify_password, hash_password
 from app.core.metrics import RESERVATIONS_CANCELLED, RESERVATIONS_RESCHEDULED, RESERVATIONS_CREATED
@@ -115,6 +114,13 @@ def _service_price(service_id: str | None) -> float:
         return float(service.price_eur)
     except Exception:
         return 0.0
+
+
+def _build_create_message(res_id: str, customer_name: str, service_name: str, start: datetime, queued: bool) -> str:
+    base = f"Reserva {res_id} creada. Cliente: {customer_name}, {service_name} el {start.strftime('%d/%m/%Y %H:%M')}"
+    if queued:
+        return f"{base}. Sincronización con Google Calendar encolada."
+    return f"{base}. No se pudo encolar la sincronización con Google Calendar; revisa el estado más tarde."
 
 
 @router.post("/login", response_model=StylistAuthOut)
@@ -644,6 +650,8 @@ def stylist_create_reservation(
     res_id = str(uuid.uuid4())
     cal_id = get_calendar_for_professional(stylist.id)
     gcal_id = None
+    sync_job_id: int | None = None
+    sync_status = "queued"
 
     # Bloquear la tabla para evitar condiciones de carrera en SQLite
     try:
@@ -697,38 +705,27 @@ def stylist_create_reservation(
             detail=f"No se pudo guardar la reserva: {e}"
         )
 
-    # Sincronizar con Google Calendar (opcional, no falla si no funciona)
+    # Encolar sincronización con Google Calendar
     try:
-        gcal_event = create_gcal_reservation(
-            Reservation(
-                id=res_id,
-                service_id=payload.service_id,
-                professional_id=stylist.id,
-                start=start,
-                end=end,
-                customer_name=customer_name,
-                customer_email=customer_email,
-                customer_phone=customer_phone,
-                notes=notes,
-            ),
-            calendar_id=cal_id,
+        job = enqueue_calendar_job(
+            session,
+            reservation_id=res_id,
+            action=CalendarSyncAction.CREATE,
+            payload={"calendar_id": cal_id},
         )
-        gcal_id = gcal_event.get("id")
-        r_upd = session.get(ReservationDB, res_id)
-        if r_upd:
-            r_upd.google_event_id = gcal_id
-            r_upd.google_calendar_id = cal_id
-            session.add(r_upd)
-            session.commit()
-        logger.info("Evento Google Calendar creado: %s", gcal_id)
-    except Exception as e:
-        logger.warning("No se pudo crear evento en Google Calendar: %s", e)
+        sync_job_id = job.id
+    except Exception as exc:
+        session.rollback()
+        sync_status = "skipped"
+        logger.warning("No se pudo encolar sincronización con Google Calendar: %s", exc)
 
     return ReservationCreateOut(
         ok=True,
         reservation_id=res_id,
-        message=f"Reserva {res_id} creada. Cliente: {customer_name}, {service.name} el {start.strftime('%d/%m/%Y %H:%M')}",
+        message=_build_create_message(res_id, customer_name, service.name, start, sync_job_id is not None),
         google_event_id=gcal_id,
+        sync_job_id=sync_job_id,
+        sync_status=sync_status,
     )
 
 
@@ -749,7 +746,35 @@ def stylist_cancel_reservation(
         RESERVATIONS_CANCELLED.inc()
     except Exception:
         pass
-    return ActionResult(ok=True, message=f"Reserva {reservation_id} cancelada.")
+    sync_note = None
+    prev_event = reservation.google_event_id
+    prev_calendar = reservation.google_calendar_id
+    if prev_event or prev_calendar:
+        try:
+            job = enqueue_calendar_job(
+                session,
+                reservation_id=reservation_id,
+                action=CalendarSyncAction.DELETE,
+                payload={
+                    "event_id": prev_event,
+                    "calendar_id": prev_calendar,
+                    "drop_calendar": True,
+                },
+            )
+            sync_note = f" Sincronización con Google Calendar encolada (job {job.id})."
+        except Exception as exc:
+            session.rollback()
+            logger.warning("No se pudo encolar eliminación en Google Calendar para %s: %s", reservation_id, exc)
+            sync_note = " No se pudo encolar la eliminación en Google Calendar; revísalo manualmente."
+        else:
+            reservation.google_event_id = None
+            reservation.google_calendar_id = None
+            session.add(reservation)
+            session.commit()
+    message = f"Reserva {reservation_id} cancelada."
+    if sync_note:
+        message += sync_note
+    return ActionResult(ok=True, message=message)
 
 
 @router.post("/reservations/{reservation_id}/reschedule", response_model=RescheduleOut)
@@ -818,26 +843,41 @@ def stylist_reschedule_reservation(
     if not ok or not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
-    gcal_message: str | None = None
-    if updated.google_event_id and updated.google_calendar_id:
-        tz_name = getattr(TZ, "key", str(TZ))
+    prev_event_id = updated.google_event_id
+    prev_calendar_id = updated.google_calendar_id
+    if prev_event_id or prev_calendar_id:
+        updated.google_event_id = None
+        updated.google_calendar_id = None
+        session.add(updated)
+        session.commit()
+        session.refresh(updated)
+
+    sync_job_id: int | None = None
+    sync_status: Optional[str] = None
+    if prev_calendar_id:
         try:
-            patch_gcal_reservation(
-                updated.google_event_id,
-                updated.start,
-                updated.end,
-                updated.google_calendar_id,
-                tz=tz_name,
+            job = enqueue_calendar_job(
+                session,
+                reservation_id=updated.id,
+                action=CalendarSyncAction.UPDATE,
+                payload={
+                    "calendar_id": prev_calendar_id,
+                    "event_id": prev_event_id,
+                },
             )
-            gcal_message = "Evento sincronizado con Google Calendar."
+            sync_job_id = job.id
+            sync_status = "queued"
         except Exception as exc:
+            session.rollback()
             logger.warning(
-                "No se pudo actualizar el evento de Google Calendar (id=%s cal=%s): %s",
-                updated.google_event_id,
+                "No se pudo encolar la actualización en Google Calendar (id=%s cal=%s): %s",
+                updated.id,
                 updated.google_calendar_id,
                 exc,
             )
-            gcal_message = "La cita se reprogramó, pero no pudimos actualizar Google Calendar. Revísalo manualmente."
+            sync_status = "skipped"
+    else:
+        sync_status = "skipped"
     session.refresh(updated)
 
     try:
@@ -846,14 +886,18 @@ def stylist_reschedule_reservation(
         pass
 
     message_out = msg if isinstance(msg, str) else "Reserva reprogramada"
-    if gcal_message:
-        message_out = f"{message_out} {gcal_message}"
+    if sync_status == "queued":
+        message_out = f"{message_out} Sincronización con Google Calendar encolada."
+    elif sync_status == "skipped":
+        message_out = f"{message_out} No se pudo encolar la actualización en Google Calendar; revísalo manualmente."
     return RescheduleOut(
         ok=True,
         message=message_out,
         reservation_id=updated.id,
         start=updated.start.isoformat() if hasattr(updated.start, "isoformat") else None,
         end=updated.end.isoformat() if hasattr(updated.end, "isoformat") else None,
+        google_sync_status=sync_status,
+        sync_job_id=sync_job_id,
     )
 
 
@@ -923,13 +967,26 @@ def stylist_delete_reservation(
     gcal_event_id = getattr(reservation, "google_event_id", None)
     gcal_calendar_id = getattr(reservation, "google_calendar_id", None)
 
-    try:
-        if gcal_event_id and gcal_calendar_id:
-            try:
-                delete_gcal_reservation(gcal_event_id, gcal_calendar_id)
-            except Exception:
-                logger.warning("No se pudo eliminar el evento de Google Calendar: %s", gcal_event_id)
+    sync_note = None
+    if gcal_event_id and gcal_calendar_id:
+        try:
+            job = enqueue_calendar_job(
+                session,
+                reservation_id=reservation_id,
+                action=CalendarSyncAction.DELETE,
+                payload={
+                    "event_id": gcal_event_id,
+                    "calendar_id": gcal_calendar_id,
+                    "drop_calendar": True,
+                },
+            )
+            sync_note = f" Se encoló la eliminación en Google Calendar (job {job.id})."
+        except Exception as exc:
+            session.rollback()
+            logger.warning("No se pudo encolar la eliminación del evento de Google Calendar %s: %s", gcal_event_id, exc)
+            sync_note = " No se pudo encolar la eliminación en Google Calendar; revísalo manualmente."
 
+    try:
         session.delete(reservation)
         session.commit()
     except Exception as exc:
@@ -937,4 +994,7 @@ def stylist_delete_reservation(
         logger.exception("Error eliminando reserva %s", reservation_id)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo eliminar la reserva") from exc
 
-    return ActionResult(ok=True, message=f"Reserva {reservation_id} eliminada definitivamente.")
+    message = f"Reserva {reservation_id} eliminada definitivamente."
+    if sync_note:
+        message += sync_note
+    return ActionResult(ok=True, message=message)

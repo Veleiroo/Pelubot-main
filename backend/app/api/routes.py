@@ -24,13 +24,12 @@ from app.services.logic import (
     find_available_slots,
     find_reservation, cancel_reservation,
     apply_reschedule,
-    create_gcal_reservation,
     get_calendar_for_professional,
     sync_from_gcal_range,
     reconcile_db_to_gcal_range,
     detect_conflicts_range,
-    patch_gcal_reservation,
 )
+from app.services.calendar_queue import enqueue_calendar_job, CalendarSyncAction
 from app.db import get_session, engine
 from app.utils.date import validate_target_dt, TZ, now_tz, MAX_AHEAD_DAYS
 from app.core.metrics import RESERVATIONS_CREATED, RESERVATIONS_RESCHEDULED, RESERVATIONS_CANCELLED
@@ -64,6 +63,13 @@ def require_api_key(request: Request):
 router = APIRouter()
 
 GCAL_CALENDAR_ID = os.getenv("GCAL_CALENDAR_ID", os.getenv("GCAL_TEST_CALENDAR_ID", "pelubot.test@gmail.com"))
+
+
+def _build_public_create_message(reservation_id: str, queued: bool) -> str:
+    base = f"Reserva creada exitosamente. ID: {reservation_id}"
+    if queued:
+        return f"{base}. Sincronización con Google Calendar encolada."
+    return f"{base}. No se pudo encolar la sincronización con Google Calendar; revísalo manualmente."
 
 @router.get("/health")
 def health():
@@ -181,7 +187,38 @@ def cancel_reservation_post(
             RESERVATIONS_CANCELLED.inc()
         except Exception:
             pass
-        return ActionResult(ok=True, message=f"Reserva {payload.reservation_id} cancelada.")
+        sync_note = ""
+        prev_event = r.google_event_id
+        prev_calendar = r.google_calendar_id
+        if prev_event or prev_calendar:
+            try:
+                job = enqueue_calendar_job(
+                    session,
+                    reservation_id=payload.reservation_id,
+                    action=CalendarSyncAction.DELETE,
+                    payload={
+                        "event_id": prev_event,
+                        "calendar_id": prev_calendar,
+                        "drop_calendar": True,
+                    },
+                )
+                sync_note = f" Sincronización con Google Calendar encolada (job {job.id})."
+            except Exception as exc:
+                session.rollback()
+                logger.warning(
+                    "No se pudo encolar la eliminación de Google Calendar para %s: %s",
+                    payload.reservation_id,
+                    exc,
+                )
+                sync_note = " No se pudo encolar la eliminación en Google Calendar; revísalo manualmente."
+            else:
+                r_db = session.get(ReservationDB, payload.reservation_id)
+                if r_db:
+                    r_db.google_event_id = None
+                    r_db.google_calendar_id = None
+                    session.add(r_db)
+                    session.commit()
+        return ActionResult(ok=True, message=f"Reserva {payload.reservation_id} cancelada.{sync_note}")
     raise HTTPException(status_code=500, detail="No se pudo cancelar la reserva")
 
 @router.delete("/reservations/{reservation_id}", response_model=ActionResult)
@@ -203,7 +240,38 @@ def cancel_reservation_delete(
             RESERVATIONS_CANCELLED.inc()
         except Exception:
             pass
-        return ActionResult(ok=True, message=f"Reserva {reservation_id} cancelada.")
+        sync_note = ""
+        prev_event = r.google_event_id
+        prev_calendar = r.google_calendar_id
+        if prev_event or prev_calendar:
+            try:
+                job = enqueue_calendar_job(
+                    session,
+                    reservation_id=reservation_id,
+                    action=CalendarSyncAction.DELETE,
+                    payload={
+                        "event_id": prev_event,
+                        "calendar_id": prev_calendar,
+                        "drop_calendar": True,
+                    },
+                )
+                sync_note = f" Sincronización con Google Calendar encolada (job {job.id})."
+            except Exception as exc:
+                session.rollback()
+                logger.warning(
+                    "No se pudo encolar la eliminación de Google Calendar para %s: %s",
+                    reservation_id,
+                    exc,
+                )
+                sync_note = " No se pudo encolar la eliminación en Google Calendar; revísalo manualmente."
+            else:
+                r_db = session.get(ReservationDB, reservation_id)
+                if r_db:
+                    r_db.google_event_id = None
+                    r_db.google_calendar_id = None
+                    session.add(r_db)
+                    session.commit()
+        return ActionResult(ok=True, message=f"Reserva {reservation_id} cancelada.{sync_note}")
     raise HTTPException(status_code=500, detail="No se pudo cancelar la reserva")
 
 @router.post("/reschedule", response_model=RescheduleOut)
@@ -257,32 +325,57 @@ def reschedule_post(
     ok, msg, r = apply_reschedule(session, payload)
     if not ok or not r:
         raise HTTPException(status_code=400, detail=msg)
-    gcal_message: Optional[str] = None
-    if r.google_event_id and r.google_calendar_id:
-        tz_name = getattr(TZ, "key", str(TZ))
+    prev_event_id = r.google_event_id
+    prev_calendar_id = r.google_calendar_id
+    if prev_event_id or prev_calendar_id:
+        r.google_event_id = None
+        r.google_calendar_id = None
+        session.add(r)
+        session.commit()
+        session.refresh(r)
+
+    sync_job_id: int | None = None
+    sync_status: Optional[str] = None
+    if prev_calendar_id:
         try:
-            patch_gcal_reservation(
-                r.google_event_id,
-                r.start,
-                r.end,
-                r.google_calendar_id,
-                tz=tz_name,
+            job = enqueue_calendar_job(
+                session,
+                reservation_id=r.id,
+                action=CalendarSyncAction.UPDATE,
+                payload={
+                    "calendar_id": prev_calendar_id,
+                    "event_id": prev_event_id,
+                },
             )
-            gcal_message = "Evento sincronizado con Google Calendar."
+            sync_job_id = job.id
+            sync_status = "queued"
         except Exception as exc:
+            session.rollback()
             logger.warning(
-                "No se pudo actualizar evento Google Calendar (id=%s cal=%s): %s",
-                r.google_event_id,
+                "No se pudo encolar la actualización en Google Calendar (id=%s cal=%s): %s",
+                r.id,
                 r.google_calendar_id,
                 exc,
             )
-            gcal_message = "Revisa Google Calendar: no se pudo actualizar el evento automáticamente."
+            sync_status = "skipped"
+    else:
+        sync_status = "skipped"
     session.refresh(r)
     message_out = msg if (isinstance(msg, str) and "Reprogramada" in msg) else f"Reprogramada: {msg}"
-    if gcal_message:
-        message_out = f"{message_out} {gcal_message}"
+    if sync_status == "queued":
+        message_out = f"{message_out} Sincronización con Google Calendar encolada."
+    elif sync_status == "skipped":
+        message_out = f"{message_out} No se pudo encolar la actualización en Google Calendar; revísalo manualmente."
     logger.info("Reservation rescheduled: id=%s start=%s end=%s pro=%s", r.id, r.start.isoformat(), r.end.isoformat(), r.professional_id)
-    return RescheduleOut(ok=True, message=message_out, reservation_id=r.id, start=r.start.isoformat(), end=r.end.isoformat())
+    return RescheduleOut(
+        ok=True,
+        message=message_out,
+        reservation_id=r.id,
+        start=r.start.isoformat(),
+        end=r.end.isoformat(),
+        google_sync_status=sync_status,
+        sync_job_id=sync_job_id,
+    )
 
 @router.post("/reservations/reschedule", response_model=RescheduleOut)
 def reschedule_post_alias(
@@ -428,6 +521,8 @@ def create_reservation(
     res_id = str(uuid.uuid4())
     cal_id = get_calendar_for_professional(payload.professional_id)
     gcal_id = None
+    sync_job_id: int | None = None
+    sync_status = "queued"
 
     # NOTA: bloqueamos la tabla para evitar condiciones de carrera en SQLite.
     try:
@@ -470,34 +565,28 @@ def create_reservation(
         session.rollback()
         raise HTTPException(status_code=500, detail=f"No se pudo guardar la reserva: {e}")
 
-    # NOTA: se sincroniza después del commit para no deshacer la reserva si Google falla.
     try:
-        gcal_event = create_gcal_reservation(
-            Reservation(
-                id=res_id,
-                service_id=payload.service_id,
-                professional_id=payload.professional_id,
-                start=start,
-                end=end,
-                customer_name=customer_name,
-                customer_email=customer_email,
-                customer_phone=customer_phone,
-                notes=notes,
-            ),
-            calendar_id=cal_id,
+        job = enqueue_calendar_job(
+            session,
+            reservation_id=res_id,
+            action=CalendarSyncAction.CREATE,
+            payload={"calendar_id": cal_id},
         )
-        gcal_id = gcal_event.get("id")
-        r_upd = session.get(ReservationDB, res_id)
-        if r_upd:
-            r_upd.google_event_id = gcal_id
-            r_upd.google_calendar_id = cal_id
-            session.add(r_upd); session.commit()
-        logger.info("Evento Google Calendar creado: %s", gcal_id)
-    except Exception as e:
-        logger.warning("Google Calendar no disponible; reserva sin sincronización: %s", e)
+        sync_job_id = job.id
+    except Exception as exc:
+        session.rollback()
+        sync_status = "skipped"
+        logger.warning("No se pudo encolar la sincronización con Google Calendar para %s: %s", res_id, exc)
 
-    message = f"Reserva creada exitosamente. ID: {res_id}"
-    payload_out = ReservationCreateOut(ok=True, message=message, reservation_id=res_id, google_event_id=gcal_id)
+    message = _build_public_create_message(res_id, sync_job_id is not None)
+    payload_out = ReservationCreateOut(
+        ok=True,
+        message=message,
+        reservation_id=res_id,
+        google_event_id=gcal_id,
+        sync_job_id=sync_job_id,
+        sync_status=sync_status,
+    )
     logger.info("Reservation created: id=%s gcal_event=%s calendar=%s start=%s end=%s", res_id, gcal_id, cal_id, start.isoformat(), end.isoformat())
     return payload_out
 
