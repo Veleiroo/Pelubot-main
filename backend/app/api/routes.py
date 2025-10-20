@@ -34,6 +34,7 @@ from app.integrations.gcal_background import (
     queue_patch_event,
     queue_delete_event,
 )
+from app.services.calendar_queue import enqueue_calendar_job, CalendarSyncAction
 from app.db import get_session, engine
 from app.utils.date import validate_target_dt, TZ, now_tz, MAX_AHEAD_DAYS
 from app.core.metrics import RESERVATIONS_CREATED, RESERVATIONS_RESCHEDULED, RESERVATIONS_CANCELLED
@@ -67,6 +68,13 @@ def require_api_key(request: Request):
 router = APIRouter()
 
 GCAL_CALENDAR_ID = os.getenv("GCAL_CALENDAR_ID", os.getenv("GCAL_TEST_CALENDAR_ID", "pelubot.test@gmail.com"))
+
+
+def _build_public_create_message(reservation_id: str, queued: bool) -> str:
+    base = f"Reserva creada exitosamente. ID: {reservation_id}"
+    if queued:
+        return f"{base}. Sincronización con Google Calendar encolada."
+    return f"{base}. No se pudo encolar la sincronización con Google Calendar; revísalo manualmente."
 
 @router.get("/health")
 def health():
@@ -273,10 +281,20 @@ def reschedule_post(
         gcal_message = "Reprogramación sincronizada con Google Calendar en background (nuevo evento)."
     session.refresh(r)
     message_out = msg if (isinstance(msg, str) and "Reprogramada" in msg) else f"Reprogramada: {msg}"
-    if gcal_message:
-        message_out = f"{message_out} {gcal_message}"
+    if sync_status == "queued":
+        message_out = f"{message_out} Sincronización con Google Calendar encolada."
+    elif sync_status == "skipped":
+        message_out = f"{message_out} No se pudo encolar la actualización en Google Calendar; revísalo manualmente."
     logger.info("Reservation rescheduled: id=%s start=%s end=%s pro=%s", r.id, r.start.isoformat(), r.end.isoformat(), r.professional_id)
-    return RescheduleOut(ok=True, message=message_out, reservation_id=r.id, start=r.start.isoformat(), end=r.end.isoformat())
+    return RescheduleOut(
+        ok=True,
+        message=message_out,
+        reservation_id=r.id,
+        start=r.start.isoformat(),
+        end=r.end.isoformat(),
+        google_sync_status=sync_status,
+        sync_job_id=sync_job_id,
+    )
 
 @router.post("/reservations/reschedule", response_model=RescheduleOut)
 def reschedule_post_alias(
