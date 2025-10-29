@@ -17,7 +17,7 @@ from sqlmodel import Session, select
 from app.db import engine
 from app.models import ReservationDB
 from app.integrations.google_calendar import build_calendar, list_events_allpages, delete_event
-from app.data import PRO_CALENDAR
+from app.data import get_professional_calendars, invalidate_catalog_cache
 
 
 def clear_database():
@@ -68,7 +68,7 @@ def clear_google_calendar():
     
     total_deleted = 0
     
-    for pro_id, cal_id in PRO_CALENDAR.items():
+    for pro_id, cal_id in get_professional_calendars().items():
         print(f"\n📅 Procesando calendario de {pro_id}...")
         print(f"   Calendar ID: {cal_id}")
         
@@ -175,10 +175,12 @@ ADVERTENCIA:
     # Ejecutar limpieza según opciones
     if args.db_only:
         clear_database()
+        invalidate_catalog_cache()
     elif args.gcal_only:
         clear_google_calendar()
     else:
         clear_database()
+        invalidate_catalog_cache()
         clear_google_calendar()
     
     print("\n" + "="*60)

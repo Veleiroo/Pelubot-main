@@ -88,6 +88,12 @@ def create_db_and_tables() -> None:
                 conn.exec_driver_sql(
                     "CREATE INDEX IF NOT EXISTS ix_res_service_start ON reservationdb (service_id, start);"
                 )
+                conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_res_sync_status ON reservationdb (sync_status);"
+                )
+                conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_res_sync_job ON reservationdb (sync_job_id);"
+                )
                 # Índices de estilistas para consultas frecuentes
                 conn.exec_driver_sql(
                     "CREATE INDEX IF NOT EXISTS ix_stylist_active ON stylistdb (is_active);"
@@ -124,9 +130,25 @@ def create_db_and_tables() -> None:
                         "customer_email": "TEXT",
                         "customer_phone": "TEXT",
                         "notes": "TEXT",
+                        "sync_status": "TEXT",
+                        "sync_job_id": "INTEGER",
+                        "sync_last_error": "TEXT",
+                        "sync_updated_at": "TIMESTAMP",
                     }.items():
                         if col not in existing_cols:
                             conn.exec_driver_sql(f"ALTER TABLE reservationdb ADD COLUMN {col} {ddl};")
+                except Exception:
+                    pass
+                try:
+                    cols = conn.exec_driver_sql("PRAGMA table_info('calendar_sync_jobs');").fetchall()
+                    existing_cols = {row[1] for row in cols}
+                    for col, ddl in {
+                        "locked_by": "TEXT",
+                        "locked_at": "TIMESTAMP",
+                        "heartbeat_at": "TIMESTAMP",
+                    }.items():
+                        if col not in existing_cols:
+                            conn.exec_driver_sql(f"ALTER TABLE calendar_sync_jobs ADD COLUMN {col} {ddl};")
                 except Exception:
                     pass
         except Exception:

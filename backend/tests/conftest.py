@@ -1,6 +1,7 @@
 """Fixtures compartidas para los tests del backend."""
 
 import importlib
+import os
 from pathlib import Path
 import sys
 
@@ -8,6 +9,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel, create_engine, Session
+
+os.environ.setdefault("API_KEY", "test-api-key")
+os.environ.setdefault("ALLOW_LOCAL_NO_AUTH", "false")
+os.environ.setdefault("PRO_PORTAL_SECRET", "test-pro-portal-secret")
 
 # tests/ está dentro de Pelubot/, así que el root del proyecto es backend/
 ROOT = Path(__file__).resolve().parents[1]

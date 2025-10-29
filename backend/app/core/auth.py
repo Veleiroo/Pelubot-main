@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Tuple
 
@@ -13,8 +14,10 @@ from sqlmodel import Session
 from app.db import get_session
 from app.models import StylistDB
 
+logger = logging.getLogger("pelubot.auth")
+
 SESSION_COOKIE_NAME = os.getenv("STYLIST_SESSION_COOKIE", "pro_session")
-_SESSION_SECRET = os.getenv("PRO_PORTAL_SECRET") or os.getenv("STYLIST_SESSION_SECRET") or os.getenv("API_KEY", "changeme")
+_SESSION_SECRET_RAW = (os.getenv("PRO_PORTAL_SECRET") or os.getenv("STYLIST_SESSION_SECRET") or "").strip()
 _SESSION_TTL_MINUTES = int(os.getenv("STYLIST_SESSION_MINUTES", "720"))  # 12 horas por defecto
 _SESSION_COOKIE_SECURE = os.getenv("STYLIST_SESSION_COOKIE_SECURE", "auto").lower()
 _SESSION_COOKIE_SAMESITE = os.getenv("STYLIST_SESSION_SAMESITE", "lax").lower()
@@ -36,20 +39,23 @@ def _now() -> datetime:
 
 def _session_secret() -> str:
     global _SESSION_SECRET_RUNTIME
-    candidate = _SESSION_SECRET_RUNTIME or _SESSION_SECRET
-    if candidate and candidate != "changeme":
-        if _SESSION_SECRET_RUNTIME is None:
-            _SESSION_SECRET_RUNTIME = candidate
-        return candidate
-    if not candidate or candidate == "changeme":
-        env = os.getenv("ENV", "dev").lower()
-        if env in {"prod", "production"}:
-            raise RuntimeError("PRO_PORTAL_SECRET no configurado; define un secreto fuerte en el entorno")
-        # Generamos un secreto efímero para desarrollo/test.
-        if _SESSION_SECRET_RUNTIME is None:
-            _SESSION_SECRET_RUNTIME = secrets.token_urlsafe(48)
+    if _SESSION_SECRET_RUNTIME:
         return _SESSION_SECRET_RUNTIME
-    return candidate
+
+    if _SESSION_SECRET_RAW:
+        if len(_SESSION_SECRET_RAW) < 32:
+            logger.warning("PRO_PORTAL_SECRET configurado con menos de 32 caracteres; considera reforzarlo.")
+        _SESSION_SECRET_RUNTIME = _SESSION_SECRET_RAW
+        return _SESSION_SECRET_RUNTIME
+
+    env = os.getenv("ENV", "dev").lower()
+    if env in {"prod", "production"}:
+        raise RuntimeError("PRO_PORTAL_SECRET no configurado; define un secreto fuerte en el entorno")
+
+    # Generamos un secreto efímero para desarrollo/test.
+    _SESSION_SECRET_RUNTIME = secrets.token_urlsafe(48)
+    logger.warning("PRO_PORTAL_SECRET no definido; generando uno efímero para entorno local.")
+    return _SESSION_SECRET_RUNTIME
 
 
 def _cookie_secure_flag() -> bool:

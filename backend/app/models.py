@@ -3,7 +3,7 @@ Modelos principales de datos para la API de reservas.
 Incluye servicios, profesionales, reservas y estructuras de consulta.
 """
 from pydantic import BaseModel, Field, field_validator, EmailStr, model_validator
-from typing import List, Optional, Literal
+from typing import Dict, List, Optional, Literal
 from datetime import datetime, date, timezone
 from sqlmodel import SQLModel, Field as SQLField
 from sqlalchemy.types import DateTime
@@ -15,10 +15,58 @@ ReservationStatus = Literal["confirmada", "asistida", "no_asistida", "cancelada"
 
 class Service(BaseModel):
     """Servicio ofrecido (ej.: corte, coloración)."""
+
     id: str
     name: str
     duration_min: int
     price_eur: float
+
+
+class ServiceCatalogBase(SQLModel):
+    """Tabla de catálogo de servicios con metadatos editables."""
+
+    id: str = SQLField(
+        primary_key=True,
+        description="Identificador estable (slug) del servicio",
+    )
+    name: str = SQLField(
+        index=True,
+        description="Nombre visible del servicio",
+    )
+    duration_min: int = SQLField(
+        default=30,
+        description="Duración estimada en minutos",
+    )
+    price_eur: float = SQLField(
+        default=0.0,
+        description="Precio estimado en euros",
+    )
+    is_active: bool = SQLField(
+        default=True,
+        index=True,
+        description="Si el servicio está activo en el catálogo público",
+    )
+    sort_order: int = SQLField(
+        default=0,
+        description="Orden recomendado para presentar el servicio",
+    )
+    created_at: datetime = SQLField(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+        nullable=False,
+    )
+    updated_at: datetime = SQLField(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+        nullable=False,
+    )
+
+
+class ServiceCatalogDB(ServiceCatalogBase, table=True):
+    __tablename__ = "service_catalog"
+    __table_args__ = (
+        Index("ix_service_catalog_active", "is_active"),
+    )
 
 class Professional(BaseModel):
     """Profesional (ej.: estilista, barbero)."""
@@ -234,6 +282,10 @@ class Reservation(BaseModel):
     customer_email: Optional[EmailStr] = None
     customer_phone: Optional[str] = None
     notes: Optional[str] = None
+    sync_status: Optional[str] = None
+    sync_job_id: Optional[int] = None
+    sync_last_error: Optional[str] = None
+    sync_updated_at: Optional[datetime] = None
 
 class SlotsQuery(BaseModel):
     """Consulta de huecos disponibles."""
@@ -368,6 +420,10 @@ class ReservationDB(SQLModel, table=True):
     customer_email: Optional[str] = SQLField(default=None, nullable=True)
     customer_phone: Optional[str] = SQLField(default=None, nullable=True)
     notes: Optional[str] = SQLField(default=None, nullable=True)
+    sync_status: Optional[str] = SQLField(default=None, index=True, nullable=True)
+    sync_job_id: Optional[int] = SQLField(default=None, index=True, nullable=True)
+    sync_last_error: Optional[str] = SQLField(default=None, nullable=True)
+    sync_updated_at: Optional[datetime] = SQLField(default=None, sa_type=DateTime(timezone=True), nullable=True)
     created_at: datetime = SQLField(default_factory=lambda: datetime.now(timezone.utc), sa_type=DateTime(timezone=True), nullable=False)
     updated_at: datetime = SQLField(default_factory=lambda: datetime.now(timezone.utc), sa_type=DateTime(timezone=True), nullable=False)
 
@@ -403,6 +459,17 @@ class CalendarSyncJobDB(SQLModel, table=True):
     )
     attempts: int = SQLField(default=0, nullable=False)
     last_error: Optional[str] = SQLField(default=None, sa_column=Column(String, nullable=True))
+    locked_by: Optional[str] = SQLField(default=None, nullable=True, index=True)
+    locked_at: Optional[datetime] = SQLField(
+        default=None,
+        sa_type=DateTime(timezone=True),
+        nullable=True,
+    )
+    heartbeat_at: Optional[datetime] = SQLField(
+        default=None,
+        sa_type=DateTime(timezone=True),
+        nullable=True,
+    )
     available_at: datetime = SQLField(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_type=DateTime(timezone=True),
@@ -431,3 +498,35 @@ def _set_calendar_job_updated(mapper, connection, target):  # type: ignore[overr
         target.updated_at = datetime.now(timezone.utc)
     except Exception:
         pass
+
+
+class CalendarJobOut(BaseModel):
+    id: int
+    reservation_id: str
+    action: str
+    status: str
+    attempts: int
+    available_at: datetime
+    locked_by: Optional[str] = None
+    locked_at: Optional[datetime] = None
+    heartbeat_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CalendarJobListOut(BaseModel):
+    jobs: List[CalendarJobOut]
+    counts: Dict[str, int]
+
+
+class CalendarJobRetryIn(BaseModel):
+    delay_seconds: Optional[int] = Field(default=0, ge=0, le=3600 * 24)
+
+
+class ReservationSyncStatusOut(BaseModel):
+    reservation_id: str
+    sync_status: Optional[str] = None
+    sync_job_id: Optional[int] = None
+    sync_last_error: Optional[str] = None
+    sync_updated_at: Optional[datetime] = None

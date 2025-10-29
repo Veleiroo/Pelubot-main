@@ -39,7 +39,7 @@ root_str = str(ROOT)
 if root_str not in sys.path:
     sys.path.insert(0, root_str)
 
-from app.data import PROS, SERVICES, SERVICE_BY_ID  # noqa  # pylint: disable=wrong-import-position
+from app.data import get_active_professionals, get_service_by_id  # noqa  # pylint: disable=wrong-import-position
 
 
 CUSTOMER_NAME = os.getenv("CUSTOMER_NAME", "Validator Bot")
@@ -268,9 +268,12 @@ def main() -> None:
     print(json.dumps({"accion": "validacion_servicios", "fecha": date.today().isoformat()}))
 
     results: List[ReservationResult] = []
-    for professional in PROS:
+    professionals = get_active_professionals()
+    for professional in professionals:
         for service_id in professional.services:
-            if service_id not in SERVICE_BY_ID:
+            try:
+                get_service_by_id(service_id)
+            except KeyError:
                 results.append(
                     ReservationResult(
                         service_id,

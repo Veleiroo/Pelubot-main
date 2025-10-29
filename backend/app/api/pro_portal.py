@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone, timedelta, date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Body, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Body
 from sqlalchemy import or_, text as _sql_text
 from sqlalchemy.exc import InvalidRequestError
 from sqlmodel import Session, select
@@ -29,7 +29,6 @@ from app.models import (
     ReservationDB,
     ReservationIn,
     ReservationCreateOut,
-    Reservation,
     RescheduleIn,
     RescheduleOut,
     StylistRescheduleIn,
@@ -42,6 +41,7 @@ from app.models import (
     StylistStatsServicePerformance,
     StylistStatsRetentionBucket,
     StylistStatsInsight,
+    ReservationSyncStatusOut,
 )
 from app.services.logic import (
     find_reservation,
@@ -49,22 +49,13 @@ from app.services.logic import (
     apply_reschedule,
     get_calendar_for_professional,
 )
-from app.integrations.gcal_background import (
-    queue_create_event,
-    queue_patch_event,
-    queue_delete_event,
-)
+from app.services.calendar_queue import CalendarSyncAction, try_enqueue_calendar_job
 
 
-def _session_engine(session: Session):
-    bind = session.get_bind()
-    if hasattr(bind, "engine"):
-        return bind.engine
-    return bind
 from app.utils.date import now_tz, TZ, validate_target_dt
 from app.utils.security import needs_rehash, verify_password, hash_password
 from app.core.metrics import RESERVATIONS_CANCELLED, RESERVATIONS_RESCHEDULED, RESERVATIONS_CREATED
-from app.data import SERVICE_BY_ID
+from app.data import get_service_by_id
 
 logger = logging.getLogger("pelubot.api.pro_portal")
 router = APIRouter(prefix="/pros", tags=["pros"])
@@ -119,7 +110,10 @@ def _pct_change(current: float, previous: float) -> float:
 def _service_price(service_id: str | None) -> float:
     if not service_id:
         return 0.0
-    service = SERVICE_BY_ID.get(service_id)
+    try:
+        service = get_service_by_id(service_id)
+    except KeyError:
+        return 0.0
     if not service:
         return 0.0
     try:
@@ -215,7 +209,10 @@ def stylist_reservations(
     rows = session.exec(stmt).all()
     reservations: list[StylistReservationOut] = []
     for row in rows:
-        service = SERVICE_BY_ID.get(row.service_id)
+        try:
+            service = get_service_by_id(row.service_id)
+        except KeyError:
+            service = None
         start_local = _to_local(getattr(row, "start", None))
         end_local = _to_local(getattr(row, "end", None))
         created_local = _to_local(getattr(row, "created_at", None))
@@ -302,7 +299,10 @@ def stylist_overview(
         # Usar el status de la DB directamente
         status = getattr(row, "status", "confirmada")
         counts[status] = counts.get(status, 0) + 1
-        service = SERVICE_BY_ID.get(row.service_id)
+        try:
+            service = get_service_by_id(row.service_id)
+        except KeyError:
+            service = None
         appointment = StylistOverviewAppointment(
             id=row.id,
             start=start_local,
@@ -477,7 +477,10 @@ def stylist_stats(
         price: float,
     ) -> None:
         service_id = getattr(reservation, "service_id", None) or "otros"
-        service = SERVICE_BY_ID.get(service_id)
+        try:
+            service = get_service_by_id(service_id)
+        except KeyError:
+            service = None
         bucket = container.setdefault(
             service_id,
             {
@@ -616,7 +619,6 @@ def stylist_stats(
 @router.post("/reservations", response_model=ReservationCreateOut)
 def stylist_create_reservation(
     payload: ReservationIn,
-    background_tasks: BackgroundTasks,
     stylist: StylistDB = Depends(get_current_stylist),
     session: Session = Depends(get_session),
 ) -> ReservationCreateOut:
@@ -630,7 +632,9 @@ def stylist_create_reservation(
         )
     
     # Verificar que el servicio existe
-    if payload.service_id not in SERVICE_BY_ID:
+    try:
+        service = get_service_by_id(payload.service_id)
+    except KeyError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servicio no encontrado")
     
     # Verificar que el profesional ofrece ese servicio
@@ -650,7 +654,6 @@ def stylist_create_reservation(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     
-    service = SERVICE_BY_ID[payload.service_id]
     end = start + timedelta(minutes=service.duration_min)
     customer_name = payload.customer_name.strip()
     customer_phone = payload.customer_phone.strip()
@@ -714,21 +717,52 @@ def stylist_create_reservation(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"No se pudo guardar la reserva: {e}"
         )
+    sync_status, sync_job_id = try_enqueue_calendar_job(
+        session,
+        reservation_id=res_id,
+        action=CalendarSyncAction.CREATE,
+        payload={"calendar_id": cal_id} if cal_id else None,
+    )
 
-    queue_create_event(background_tasks, res_id, _session_engine(session))
+    sync_error = None
+    if sync_status != "queued":
+        sync_error = "No se pudo encolar la sincronización en Google Calendar."
+    try:
+        session.refresh(row)
+    except Exception:
+        pass
+    try:
+        row.sync_status = sync_status
+        row.sync_job_id = sync_job_id
+        row.sync_last_error = sync_error
+        row.sync_updated_at = datetime.now(timezone.utc)
+        session.add(row)
+        session.commit()
+    except Exception:
+        session.rollback()
+
+    message = f"Reserva {res_id} creada. Cliente: {customer_name}, {service.name} el {start.strftime('%d/%m/%Y %H:%M')}."
+    if sync_status == "queued":
+        suffix = " Sincronización con Google Calendar encolada."
+        if sync_job_id is not None:
+            suffix = f"{suffix[:-1]} (job {sync_job_id})."
+        message = f"{message}{suffix}"
+    else:
+        message = f"{message} No se pudo encolar la sincronización con Google Calendar; revísalo manualmente."
 
     return ReservationCreateOut(
         ok=True,
         reservation_id=res_id,
-        message=f"Reserva {res_id} creada. Cliente: {customer_name}, {service.name} el {start.strftime('%d/%m/%Y %H:%M')}. Sincronización con Google Calendar en background.",
+        message=message,
         google_event_id=None,
+        sync_status=sync_status,
+        sync_job_id=sync_job_id,
     )
 
 
 @router.post("/reservations/{reservation_id}/cancel", response_model=ActionResult)
 def stylist_cancel_reservation(
     reservation_id: str,
-    background_tasks: BackgroundTasks,
     stylist: StylistDB = Depends(get_current_stylist),
     session: Session = Depends(get_session),
 ) -> ActionResult:
@@ -743,14 +777,47 @@ def stylist_cancel_reservation(
         RESERVATIONS_CANCELLED.inc()
     except Exception:
         pass
-    queue_delete_event(background_tasks, reservation_id, _session_engine(session))
-    return ActionResult(ok=True, message=f"Reserva {reservation_id} cancelada. Sincronización con Google Calendar en background.")
+
+    payload = {"drop_calendar": False}
+    if getattr(reservation, "google_event_id", None):
+        payload["event_id"] = reservation.google_event_id
+    if getattr(reservation, "google_calendar_id", None):
+        payload["calendar_id"] = reservation.google_calendar_id
+    sync_status, sync_job_id = try_enqueue_calendar_job(
+        session,
+        reservation_id=reservation_id,
+        action=CalendarSyncAction.DELETE,
+        payload=payload,
+    )
+
+    base_message = f"Reserva {reservation_id} cancelada."
+    if sync_status == "queued":
+        extra = " Sincronización con Google Calendar encolada."
+        if sync_job_id is not None:
+            extra = f"{extra[:-1]} (job {sync_job_id})."
+    else:
+        extra = " No se pudo encolar la sincronización con Google Calendar; revísalo manualmente."
+
+    sync_error = None if sync_status == "queued" else extra.strip()
+    try:
+        session.refresh(reservation)
+    except Exception:
+        pass
+    try:
+        reservation.sync_status = sync_status
+        reservation.sync_job_id = sync_job_id
+        reservation.sync_last_error = sync_error
+        reservation.sync_updated_at = datetime.now(timezone.utc)
+        session.add(reservation)
+        session.commit()
+    except Exception:
+        session.rollback()
+    return ActionResult(ok=True, message=f"{base_message}{extra}")
 
 
 @router.post("/reservations/{reservation_id}/reschedule", response_model=RescheduleOut)
 def stylist_reschedule_reservation(
     reservation_id: str,
-    background_tasks: BackgroundTasks,
     payload: StylistRescheduleIn = Body(...),
     stylist: StylistDB = Depends(get_current_stylist),
     session: Session = Depends(get_session),
@@ -814,14 +881,25 @@ def stylist_reschedule_reservation(
     if not ok or not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
-    gcal_message: str | None = None
-    engine_override = _session_engine(session)
-    if updated.google_event_id and updated.google_calendar_id:
-        queue_patch_event(background_tasks, updated.id, engine_override)
-        gcal_message = "Reprogramación sincronizada con Google Calendar en background."
+    calendar_id = getattr(updated, "google_calendar_id", None) or get_calendar_for_professional(updated.professional_id)
+    sync_status = "skipped"
+    sync_job_id: Optional[int] = None
+    if updated.google_event_id and calendar_id:
+        payload_sync = {"calendar_id": calendar_id, "event_id": updated.google_event_id}
+        sync_status, sync_job_id = try_enqueue_calendar_job(
+            session,
+            reservation_id=updated.id,
+            action=CalendarSyncAction.UPDATE,
+            payload=payload_sync,
+        )
     else:
-        queue_create_event(background_tasks, updated.id, engine_override)
-        gcal_message = "Reprogramación sincronizada con Google Calendar en background (nuevo evento)."
+        payload_sync = {"calendar_id": calendar_id} if calendar_id else None
+        sync_status, sync_job_id = try_enqueue_calendar_job(
+            session,
+            reservation_id=updated.id,
+            action=CalendarSyncAction.CREATE,
+            payload=payload_sync,
+        )
     try:
         session.refresh(updated)
     except InvalidRequestError:
@@ -840,6 +918,21 @@ def stylist_reschedule_reservation(
         message_out = f"{message_out} Sincronización con Google Calendar encolada."
     elif sync_status == "skipped":
         message_out = f"{message_out} No se pudo encolar la actualización en Google Calendar; revísalo manualmente."
+
+    sync_error = None if sync_status == "queued" else "No se pudo encolar la sincronización con Google Calendar; revísalo manualmente." if sync_status == "skipped" else None
+    try:
+        session.refresh(updated)
+    except Exception:
+        pass
+    try:
+        updated.sync_status = sync_status
+        updated.sync_job_id = sync_job_id
+        updated.sync_last_error = sync_error
+        updated.sync_updated_at = datetime.now(timezone.utc)
+        session.add(updated)
+        session.commit()
+    except Exception:
+        session.rollback()
     return RescheduleOut(
         ok=True,
         message=message_out,
@@ -903,6 +996,24 @@ def stylist_mark_no_show(
     return ActionResult(ok=True, message=message)
 
 
+@router.get("/reservations/{reservation_id}/sync", response_model=ReservationSyncStatusOut)
+def stylist_reservation_sync_status(
+    reservation_id: str,
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+) -> ReservationSyncStatusOut:
+    reservation = session.get(ReservationDB, reservation_id)
+    if not reservation or reservation.professional_id != stylist.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reserva no encontrada")
+    return ReservationSyncStatusOut(
+        reservation_id=reservation.id,
+        sync_status=reservation.sync_status,
+        sync_job_id=reservation.sync_job_id,
+        sync_last_error=reservation.sync_last_error,
+        sync_updated_at=reservation.sync_updated_at,
+    )
+
+
 @router.delete("/reservations/{reservation_id}", response_model=ActionResult)
 def stylist_delete_reservation(
     reservation_id: str,
@@ -920,7 +1031,7 @@ def stylist_delete_reservation(
     sync_note = None
     if gcal_event_id and gcal_calendar_id:
         try:
-            job = enqueue_calendar_job(
+            sync_status, job_id = try_enqueue_calendar_job(
                 session,
                 reservation_id=reservation_id,
                 action=CalendarSyncAction.DELETE,
@@ -930,7 +1041,10 @@ def stylist_delete_reservation(
                     "drop_calendar": True,
                 },
             )
-            sync_note = f" Se encoló la eliminación en Google Calendar (job {job.id})."
+            if sync_status == "queued" and job_id is not None:
+                sync_note = f" Se encoló la eliminación en Google Calendar (job {job_id})."
+            else:
+                sync_note = " No se pudo encolar la eliminación en Google Calendar; revísalo manualmente."
         except Exception as exc:
             session.rollback()
             logger.warning("No se pudo encolar la eliminación del evento de Google Calendar %s: %s", gcal_event_id, exc)

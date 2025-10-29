@@ -4,12 +4,16 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional
 
+from sqlalchemy import func
 from sqlmodel import Session, select
+
+from prometheus_client import Counter, Gauge, Histogram
 
 from app.db import engine
 from app.models import CalendarSyncJobDB, Reservation, ReservationDB
@@ -21,6 +25,60 @@ from app.services.logic import (
 from app.utils.date import TZ
 
 logger = logging.getLogger("pelubot.calendar_queue")
+
+
+QUEUE_PENDING_GAUGE = Gauge(
+    "pelubot_calendar_jobs_pending",
+    "Trabajos pendientes de ejecutar en la cola de Google Calendar",
+)
+QUEUE_PROCESSING_GAUGE = Gauge(
+    "pelubot_calendar_jobs_processing",
+    "Trabajos actualmente en procesamiento por el worker de Google Calendar",
+)
+QUEUE_JOB_DURATION = Histogram(
+    "pelubot_calendar_job_duration_seconds",
+    "Duración de los trabajos procesados en la cola de Google Calendar",
+    labelnames=("action", "result"),
+    buckets=(0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60),
+)
+QUEUE_JOB_TOTAL = Counter(
+    "pelubot_calendar_jobs_processed_total",
+    "Trabajos procesados por el worker de Google Calendar",
+    labelnames=("action", "result"),
+)
+
+
+def _set_queue_gauges(pending: int, processing: int) -> None:
+    try:
+        QUEUE_PENDING_GAUGE.set(max(pending, 0))
+    except Exception:
+        pass
+    try:
+        QUEUE_PROCESSING_GAUGE.set(max(processing, 0))
+    except Exception:
+        pass
+
+
+def refresh_queue_metrics(engine_override=None) -> tuple[int, int]:
+    """Recalcula y expone métricas agregadas de la cola."""
+
+    eng = engine_override or engine
+    try:
+        with Session(eng) as session:
+            pending = session.scalar(
+                select(func.count())
+                .select_from(CalendarSyncJobDB)
+                .where(CalendarSyncJobDB.status == "pending")
+            ) or 0
+            processing = session.scalar(
+                select(func.count())
+                .select_from(CalendarSyncJobDB)
+                .where(CalendarSyncJobDB.status == "processing")
+            ) or 0
+    except Exception:
+        pending, processing = 0, 0
+    _set_queue_gauges(pending, processing)
+    return pending, processing
 
 
 class CalendarSyncAction(str, Enum):
@@ -59,8 +117,30 @@ def _reservation_from_row(row: ReservationDB) -> Reservation:
         customer_email=row.customer_email,
         customer_phone=row.customer_phone,
         notes=row.notes,
+        sync_status=row.sync_status,
+        sync_job_id=row.sync_job_id,
+        sync_last_error=row.sync_last_error,
+        sync_updated_at=row.sync_updated_at,
     )
 
+
+def set_reservation_sync_state(
+    session: Session,
+    reservation_id: str,
+    *,
+    status: Optional[str],
+    job_id: Optional[int],
+    error: Optional[str] = None,
+) -> None:
+    reservation = session.get(ReservationDB, reservation_id)
+    if not reservation:
+        return
+    reservation.sync_status = status
+    reservation.sync_job_id = job_id
+    reservation.sync_last_error = error
+    reservation.sync_updated_at = _utcnow()
+    session.add(reservation)
+    
 
 def enqueue_calendar_job(
     session: Session,
@@ -88,7 +168,39 @@ def enqueue_calendar_job(
         job.action,
         job.available_at.isoformat(),
     )
+    refresh_queue_metrics()
     return job
+
+
+def try_enqueue_calendar_job(
+    session: Session,
+    *,
+    reservation_id: str,
+    action: CalendarSyncAction | str,
+    payload: Optional[dict] = None,
+    available_at: Optional[datetime] = None,
+) -> tuple[str, Optional[int]]:
+    """Encola un trabajo y devuelve el estado de sincronización y el id asignado."""
+
+    try:
+        job = enqueue_calendar_job(
+            session,
+            reservation_id=reservation_id,
+            action=action,
+            payload=payload,
+            available_at=available_at,
+        )
+    except Exception as exc:  # noqa: BLE001 - queremos registrar el fallo sin propagarlo
+        logger.warning(
+            "No se pudo encolar trabajo de Google Calendar: reservation=%s action=%s error=%s",
+            reservation_id,
+            action,
+            exc,
+        )
+        with suppress(Exception):
+            session.rollback()
+        return "skipped", None
+    return "queued", job.id
 
 
 class CalendarSyncWorker:
@@ -100,6 +212,12 @@ class CalendarSyncWorker:
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._engine = engine
+        self.worker_id: Optional[str] = None
+        try:
+            stale_env = os.getenv("GCAL_QUEUE_STALE_SECONDS")
+            self._stale_seconds = float(stale_env) if stale_env else 0.0
+        except ValueError:
+            self._stale_seconds = 0.0
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -115,9 +233,16 @@ class CalendarSyncWorker:
         self._stop_event.set()
         with suppress(Exception):
             self._thread.join(timeout=timeout)
+        self.worker_id = None
         logger.info("Worker de sincronización Google Calendar detenido.")
 
     def _run_loop(self) -> None:
+        self.worker_id = f"{os.getpid()}:{threading.current_thread().name}"
+        try:
+            self._recover_stuck_jobs()
+        except Exception:
+            logger.exception("Error recuperando trabajos atascados de Google Calendar")
+        refresh_queue_metrics(self._engine)
         backoff = self.poll_interval
         while not self._stop_event.is_set():
             try:
@@ -131,6 +256,75 @@ class CalendarSyncWorker:
             # Nada que hacer; esperar con backoff simple para no saturar la CPU
             self._stop_event.wait(backoff)
             backoff = min(backoff * 2, 30)
+
+    def _recover_stuck_jobs(self) -> None:
+        stale_seconds = self._stale_seconds if self._stale_seconds > 0 else max(self.poll_interval * 2, 60.0)
+        threshold = _utcnow() - timedelta(seconds=stale_seconds)
+        recovered = 0
+        with Session(self._engine) as session:
+            stale_expr = func.coalesce(
+                CalendarSyncJobDB.heartbeat_at,
+                CalendarSyncJobDB.locked_at,
+                CalendarSyncJobDB.updated_at,
+                CalendarSyncJobDB.created_at,
+            )
+            jobs = (
+                session.exec(
+                    select(CalendarSyncJobDB).where(
+                        CalendarSyncJobDB.status == "processing",
+                        stale_expr <= threshold,
+                    )
+                ).all()
+            )
+            if not jobs:
+                self._update_queue_gauges(session)
+                return
+            now = _utcnow()
+            for job in jobs:
+                logger.warning(
+                    "Reactivando trabajo atascado id=%s action=%s locked_by=%s",
+                    job.id,
+                    job.action,
+                    job.locked_by,
+                )
+                job.status = "pending"
+                job.locked_by = None
+                job.locked_at = None
+                job.heartbeat_at = None
+                job.updated_at = now
+                if job.available_at is not None and job.available_at.tzinfo is None:
+                    job.available_at = job.available_at.replace(tzinfo=timezone.utc)
+                if job.available_at is None or job.available_at > now:
+                    job.available_at = now
+                set_reservation_sync_state(
+                    session,
+                    job.reservation_id,
+                    status="queued",
+                    job_id=job.id,
+                    error=job.last_error,
+                )
+                session.add(job)
+                recovered += 1
+            session.commit()
+            self._update_queue_gauges(session)
+        if recovered:
+            logger.warning("Worker %s reactivó %s trabajos encolados", self.worker_id, recovered)
+
+    def _update_queue_gauges(self, session: Session) -> None:
+        try:
+            pending = session.scalar(
+                select(func.count())
+                .select_from(CalendarSyncJobDB)
+                .where(CalendarSyncJobDB.status == "pending")
+            ) or 0
+            processing = session.scalar(
+                select(func.count())
+                .select_from(CalendarSyncJobDB)
+                .where(CalendarSyncJobDB.status == "processing")
+            ) or 0
+        except Exception:
+            return
+        _set_queue_gauges(int(pending), int(processing))
 
     def _process_once(self) -> bool:
         now = _utcnow()
@@ -152,10 +346,14 @@ class CalendarSyncWorker:
             )
             job = session.exec(stmt).first()
             if not job:
+                self._update_queue_gauges(session)
                 return False
             job.status = "processing"
             job.attempts += 1
-            job.updated_at = _utcnow()
+            job.locked_by = self.worker_id or f"{os.getpid()}:{threading.current_thread().name}"
+            job.locked_at = now
+            job.heartbeat_at = now
+            job.updated_at = now
             session.add(job)
             session.commit()
             session.refresh(job)
@@ -164,12 +362,15 @@ class CalendarSyncWorker:
             action = job.action
             payload = _ensure_payload(job.payload)
             attempts = job.attempts
+            self._update_queue_gauges(session)
 
         if not job_id or not reservation_id or not action:
+            refresh_queue_metrics(self._engine)
             return False
 
         success = False
         error_message: Optional[str] = None
+        start_time = time.perf_counter()
         try:
             success = self._execute_action(reservation_id, action, payload)
         except Exception as exc:  # noqa: BLE001 - registramos y reintentamos
@@ -179,26 +380,62 @@ class CalendarSyncWorker:
             )
         else:
             error_message = None
+        duration = time.perf_counter() - start_time
+
+        result_label = "success" if success else "failure"
+        try:
+            QUEUE_JOB_TOTAL.labels(action=action, result=result_label).inc()
+            QUEUE_JOB_DURATION.labels(action=action, result=result_label).observe(duration)
+        except Exception:
+            pass
 
         with Session(self._engine) as session:
             job = session.get(CalendarSyncJobDB, job_id)
             if not job:
+                refresh_queue_metrics(self._engine)
                 return True
-            job.updated_at = _utcnow()
+            now_update = _utcnow()
+            job.updated_at = now_update
             if success:
                 job.status = "completed"
                 job.last_error = None
-                job.completed_at = _utcnow()
+                job.completed_at = now_update
+                set_reservation_sync_state(
+                    session,
+                    reservation_id,
+                    status="synced",
+                    job_id=job_id,
+                    error=None,
+                )
             else:
                 job.last_error = error_message
+                job.completed_at = None
                 if attempts >= self.max_attempts:
                     job.status = "failed"
+                    set_reservation_sync_state(
+                        session,
+                        reservation_id,
+                        status="failed",
+                        job_id=job_id,
+                        error=error_message,
+                    )
                 else:
                     job.status = "pending"
                     delay = int(os.getenv("GCAL_QUEUE_RETRY_SECONDS", "60"))
                     job.available_at = _utcnow() + timedelta(seconds=delay * attempts)
+                    set_reservation_sync_state(
+                        session,
+                        reservation_id,
+                        status="queued",
+                        job_id=job_id,
+                        error=error_message,
+                    )
+            job.locked_by = None
+            job.locked_at = None
+            job.heartbeat_at = None
             session.add(job)
             session.commit()
+            self._update_queue_gauges(session)
         return True
 
     def _execute_action(self, reservation_id: str, action: str, payload: dict) -> bool:

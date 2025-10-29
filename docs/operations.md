@@ -70,6 +70,14 @@ uvicorn app.main:app --host 127.0.0.1 --port 8776
 make dev-start PORT=8776 FAKE=0
 ```
 
+## Cola de Google Calendar
+
+- Arranca **un único worker** por entorno. El hilo embebido solo debe ejecutarse cuando `uvicorn` corre con un único proceso (`--workers 1`); en despliegues multi-worker deshabilita el worker embebido (`PELUBOT_DISABLE_GCAL_WORKER=1`) y ejecuta el sincronizador como servicio independiente.
+- Las métricas de cola se exponen en `/metrics` (`pelubot_calendar_jobs_*`). Úsalas para alertar sobre trabajos atascados, pendientes o fallidos.
+- Los administradores pueden consultar y reencolar trabajos vía los endpoints protegidos `/admin/calendar-jobs` (GET) y `/admin/calendar-jobs/{id}/retry` (POST, admite `delay_seconds`).
+- El portal profesional dispone de `GET /pros/reservations/{id}/sync` para mostrar el último estado al estilista; la API interna ofrece `GET /reservations/{id}/sync` (requiere API key) para soporte y automatizaciones.
+- El catálogo de servicios y profesionales se consulta en caliente y se cachea durante `CATALOG_CACHE_SECONDS` (30 s por defecto); tras cambios masivos, ejecuta `app.data.invalidate_catalog_cache()` o, si solo ajustaste servicios, `app.data.invalidate_services_cache()`.
+
 ## Checklist previa a producción
 
 ### Base de datos

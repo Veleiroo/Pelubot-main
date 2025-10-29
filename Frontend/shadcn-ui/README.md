@@ -14,18 +14,17 @@ SPA construida con Vite + React + TypeScript + Tailwind + shadcn/ui.
 Situado en `Frontend/shadcn-ui/` (ejemplo):
 ```
 VITE_API_BASE_URL=http://127.0.0.1:8776
+VITE_API_KEY=tu_api_key_segura
 # Opcional: habilita el calendario visual en /book/date
 VITE_ENABLE_CALENDAR=true
 # Opcional: expone la ruta /debug (solo en dev)
 VITE_ENABLE_DEBUG=true
-# Opcional: si el backend requiere API Key para crear reservas
-# VITE_API_KEY=tu_api_key
 # Opcional: fuerza peticiones a Google Calendar desde el frontend
 # VITE_USE_GCAL=true
 # Opcional: muestra páginas futuras (Clientes/Estadísticas) para demos
 VITE_ENABLE_FUTURE_FEATURES=true
 ```
-El backend controla si las reservas son públicas mediante la variable `PUBLIC_RESERVATIONS_ENABLED`. No se envía API key en el bundle.
+El backend rechaza peticiones sin API key (`API_KEY` ≠ `changeme`), por lo que `VITE_API_KEY` debe definirse en todos los entornos. La clave se inyecta en tiempo de build y no se expone en el bundle público.
 
 ### Páginas Futuras (Demo Mode)
 Para mostrar las páginas de **Clientes** y **Estadísticas** en modo demostración (ideal para presentaciones a clientes):

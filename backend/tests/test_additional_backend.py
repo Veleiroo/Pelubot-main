@@ -24,25 +24,28 @@ def _next_workday(days_ahead: int = 32) -> date:
     return d
 
 
-def test_ready_ok_and_gcal_fail(app_client, monkeypatch):
-    # ok
+def test_ready_ok_and_queue_fail(app_client, monkeypatch):
     r = app_client.get("/ready")
     assert r.status_code == 200
     body = r.json()
     assert body["ok"] is True
+    assert body["db"] == "ok"
+    assert body["queue_worker"] == "ok"
+    assert "queue_pending" in body
+    assert "queue_processing" in body
 
-    # simular fallo en cliente gcal
-    import app.integrations.google_calendar as gcal
+    import app.api.routes as routes_module
 
-    def boom():
+    def boom():  # pragma: no cover - simulated failure
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(gcal, "build_calendar", boom)
+    monkeypatch.setattr(routes_module, "refresh_queue_metrics", boom)
     r2 = app_client.get("/ready")
     assert r2.status_code == 200
     b2 = r2.json()
     assert b2["ok"] is False
-    assert isinstance(b2.get("gcal"), str) and "error:" in b2["gcal"].lower()
+    assert isinstance(b2.get("queue_worker"), str)
+    assert "error" in b2["queue_worker"].lower()
 
 
 def test_auth_required_on_protected_endpoints(app_client):

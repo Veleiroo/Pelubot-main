@@ -4,7 +4,14 @@ from datetime import datetime, date, time, timedelta
 import os
 from sqlmodel import Session, select
 from app.models import Service, RescheduleIn, Reservation, ReservationDB
-from app.data import SERVICE_BY_ID, PROS, PRO_BY_ID, WEEKLY_SCHEDULE, PRO_CALENDAR, PRO_USE_GCAL_BUSY
+from app.data import (
+    WEEKLY_SCHEDULE,
+    calendar_for_professional as catalog_calendar_for_professional,
+    get_active_professionals,
+    get_service_by_id,
+    iter_professional_calendars,
+    professionals_using_gcal,
+)
 from app.integrations.google_calendar import build_calendar, freebusy_multi, create_event, patch_event, delete_event, iso_datetime, list_events_range
 from zoneinfo import ZoneInfo
 from datetime import timezone as _utc_tz
@@ -26,7 +33,7 @@ def _to_naive_local(dt: datetime) -> datetime:
 
 def get_calendar_for_professional(pro_id: str) -> str:
     """Calendar destino para el profesional; fallback al calendar general."""
-    return PRO_CALENDAR.get(pro_id) or DEFAULT_CALENDAR_ID
+    return catalog_calendar_for_professional(pro_id) or DEFAULT_CALENDAR_ID
 
 def _reservations_for_prof_on_date(session: Session, pro_id: str, on_date: date) -> List[ReservationDB]:
     """Reservas activas del profesional que solapan el día (excluye canceladas)."""
@@ -64,11 +71,19 @@ def find_available_slots(
     precomputed_busy: Optional[Dict[str, List[Tuple[datetime, datetime]]]] = None,
 ) -> List[datetime]:
     """Calcula huecos disponibles combinando agenda local y, si aplica, eventos de GCal."""
-    service: Service = SERVICE_BY_ID[service_id]
+    try:
+        service: Service = get_service_by_id(service_id)
+    except KeyError:
+        return []
     day_ranges = WEEKLY_SCHEDULE.get(on_date.weekday(), [])
     if not day_ranges:
         return []
-    pro_ids = [professional_id] if professional_id else [p.id for p in PROS if service_id in p.services]
+
+    active_pros = get_active_professionals()
+    if professional_id:
+        pro_ids = [professional_id]
+    else:
+        pro_ids = [p.id for p in active_pros if service_id in (p.services or [])]
 
     starts: List[datetime] = []
     for start_t, end_t in day_ranges:
@@ -78,10 +93,12 @@ def find_available_slots(
             starts.append(cursor)
             cursor += timedelta(minutes=step_min)
 
+    use_gcal_map = professionals_using_gcal()
+
     def pro_uses_gcal(pid: str) -> bool:
         if use_gcal_busy_override is not None:
             return bool(use_gcal_busy_override)
-        return PRO_USE_GCAL_BUSY.get(pid, USE_GCAL_BUSY)
+        return use_gcal_map.get(pid, USE_GCAL_BUSY)
 
     gcal_busy_map: dict[str, List[Tuple[datetime, datetime]]] = {}
     if precomputed_busy:
@@ -154,10 +171,12 @@ def collect_gcal_busy_for_range(
     Cuando no hay integración o ocurre un error, devuelve diccionario vacío.
     """
 
+    use_gcal_map = professionals_using_gcal()
+
     def pro_uses_gcal(pid: str) -> bool:
         if use_gcal_override is not None:
             return bool(use_gcal_override)
-        return PRO_USE_GCAL_BUSY.get(pid, USE_GCAL_BUSY)
+        return use_gcal_map.get(pid, USE_GCAL_BUSY)
 
     pros_needing_gcal = [pid for pid in pro_ids if pro_uses_gcal(pid)]
     if not pros_needing_gcal:
@@ -221,7 +240,11 @@ def apply_reschedule(session: Session, payload: RescheduleIn) -> Tuple[bool, str
     r = session.get(ReservationDB, payload.reservation_id)
     if not r:
         return False, "La reserva no existe.", None
-    service = SERVICE_BY_ID[r.service_id]
+    try:
+        service = get_service_by_id(r.service_id)
+    except KeyError:
+        return False, "El servicio asociado a la reserva no existe.", None
+    pros_by_id = {pro.id: pro for pro in get_active_professionals()}
 
     # Determinar nuevo inicio
     new_start_dt: Optional[datetime] = None
@@ -251,7 +274,7 @@ def apply_reschedule(session: Session, payload: RescheduleIn) -> Tuple[bool, str
 
     # Profesional destino (por defecto, el mismo)
     new_pro = payload.professional_id or r.professional_id
-    if new_pro not in PRO_BY_ID:
+    if new_pro not in pros_by_id:
         return False, "professional_id no existe.", None
 
     # Comparaciones en hora local naive
@@ -291,7 +314,8 @@ def apply_reschedule(session: Session, payload: RescheduleIn) -> Tuple[bool, str
         if x.id == r.id:
             continue
         if not (end_dt <= x.start or start_dt >= x.end):
-            return False, f"El profesional {PRO_BY_ID[new_pro].name} ya tiene esa hora ocupada.", None
+            pro_name = pros_by_id[new_pro].name
+            return False, f"El profesional {pro_name} ya tiene esa hora ocupada.", None
 
     # Validación estricta por intervalo [start,end) en BD (con TZ)
     try:
@@ -309,7 +333,8 @@ def apply_reschedule(session: Session, payload: RescheduleIn) -> Tuple[bool, str
         ReservationDB.status != "cancelada",
     )
     if session.exec(q).first():
-        return False, f"El profesional {PRO_BY_ID[new_pro].name} ya tiene esa hora ocupada.", None
+        pro_name = pros_by_id[new_pro].name
+        return False, f"El profesional {pro_name} ya tiene esa hora ocupada.", None
 
     # Persistencia
     r.professional_id = new_pro
@@ -414,14 +439,13 @@ def _detect_service_from_summary(summary: str, default_sid: str) -> str:
 
 def sync_from_gcal_range(session: Session, start_date: date, end_date: date, default_service: str = "corte_cabello", by_professional: bool = True, calendar_id: str | None = None, professional_id: str | None = None, tz: str = os.getenv("TZ", "Europe/Madrid")) -> dict:
     """Importa eventos de GCal a la BD (upsert) en [start_date, end_date]."""
-    from app.data import PRO_CALENDAR
     try:
         svc = build_calendar()
     except Exception:
         return {"inserted": 0, "updated": 0, "calendars": 0, "ok": False, "error": "gcal client"}
     pairs: list[tuple[str, str | None]] = []
     if by_professional:
-        for pro_id, cal in PRO_CALENDAR.items():
+        for pro_id, cal in iter_professional_calendars():
             pairs.append((cal, pro_id))
     else:
         if not calendar_id:
@@ -479,14 +503,13 @@ def sync_from_gcal_range(session: Session, start_date: date, end_date: date, def
 
 def reconcile_db_to_gcal_range(session: Session, start_date: date, end_date: date, by_professional: bool = True, calendar_id: str | None = None, professional_id: str | None = None, tz: str = os.getenv("TZ", "Europe/Madrid")) -> dict:
     """Alinea eventos de GCal con la BD local: crea, parchea o mueve entre calendarios."""
-    from app.data import PRO_CALENDAR
     try:
         svc = build_calendar()
     except Exception:
         return {"ok": False, "created": 0, "patched": 0, "calendars": 0, "error": "gcal client"}
     pairs: list[tuple[str, str | None]] = []
     if by_professional:
-        for pid, cal in PRO_CALENDAR.items():
+        for pid, cal in iter_professional_calendars():
             pairs.append((cal, pid))
     else:
         if not calendar_id:
@@ -585,10 +608,9 @@ def detect_conflicts_range(session: Session, start_date: date, end_date: date, b
         svc = build_calendar()
     except Exception as e:
         return {"ok": False, "error": f"gcal client: {e}"}
-    from app.data import PRO_CALENDAR
     pairs: list[tuple[str, str | None]] = []
     if by_professional:
-        for pid, cal in PRO_CALENDAR.items():
+        for pid, cal in iter_professional_calendars():
             pairs.append((cal, pid))
     else:
         if not calendar_id:

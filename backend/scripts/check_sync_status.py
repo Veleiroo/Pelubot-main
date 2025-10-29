@@ -16,7 +16,7 @@ from sqlmodel import Session, select
 from app.db import engine
 from app.models import ReservationDB, StylistDB
 from app.integrations.google_calendar import build_calendar, list_events_range
-from app.data import PRO_CALENDAR
+from app.data import get_professional_calendars
 from datetime import datetime
 
 def count_db_reservations(session: Session, days_back: int = 30) -> dict:
@@ -55,7 +55,7 @@ def count_gcal_events(days_back: int = 30) -> dict:
     total_events = 0
     by_calendar = {}
     
-    for pro_id, cal_id in PRO_CALENDAR.items():
+    for pro_id, cal_id in get_professional_calendars().items():
         try:
             events = list_events_range(
                 svc,

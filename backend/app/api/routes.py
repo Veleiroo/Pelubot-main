@@ -2,23 +2,31 @@
 Rutas y endpoints de la API (estructura nueva).
 """
 from __future__ import annotations
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Dict, List, Tuple, Optional
 import os
 import uuid
 import logging
 
-from fastapi import APIRouter, HTTPException, Depends, Request, Body, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, Request, Body, Query
 from sqlmodel import Session, select
-from sqlalchemy import delete as sa_delete, text as _sql_text
+from sqlalchemy import delete as sa_delete, text as _sql_text, func
 
-from app.data import SERVICES, PROS, SERVICE_BY_ID, PRO_BY_ID
+from app.data import (
+    get_services,
+    get_service_by_id,
+    get_active_professionals,
+    get_professional_by_id,
+    get_professional_calendars,
+)
 from app.models import (
     SlotsQuery, SlotsOut,
-    Reservation, CancelReservationIn, ActionResult,
+    CancelReservationIn, ActionResult,
     RescheduleIn, RescheduleOut, ReservationIn, ReservationCreateOut,
     ReservationDB,
     DaysAvailabilityIn, DaysAvailabilityOut,
+    CalendarSyncJobDB, CalendarJobOut, CalendarJobListOut, CalendarJobRetryIn,
+    ReservationSyncStatusOut,
 )
 from app.services.logic import (
     find_available_slots,
@@ -29,32 +37,48 @@ from app.services.logic import (
     reconcile_db_to_gcal_range,
     detect_conflicts_range,
 )
-from app.integrations.gcal_background import (
-    queue_create_event,
-    queue_patch_event,
-    queue_delete_event,
-)
-from app.services.calendar_queue import enqueue_calendar_job, CalendarSyncAction
+from app.services.calendar_queue import CalendarSyncAction, try_enqueue_calendar_job, refresh_queue_metrics
 from app.db import get_session, engine
 from app.utils.date import validate_target_dt, TZ, now_tz, MAX_AHEAD_DAYS
-from app.core.metrics import RESERVATIONS_CREATED, RESERVATIONS_RESCHEDULED, RESERVATIONS_CANCELLED
+from app.core.metrics import RESERVATIONS_CREATED, RESERVATIONS_CANCELLED
 from datetime import timezone as _utc_tz
 
 logger = logging.getLogger("pelubot.api")
 
-API_KEY = os.getenv("API_KEY", "changeme")
+_ENV_NAME = os.getenv("ENV", "dev").lower()
+
+
+def _load_api_key() -> str:
+    key = (os.getenv("API_KEY") or "").strip()
+    if not key:
+        raise RuntimeError("API_KEY no configurada; define una clave segura en el entorno")
+    if key.lower() == "changeme":
+        raise RuntimeError("API_KEY no puede ser 'changeme'; define una clave única")
+    return key
+
+
+API_KEY = _load_api_key()
 PUBLIC_RESERVATIONS_ENABLED = os.getenv("PUBLIC_RESERVATIONS_ENABLED", "false").lower() in ("1","true","yes","y","si","sí")
-# En tests, forzamos autenticación aunque ALLOW_LOCAL_NO_AUTH esté activado en .env
-_allow_local = os.getenv("ALLOW_LOCAL_NO_AUTH", "false").lower() in ("1","true","yes","y","si","sí")
-ALLOW_LOCAL_NO_AUTH = False if os.getenv("PYTEST_CURRENT_TEST") else _allow_local
+
+_allow_local_raw = os.getenv("ALLOW_LOCAL_NO_AUTH", "false").lower() in ("1","true","yes","y","si","sí")
+if _allow_local_raw and _ENV_NAME in {"prod", "production"}:
+    logger.warning("Ignorando ALLOW_LOCAL_NO_AUTH porque ENV indica entorno productivo")
+ALLOW_LOCAL_NO_AUTH = (False if os.getenv("PYTEST_CURRENT_TEST") else _allow_local_raw) and _ENV_NAME not in {"prod", "production"}
+_LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def _is_request_local(request: Request) -> bool:
+    client_host = getattr(request.client, "host", None)
+    forwarded = request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip")
+    if forwarded:
+        forwarded_host = forwarded.split(",")[0].strip()
+        if forwarded_host and forwarded_host not in _LOCAL_HOSTS:
+            return False
+    return client_host in _LOCAL_HOSTS
 
 def require_api_key(request: Request):
     """Pequeño guard: permite tráfico local en dev si así se configura."""
-    client_host = getattr(request.client, "host", None)
-    if ALLOW_LOCAL_NO_AUTH and client_host in ("127.0.0.1", "localhost"):
-        return
-    # Para desarrollo, permitir sin autenticación si ALLOW_LOCAL_NO_AUTH está activado
-    if ALLOW_LOCAL_NO_AUTH:
+    if ALLOW_LOCAL_NO_AUTH and _is_request_local(request):
         return
     key = request.headers.get("X-API-Key") or ""
     auth = request.headers.get("Authorization") or ""
@@ -70,11 +94,15 @@ router = APIRouter()
 GCAL_CALENDAR_ID = os.getenv("GCAL_CALENDAR_ID", os.getenv("GCAL_TEST_CALENDAR_ID", "pelubot.test@gmail.com"))
 
 
-def _build_public_create_message(reservation_id: str, queued: bool) -> str:
-    base = f"Reserva creada exitosamente. ID: {reservation_id}"
-    if queued:
-        return f"{base}. Sincronización con Google Calendar encolada."
-    return f"{base}. No se pudo encolar la sincronización con Google Calendar; revísalo manualmente."
+def _build_public_create_message(reservation_id: str, sync_status: str, sync_job_id: Optional[int]) -> str:
+    base = f"Reserva creada exitosamente. ID: {reservation_id}."
+    if sync_status == "queued":
+        if sync_job_id is not None:
+            return f"{base} Sincronización con Google Calendar encolada (job {sync_job_id})."
+        return f"{base} Sincronización con Google Calendar encolada."
+    if sync_status == "skipped":
+        return f"{base} No se pudo encolar la sincronización con Google Calendar; revísalo manualmente."
+    return base
 
 @router.get("/health")
 def health():
@@ -84,20 +112,28 @@ def health():
 @router.get("/ready", tags=["monitor"])
 def readiness():
     """Verifica conectividad básica con la base de datos y Google Calendar."""
-    status = {"db": "ok", "gcal": "ok"}
+    status = {"db": "ok", "queue_worker": "ok"}
     try:
         with engine.connect() as conn:
             conn.exec_driver_sql("SELECT 1")
     except Exception as e:
         status["db"] = f"error: {e}"
+        logger.exception("Readiness DB check failed")
+    queue_pending: Optional[int] = None
+    queue_processing: Optional[int] = None
     try:
-        # Cliente de Google Calendar: integración nueva
-        from app.integrations.google_calendar import build_calendar
-        _ = build_calendar()
+        pending, processing = refresh_queue_metrics()
+        queue_pending, queue_processing = pending, processing
     except Exception as e:
-        status["gcal"] = f"error: {e}"
-    ok = all(v == "ok" for v in status.values())
-    return {"ok": ok, **status}
+        status["queue_worker"] = f"error: {e}"
+        logger.exception("Readiness queue metrics failed")
+    ok = status["db"] == "ok" and status["queue_worker"] == "ok"
+    payload = {"ok": ok, **status}
+    if queue_pending is not None:
+        payload["queue_pending"] = queue_pending
+    if queue_processing is not None:
+        payload["queue_processing"] = queue_processing
+    return payload
 
 @router.get("/")
 def home():
@@ -116,17 +152,50 @@ def home():
 @router.get("/services")
 def list_services():
     """Devuelve el catálogo estático de servicios."""
-    return SERVICES
+    return get_services()
 
 @router.get("/professionals")
 def list_professionals():
     """Devuelve el catálogo estático de profesionales."""
-    return PROS
+    return get_active_professionals()
 
 @router.get("/reservations")
-def list_reservations(session: Session = Depends(get_session)):
-    """Lista reservas ordenadas por inicio, normalizando TZ si faltan."""
-    rows = session.exec(select(ReservationDB).order_by(ReservationDB.start)).all()
+def list_reservations(
+    session: Session = Depends(get_session),
+    professional_id: Optional[str] = Query(default=None, description="Filtra por profesional"),
+    status: Optional[str] = Query(default=None, description="Filtra por estado"),
+    start_from: Optional[str] = Query(default=None, description="ISO8601 desde (incluido)"),
+    start_to: Optional[str] = Query(default=None, description="ISO8601 hasta (incluido)"),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    """Lista reservas con filtros básicos y paginación."""
+    stmt = select(ReservationDB)
+    if professional_id:
+        stmt = stmt.where(ReservationDB.professional_id == professional_id)
+    if status:
+        stmt = stmt.where(ReservationDB.status == status)
+
+    def _parse_bound(value: str, field: str) -> datetime:
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"{field} inválido. Usa ISO 8601.")
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=TZ)
+        else:
+            dt = dt.astimezone(TZ)
+        return dt
+
+    if start_from:
+        start_dt = _parse_bound(start_from, "start_from")
+        stmt = stmt.where(ReservationDB.start >= start_dt)
+    if start_to:
+        end_dt = _parse_bound(start_to, "start_to")
+        stmt = stmt.where(ReservationDB.start <= end_dt)
+
+    stmt = stmt.order_by(ReservationDB.start).offset(offset).limit(limit)
+    rows = session.exec(stmt).all()
     logger.info("List reservations: %s rows", len(rows))
     out = []
     for r in rows:
@@ -163,13 +232,35 @@ def list_reservations(session: Session = Depends(get_session)):
             "notes": getattr(r, "notes", None),
             "created_at": created.isoformat() if created else None,
             "updated_at": updated.isoformat() if updated else None,
+            "sync_status": getattr(r, "sync_status", None),
+            "sync_job_id": getattr(r, "sync_job_id", None),
+            "sync_last_error": getattr(r, "sync_last_error", None),
+            "sync_updated_at": getattr(r, "sync_updated_at", None).isoformat() if getattr(r, "sync_updated_at", None) else None,
         })
     return out
+
+
+@router.get("/reservations/{reservation_id}/sync", response_model=ReservationSyncStatusOut)
+def get_reservation_sync_status(
+    reservation_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    require_api_key(request)
+    reservation = session.get(ReservationDB, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="La reserva no existe")
+    return ReservationSyncStatusOut(
+        reservation_id=reservation.id,
+        sync_status=reservation.sync_status,
+        sync_job_id=reservation.sync_job_id,
+        sync_last_error=reservation.sync_last_error,
+        sync_updated_at=reservation.sync_updated_at,
+    )
 
 @router.post("/cancel_reservation", response_model=ActionResult)
 def cancel_reservation_post(
     request: Request,
-    background_tasks: BackgroundTasks,
     payload: dict | None = Body(None),
     session: Session = Depends(get_session),
 ):
@@ -193,15 +284,45 @@ def cancel_reservation_post(
             RESERVATIONS_CANCELLED.inc()
         except Exception:
             pass
-        queue_delete_event(background_tasks, payload.reservation_id)
-        return ActionResult(ok=True, message=f"Reserva {payload.reservation_id} cancelada. Sincronización con Google Calendar en background.")
+        payload_sync = {"drop_calendar": False}
+        if getattr(r, "google_event_id", None):
+            payload_sync["event_id"] = r.google_event_id
+        if getattr(r, "google_calendar_id", None):
+            payload_sync["calendar_id"] = r.google_calendar_id
+        sync_status, sync_job_id = try_enqueue_calendar_job(
+            session,
+            reservation_id=payload.reservation_id,
+            action=CalendarSyncAction.DELETE,
+            payload=payload_sync,
+        )
+        base = f"Reserva {payload.reservation_id} cancelada."
+        if sync_status == "queued":
+            suffix = " Sincronización con Google Calendar encolada."
+            if sync_job_id is not None:
+                suffix = f"{suffix[:-1]} (job {sync_job_id})."
+        else:
+            suffix = " No se pudo encolar la sincronización con Google Calendar; revísalo manualmente."
+        sync_error = None if sync_status == "queued" else suffix.strip()
+        try:
+            session.refresh(r)
+        except Exception:
+            pass
+        try:
+            r.sync_status = sync_status
+            r.sync_job_id = sync_job_id
+            r.sync_last_error = sync_error
+            r.sync_updated_at = datetime.now(timezone.utc)
+            session.add(r)
+            session.commit()
+        except Exception:
+            session.rollback()
+        return ActionResult(ok=True, message=f"{base}{suffix}")
     raise HTTPException(status_code=500, detail="No se pudo cancelar la reserva")
 
 @router.delete("/reservations/{reservation_id}", response_model=ActionResult)
 def cancel_reservation_delete(
     reservation_id: str,
     request: Request,
-    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
     require_api_key(request)
@@ -217,8 +338,39 @@ def cancel_reservation_delete(
             RESERVATIONS_CANCELLED.inc()
         except Exception:
             pass
-        queue_delete_event(background_tasks, reservation_id)
-        return ActionResult(ok=True, message=f"Reserva {reservation_id} cancelada. Sincronización con Google Calendar en background.")
+        payload_sync = {"drop_calendar": False}
+        if getattr(r, "google_event_id", None):
+            payload_sync["event_id"] = r.google_event_id
+        if getattr(r, "google_calendar_id", None):
+            payload_sync["calendar_id"] = r.google_calendar_id
+        sync_status, sync_job_id = try_enqueue_calendar_job(
+            session,
+            reservation_id=reservation_id,
+            action=CalendarSyncAction.DELETE,
+            payload=payload_sync,
+        )
+        base = f"Reserva {reservation_id} cancelada."
+        if sync_status == "queued":
+            suffix = " Sincronización con Google Calendar encolada."
+            if sync_job_id is not None:
+                suffix = f"{suffix[:-1]} (job {sync_job_id})."
+        else:
+            suffix = " No se pudo encolar la sincronización con Google Calendar; revísalo manualmente."
+        sync_error = None if sync_status == "queued" else suffix.strip()
+        try:
+            session.refresh(r)
+        except Exception:
+            pass
+        try:
+            r.sync_status = sync_status
+            r.sync_job_id = sync_job_id
+            r.sync_last_error = sync_error
+            r.sync_updated_at = datetime.now(timezone.utc)
+            session.add(r)
+            session.commit()
+        except Exception:
+            session.rollback()
+        return ActionResult(ok=True, message=f"{base}{suffix}")
     raise HTTPException(status_code=500, detail="No se pudo cancelar la reserva")
 
 @router.post("/reschedule", response_model=RescheduleOut)
@@ -268,23 +420,52 @@ def reschedule_post(
             raise HTTPException(status_code=400, detail="Fecha/hora inválidas (formato).")
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
-    old_start, old_end, old_pro, old_cal = r_prev.start, r_prev.end, r_prev.professional_id, r_prev.google_calendar_id
     ok, msg, r = apply_reschedule(session, payload)
     if not ok or not r:
         raise HTTPException(status_code=400, detail=msg)
-    gcal_message: Optional[str] = None
-    if r.google_event_id and r.google_calendar_id:
-        queue_patch_event(background_tasks, r.id)
-        gcal_message = "Reprogramación sincronizada con Google Calendar en background."
+    calendar_id = getattr(r, "google_calendar_id", None) or get_calendar_for_professional(r.professional_id)
+    sync_status = "skipped"
+    sync_job_id: Optional[int] = None
+    if r.google_event_id and calendar_id:
+        payload_sync = {"calendar_id": calendar_id, "event_id": r.google_event_id}
+        sync_status, sync_job_id = try_enqueue_calendar_job(
+            session,
+            reservation_id=r.id,
+            action=CalendarSyncAction.UPDATE,
+            payload=payload_sync,
+        )
     else:
-        queue_create_event(background_tasks, r.id)
-        gcal_message = "Reprogramación sincronizada con Google Calendar en background (nuevo evento)."
+        payload_sync = {"calendar_id": calendar_id} if calendar_id else None
+        sync_status, sync_job_id = try_enqueue_calendar_job(
+            session,
+            reservation_id=r.id,
+            action=CalendarSyncAction.CREATE,
+            payload=payload_sync,
+        )
     session.refresh(r)
     message_out = msg if (isinstance(msg, str) and "Reprogramada" in msg) else f"Reprogramada: {msg}"
     if sync_status == "queued":
         message_out = f"{message_out} Sincronización con Google Calendar encolada."
     elif sync_status == "skipped":
         message_out = f"{message_out} No se pudo encolar la actualización en Google Calendar; revísalo manualmente."
+    sync_error = None if sync_status == "queued" else (
+        "No se pudo encolar la sincronización con Google Calendar; revísalo manualmente."
+        if sync_status == "skipped"
+        else None
+    )
+    try:
+        session.refresh(r)
+    except Exception:
+        pass
+    try:
+        r.sync_status = sync_status
+        r.sync_job_id = sync_job_id
+        r.sync_last_error = sync_error
+        r.sync_updated_at = datetime.now(timezone.utc)
+        session.add(r)
+        session.commit()
+    except Exception:
+        session.rollback()
     logger.info("Reservation rescheduled: id=%s start=%s end=%s pro=%s", r.id, r.start.isoformat(), r.end.isoformat(), r.professional_id)
     return RescheduleOut(
         ok=True,
@@ -299,14 +480,13 @@ def reschedule_post(
 @router.post("/reservations/reschedule", response_model=RescheduleOut)
 def reschedule_post_alias(
     request: Request,
-    background_tasks: BackgroundTasks,
     payload: dict | None = Body(None),
     session: Session = Depends(get_session),
 ):
     """Alias legada del endpoint de reprogramación."""
     if payload is None:
         raise HTTPException(status_code=422, detail="Payload requerido")
-    return reschedule_post(request, background_tasks, payload, session)
+    return reschedule_post(request, payload, session)
 
 @router.post("/slots", response_model=SlotsOut)
 def get_slots(q: SlotsQuery, session: Session = Depends(get_session)):
@@ -323,9 +503,11 @@ def get_slots(q: SlotsQuery, session: Session = Depends(get_session)):
         raise HTTPException(status_code=400, detail="La fecha está en el pasado.")
     if d > today + timedelta(days=MAX_AHEAD_DAYS):
         raise HTTPException(status_code=400, detail="La fecha excede el límite de 6 meses.")
-    if q.service_id not in SERVICE_BY_ID:
+    try:
+        get_service_by_id(q.service_id)
+    except KeyError:
         raise HTTPException(status_code=404, detail="service_id no existe")
-    if q.professional_id and q.professional_id not in PRO_BY_ID:
+    if q.professional_id and not get_professional_by_id(q.professional_id):
         raise HTTPException(status_code=404, detail="professional_id no existe")
     avail = find_available_slots(session, q.service_id, d, q.professional_id, use_gcal_busy_override=False)
     # Filtrar horas ya pasadas si es el día de hoy
@@ -338,9 +520,11 @@ def get_slots(q: SlotsQuery, session: Session = Depends(get_session)):
 @router.post("/slots/days", response_model=DaysAvailabilityOut)
 def get_days_availability(body: DaysAvailabilityIn, session: Session = Depends(get_session)):
     """Enumera los días del rango que aún tienen huecos disponibles."""
-    if body.service_id not in SERVICE_BY_ID:
+    try:
+        get_service_by_id(body.service_id)
+    except KeyError:
         raise HTTPException(status_code=404, detail="service_id no existe")
-    if body.professional_id and body.professional_id not in PRO_BY_ID:
+    if body.professional_id and not get_professional_by_id(body.professional_id):
         raise HTTPException(status_code=404, detail="professional_id no existe")
     if body.end < body.start:
         raise HTTPException(status_code=400, detail="Rango inválido")
@@ -349,11 +533,12 @@ def get_days_availability(body: DaysAvailabilityIn, session: Session = Depends(g
         raise HTTPException(status_code=400, detail="Rango demasiado grande (máx. 62 días)")
     today = now_tz().date()
 
-    pro_ids_for_service = (
-        [body.professional_id]
-        if body.professional_id
-        else [p.id for p in PROS if body.service_id in (p.services or [])]
-    )
+    if body.professional_id:
+        pro_ids_for_service = [body.professional_id]
+    else:
+        pro_ids_for_service = [
+            p.id for p in get_active_professionals() if body.service_id in (p.services or [])
+        ]
     gcal_busy_range: Dict[str, Dict[date, List[Tuple[datetime, datetime]]]] = {}
 
     available_days: list[str] = []
@@ -394,7 +579,6 @@ def _naive(dt: datetime) -> datetime:
 @router.post("/reservations", response_model=ReservationCreateOut)
 def create_reservation(
     request: Request,
-    background_tasks: BackgroundTasks,
     payload: dict | None = Body(None),
     session: Session = Depends(get_session),
 ):
@@ -408,17 +592,15 @@ def create_reservation(
     except Exception:
         raise HTTPException(status_code=422, detail="Payload inválido")
     logger.info("Create reservation: service=%s pro=%s start=%s", payload.service_id, payload.professional_id, payload.start.isoformat())
-    if payload.service_id not in SERVICE_BY_ID:
-        raise HTTPException(status_code=404, detail="service_id no existe")
-    if payload.professional_id not in PRO_BY_ID:
-        raise HTTPException(status_code=404, detail="professional_id no existe")
-    # Compatibilidad: el profesional debe ofrecer el servicio solicitado
     try:
-        pro = PRO_BY_ID[payload.professional_id]
-        if payload.service_id not in (pro.services or []):
-            raise HTTPException(status_code=400, detail="El profesional no ofrece ese servicio")
-    except Exception:
-        pass
+        service = get_service_by_id(payload.service_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="service_id no existe")
+    pro = get_professional_by_id(payload.professional_id)
+    if pro is None:
+        raise HTTPException(status_code=404, detail="professional_id no existe")
+    if payload.service_id not in (pro.services or []):
+        raise HTTPException(status_code=400, detail="El profesional no ofrece ese servicio")
     start = payload.start
     if start.tzinfo is None:
         start = start.replace(tzinfo=TZ)
@@ -426,7 +608,6 @@ def create_reservation(
         validate_target_dt(start)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    service = SERVICE_BY_ID[payload.service_id]
     end = start + timedelta(minutes=service.duration_min)
     customer_name = payload.customer_name.strip()
     customer_phone = payload.customer_phone.strip()
@@ -483,10 +664,37 @@ def create_reservation(
         session.rollback()
         raise HTTPException(status_code=500, detail=f"No se pudo guardar la reserva: {e}")
 
-    queue_create_event(background_tasks, res_id)
+    sync_status, sync_job_id = try_enqueue_calendar_job(
+        session,
+        reservation_id=res_id,
+        action=CalendarSyncAction.CREATE,
+        payload={"calendar_id": cal_id} if cal_id else None,
+    )
 
-    message = f"Reserva creada exitosamente. ID: {res_id}. Sincronización con Google Calendar en background."
-    payload_out = ReservationCreateOut(ok=True, message=message, reservation_id=res_id, google_event_id=None)
+    sync_error = None if sync_status == "queued" else "No se pudo encolar la sincronización en Google Calendar; revísalo manualmente."
+    try:
+        session.refresh(row)
+    except Exception:
+        pass
+    try:
+        row.sync_status = sync_status
+        row.sync_job_id = sync_job_id
+        row.sync_last_error = sync_error
+        row.sync_updated_at = datetime.now(timezone.utc)
+        session.add(row)
+        session.commit()
+    except Exception:
+        session.rollback()
+
+    message = _build_public_create_message(res_id, sync_status, sync_job_id)
+    payload_out = ReservationCreateOut(
+        ok=True,
+        message=message,
+        reservation_id=res_id,
+        google_event_id=None,
+        sync_status=sync_status,
+        sync_job_id=sync_job_id,
+    )
     logger.info("Reservation created: id=%s calendar=%s start=%s end=%s", res_id, cal_id, start.isoformat(), end.isoformat())
     return payload_out
 
@@ -502,6 +710,90 @@ class AdminSyncIn(BaseModel):
     calendar_id: str | None = None
     professional_id: str | None = None
     default_service: str | None = None
+
+
+@router.get("/admin/calendar-jobs", response_model=CalendarJobListOut)
+def admin_calendar_jobs(
+    status: Optional[str] = Query(default=None, description="Filtra por estado: pending, processing, completed, failed"),
+    reservation_id: Optional[str] = Query(default=None, description="Filtra por id de reserva"),
+    limit: int = Query(default=100, ge=1, le=500, description="Número máximo de trabajos a devolver"),
+    session: Session = Depends(get_session),
+    _=Depends(require_api_key),
+):
+    stmt = (
+        select(CalendarSyncJobDB)
+        .order_by(CalendarSyncJobDB.id.desc())
+        .limit(limit)
+    )
+    if status:
+        stmt = stmt.where(CalendarSyncJobDB.status == status)
+    if reservation_id:
+        stmt = stmt.where(CalendarSyncJobDB.reservation_id == reservation_id)
+    rows = session.exec(stmt).all()
+    counts_raw = session.exec(
+        select(CalendarSyncJobDB.status, func.count())
+        .group_by(CalendarSyncJobDB.status)
+    ).all()
+    counts = {str(state): int(total) for state, total in counts_raw}
+    jobs = [
+        CalendarJobOut(
+            id=row.id,
+            reservation_id=row.reservation_id,
+            action=row.action,
+            status=row.status,
+            attempts=row.attempts,
+            available_at=row.available_at,
+            locked_by=row.locked_by,
+            locked_at=row.locked_at,
+            heartbeat_at=row.heartbeat_at,
+            last_error=row.last_error,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+        for row in rows
+    ]
+    refresh_queue_metrics()
+    return CalendarJobListOut(jobs=jobs, counts=counts)
+
+
+@router.post("/admin/calendar-jobs/{job_id}/retry", response_model=ActionResult)
+def admin_calendar_job_retry(
+    job_id: int,
+    payload: CalendarJobRetryIn | None = Body(default=None),
+    session: Session = Depends(get_session),
+    _=Depends(require_api_key),
+):
+    job = session.get(CalendarSyncJobDB, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Trabajo no encontrado")
+    delay_seconds = 0
+    if payload and payload.delay_seconds is not None:
+        delay_seconds = max(0, int(payload.delay_seconds))
+    now_utc = datetime.now(timezone.utc)
+    job.status = "pending"
+    job.locked_by = None
+    job.locked_at = None
+    job.heartbeat_at = None
+    job.updated_at = now_utc
+    job.available_at = now_utc + timedelta(seconds=delay_seconds)
+    session.add(job)
+    session.commit()
+    reservation = session.get(ReservationDB, job.reservation_id)
+    if reservation:
+        reservation.sync_status = "queued"
+        reservation.sync_job_id = job.id
+        reservation.sync_last_error = None
+        reservation.sync_updated_at = now_utc
+        session.add(reservation)
+        session.commit()
+    refresh_queue_metrics()
+    if delay_seconds:
+        return ActionResult(
+            ok=True,
+            message=f"Trabajo {job_id} reencolado. Disponible en {delay_seconds} segundos.",
+        )
+    return ActionResult(ok=True, message=f"Trabajo {job_id} reencolado y listo para ejecutar.")
+
 
 @router.post("/admin/sync")
 def admin_sync(body: AdminSyncIn | None = None, session: Session = Depends(get_session), _=Depends(require_api_key)):
@@ -593,7 +885,6 @@ from app.integrations.google_calendar import build_calendar, clear_calendar, lis
 @router.post("/admin/clear_calendars")
 def admin_clear_calendars(body: AdminClearCalendarsIn | None = None, _=Depends(require_api_key)):
     """Limpia calendarios de Google con opciones de dry-run y filtro por eventos de PeluBot."""
-    from app.data import PRO_CALENDAR
     body = body or AdminClearCalendarsIn()
     if not (body.dry_run or (body.confirm and body.confirm.upper() == "DELETE")):
         return {"ok": False, "error": "Confirmación requerida: confirm='DELETE' o dry_run=true"}
@@ -603,7 +894,7 @@ def admin_clear_calendars(body: AdminClearCalendarsIn | None = None, _=Depends(r
     if body.calendar_id:
         cals.append(body.calendar_id)
     if body.by_professional or not cals:
-        cals.extend([v for v in PRO_CALENDAR.values() if v])
+        cals.extend([v for v in get_professional_calendars().values() if v])
     cals = sorted(set(cals))
     if not cals:
         return {"ok": False, "error": "No hay calendarios destino"}
@@ -640,7 +931,6 @@ def admin_cleanup_orphans(body: AdminCleanupOrphansIn | None = None, session: Se
     """Borra eventos en GCal con private.reservation_id cuyo ID no existe en la BD local.
     Requiere confirm='DELETE' si dry_run es False.
     """
-    from app.data import PRO_CALENDAR
     body = body or AdminCleanupOrphansIn()
     if not (body.dry_run or (body.confirm and body.confirm.upper() == "DELETE")):
         return {"ok": False, "error": "Confirmación requerida: confirm='DELETE' o dry_run=true"}
@@ -650,7 +940,7 @@ def admin_cleanup_orphans(body: AdminCleanupOrphansIn | None = None, session: Se
     if body.calendar_id:
         cals.append(body.calendar_id)
     if body.by_professional or not cals:
-        cals.extend([v for v in PRO_CALENDAR.values() if v])
+        cals.extend([v for v in get_professional_calendars().values() if v])
     cals = sorted(set(cals))
     if not cals:
         return {"ok": False, "error": "No hay calendarios destino"}

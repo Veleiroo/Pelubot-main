@@ -77,6 +77,8 @@ def test_stylist_cancel_reservation_removes_booking(app_client: TestClient):
         stored = session.get(ReservationDB, reservation.id)
         assert stored is not None
         assert stored.status == "cancelada"
+        assert stored.sync_status == "queued"
+        assert stored.sync_job_id is not None
 
 
 def test_stylist_cannot_cancel_other_professional_reservation(app_client: TestClient):
@@ -128,6 +130,37 @@ def test_stylist_reschedule_updates_reservation(app_client: TestClient):
         assert stored.start.hour == 12
         assert stored.google_event_id == "gcal-123"
         assert stored.google_calendar_id == "primary"
+        assert stored.sync_status == "queued"
+        assert stored.sync_job_id is not None
+
+
+def test_stylist_reservation_sync_status_endpoint(app_client: TestClient):
+    engine = app_client.app.state.test_engine
+    _seed_stylist(engine)
+    start = (now_tz() + timedelta(days=10)).replace(hour=9, minute=0, second=0, microsecond=0)
+    reservation = _seed_reservation(
+        engine,
+        reservation_id="res-sync-1",
+        professional_id="deinis",
+        start=start,
+        google_event_id="gcal-456",
+        google_calendar_id="primary",
+    )
+
+    _login(app_client, "deinis", "1234")
+    # Reprogramar para encolar un job y luego consultar el estado
+    resp = app_client.post(
+        f"/pros/reservations/{reservation.id}/reschedule",
+        json={"new_time": "10:00"},
+    )
+    assert resp.status_code == 200
+
+    sync_resp = app_client.get(f"/pros/reservations/{reservation.id}/sync")
+    assert sync_resp.status_code == 200
+    payload = sync_resp.json()
+    assert payload["reservation_id"] == reservation.id
+    assert payload["sync_status"] == "queued"
+    assert payload["sync_job_id"] is not None
 
 
 def test_stylist_reschedule_forbidden_for_other_professional(app_client: TestClient):
