@@ -86,10 +86,10 @@ export default function ServicesSection() {
           {services.map((service, index) => (
             <article
               key={index}
-              className="group relative flex h-full flex-col items-center rounded-xl border border-white/10 bg-[#111111] p-6 text-center transition-all duration-300 hover:-translate-y-1 hover:border-brand/60 hover:shadow-[0_18px_45px_-20px_rgba(16,185,129,0.8)]"
+              className="group relative flex h-full flex-col items-center rounded-xl border border-white/10 bg-[#111111] p-6 text-center transition-all duration-300 hover:-translate-y-1 hover:border-white/70 hover:shadow-[0_18px_45px_-20px_rgba(255,255,255,0.35)]"
             >
               <div className="flex w-full items-center justify-center gap-3">
-                <div className="rounded-lg border border-white/10 bg-black/70 p-2.5 transition-colors group-hover:border-brand/60">
+                <div className="rounded-lg border border-white/10 bg-black/70 p-2.5 transition-colors group-hover:border-white/70">
                   {service.icon}
                 </div>
                 <span className="inline-flex items-center rounded-full bg-brand/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand sm:text-sm">
@@ -105,7 +105,7 @@ export default function ServicesSection() {
               <ul className="mt-4 space-y-1.5 text-sm text-gray-300">
                 {service.features.map((feature, featureIndex) => (
                   <li key={featureIndex} className="flex items-center justify-center gap-2 leading-relaxed">
-                    <span className="inline-block size-1.5 rounded-full bg-brand/70" />
+                    <span className="inline-block size-1.5 rounded-full bg-white/80" />
                     <span>{feature}</span>
                   </li>
                 ))}

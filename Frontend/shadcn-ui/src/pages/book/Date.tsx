@@ -3,7 +3,6 @@ import { useBooking } from '@/store/booking';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import type { KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, type Service } from '@/lib/api';
 import { addDays, addMonths, endOfMonth, endOfWeek, format, isAfter, isBefore, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek, subMonths } from 'date-fns';
@@ -13,8 +12,9 @@ import '@/styles/calendar.css';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { buildBookingState } from '@/lib/booking-route';
+import { loadBookService } from '@/lib/route-imports';
 import { BookingLayout } from '@/components/BookingLayout';
-import { Check, Loader2 } from '@/lib/icons';
+import { Check, Loader2, Scissors, Sparkles, Crown, Brush, type LucideIcon } from '@/lib/icons';
 
 type PeriodValue = 'manana' | 'tarde' | 'noche';
 
@@ -26,7 +26,12 @@ const PERIOD_DEFINITIONS: Array<{ value: PeriodValue; label: string; fromHour: n
   { value: 'noche', label: 'Noche', fromHour: 19, toHour: 24 },
 ];
 
-const ANY_PRO = '__any__';
+const SERVICE_ICON_MAP: Record<string, LucideIcon> = {
+  corte_cabello: Scissors,
+  corte_barba: Sparkles,
+  arreglo_barba: Brush,
+  corte_jubilado: Crown,
+};
 
 const toYmd = (d: Date) => {
   const y = d.getFullYear();
@@ -128,6 +133,15 @@ const BookDate = () => {
     );
   }, [serviceId, serviceName, serviceNameParam, servicesData]);
 
+  const resolvedServiceId = serviceId ?? serviceIdParam ?? undefined;
+
+  const selectedServiceInfo = useMemo(() => {
+    if (!resolvedServiceId) return undefined;
+    return servicesData.find((s) => s.id === resolvedServiceId);
+  }, [servicesData, resolvedServiceId]);
+
+  const ServiceIcon = resolvedServiceId ? SERVICE_ICON_MAP[resolvedServiceId] : undefined;
+
   const {
     data: pros = [],
     isFetched: prosFetched,
@@ -149,9 +163,6 @@ const BookDate = () => {
       }
     }
   }, [prosFetched, pros, professionalId, setProfessional]);
-
-  const showProfessionalSelect = prosFetched && pros.length > 1;
-  const singleProfessional = prosFetched && pros.length === 1 ? pros[0] : null;
 
   const monthKey = `${month.getFullYear()}-${month.getMonth()}`;
   const daysQueryUseGcal = false;
@@ -294,6 +305,11 @@ const BookDate = () => {
   const canContinue = !!slotStart;
   const noProfessionals = prosFetched && pros.length === 0;
 
+  const onChangeService = useCallback(() => {
+    loadBookService();
+    navigate('/book/service', { state: buildBookingState(location) });
+  }, [location, navigate]);
+
   const onNext = () => {
     if (!selectedValid || slots.length === 0 || !slotStart) return;
     const params = new URLSearchParams();
@@ -395,59 +411,53 @@ const BookDate = () => {
   };
 
   return (
-    <BookingLayout className="px-5 py-5 md:px-7 md:py-6">
+    <BookingLayout className="rounded-[28px] bg-background px-5 py-5 shadow-[0_50px_120px_-65px_rgba(0,0,0,0.85)] md:px-7 md:py-6">
       <div className="relative mx-auto flex w-full flex-col gap-8">
-        <div className="relative flex flex-col items-center gap-4 md:h-16 md:flex-row md:items-center md:justify-center">
-          <div className="text-center md:absolute md:left-1/2 md:-translate-x-1/2 md:text-center">
-            <h3 className="text-lg font-semibold text-white md:text-xl">Selecciona fecha y hora</h3>
-            <p className="mt-1 text-xs text-zinc-400 md:text-sm">Elige un día y después un horario disponible.</p>
-            {resolvedServiceLabel && (
-              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-white/70 md:text-sm">
-                <span>Servicio:</span>
-                <strong className="text-white">{resolvedServiceLabel}</strong>
+        {resolvedServiceLabel && (
+          <div className="mx-auto w-full max-w-3xl rounded-2xl border border-white/12 bg-background px-5 py-5 text-white shadow-[0_40px_85px_-50px_rgba(0,0,0,0.85)]">
+            <div className="flex flex-col items-center gap-5 md:flex-row md:items-center md:justify-between">
+              <div className="flex w-full flex-1 items-center gap-4 text-left">
+                {ServiceIcon ? (
+                  <span className="grid h-14 w-14 flex-none place-items-center rounded-xl bg-white/10 text-white">
+                    <ServiceIcon className="h-7 w-7" aria-hidden="true" />
+                  </span>
+                ) : null}
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/50">
+                    Servicio seleccionado
+                  </p>
+                  <h4 className="text-xl font-semibold text-white md:text-2xl">{resolvedServiceLabel}</h4>
+                </div>
               </div>
-            )}
-          </div>
-          <div className="flex w-full justify-center md:absolute md:right-0 md:w-auto md:justify-end">
-            {!prosFetched ? (
-              <div className="flex flex-col items-center gap-1 md:items-end">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-600">Profesional</span>
-                <Skeleton className="h-8 w-32 rounded-lg bg-zinc-800/70" />
-              </div>
-            ) : showProfessionalSelect ? (
-              <div className="flex flex-col items-center gap-1 md:items-end">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-600">Profesional</span>
-                <Select
-                  value={professionalId ?? ANY_PRO}
-                  onValueChange={(v) => {
-                    const nextId = v === ANY_PRO ? null : v;
-                    const nextName = nextId ? pros.find((p) => p.id === nextId)?.name ?? null : null;
-                    setProfessional(nextId, nextName);
-                    setDate('');
-                  }}
+              <div className="flex w-full flex-col items-stretch justify-center gap-4 border-t border-white/10 pt-4 md:w-auto md:flex-row md:items-center md:gap-8 md:border-t-0 md:pt-0">
+                {selectedServiceInfo ? (
+                  <>
+                    <div className="text-center md:text-left">
+                      <p className="text-[11px] uppercase tracking-[0.28em] text-white/60">Duración</p>
+                      <p className="text-lg font-semibold text-white">
+                        {selectedServiceInfo.duration_min} min
+                      </p>
+                    </div>
+                    <div className="text-center md:text-left">
+                      <p className="text-[11px] uppercase tracking-[0.28em] text-white/60">Precio</p>
+                      <p className="text-lg font-semibold text-white">
+                        {selectedServiceInfo.price_eur} €
+                      </p>
+                    </div>
+                  </>
+                ) : null}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg border-white/25 bg-transparent px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-white/40 hover:bg-white/10"
+                  onClick={onChangeService}
                 >
-                  <SelectTrigger
-                    aria-label="Seleccionar profesional"
-                    className="flex h-8 w-36 items-center justify-between rounded-lg border border-zinc-700/60 bg-zinc-900/70 px-3 text-xs font-medium text-zinc-300 shadow-[0_10px_30px_-20px_rgba(16,185,129,0.6)] ring-offset-black transition-colors placeholder:text-emerald-200/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1"
-                  >
-                    <SelectValue placeholder="Cualquiera" />
-                  </SelectTrigger>
-                  <SelectContent align="end" sideOffset={6} className="min-w-[150px]">
-                    <SelectItem value={ANY_PRO}>Cualquiera</SelectItem>
-                    {pros.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  Cambiar servicio
+                </Button>
               </div>
-            ) : singleProfessional ? (
-              <div className="flex flex-col items-center gap-1 text-xs text-zinc-400 md:items-end">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-600">Profesional</span>
-                <span className="text-sm text-zinc-400">{singleProfessional.name ?? professionalName ?? 'Cualquiera'}</span>
-              </div>
-            ) : null}
+            </div>
           </div>
-        </div>
+        )}
 
         {noProfessionals && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200" aria-live="polite">
@@ -456,12 +466,12 @@ const BookDate = () => {
         )}
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] lg:items-start lg:gap-10">
-          <section className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 md:p-6 lg:p-7">
+          <section className="w-full rounded-2xl border border-white/12 bg-background p-5 md:p-6 lg:p-7">
             <CalendarNav month={month} onPrev={onPrevMonth} onNext={onNextMonth} />
 
             <div className="mt-4 grid grid-cols-7 gap-1.5 text-center text-[11px] uppercase tracking-wide text-white/50 md:gap-2">
               {['lu', 'ma', 'mi', 'ju', 'vi', 'sá', 'do'].map((w) => (
-                <div key={w} className="grid h-7 place-items-center rounded-lg bg-zinc-900/70 text-xs font-semibold text-white/60 md:h-8">
+                <div key={w} className="grid h-7 place-items-center rounded-lg bg-white/5 text-xs font-semibold text-white/60 md:h-8">
                   {w}
                 </div>
               ))}
@@ -483,16 +493,16 @@ const BookDate = () => {
                 const selectedDay = selected ? isSameDay(d, selected) : false;
                 const isFocused = isSameDay(d, focusedDate);
                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                const dayClasses = cn(
-                  'group relative grid h-11 w-11 place-items-center rounded-2xl text-sm font-semibold leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 md:h-12 md:w-12 md:text-base lg:h-[3.25rem] lg:w-[3.25rem]',
-                  '[font-variant-numeric:tabular-nums] shadow-none',
-                  isWeekend ? 'text-white/75' : 'text-white/85',
-                  !inMonth && 'cursor-not-allowed text-white/20 opacity-80 hover:bg-transparent',
-                  inMonth && !enabled && 'cursor-not-allowed text-white/35 opacity-70 hover:bg-transparent',
-                  enabled && inMonth && !selectedDay && 'border border-transparent hover:border-white/15 hover:bg-white/5',
-                  selectedDay && 'border border-emerald-500/50 bg-emerald-500/10 text-emerald-200 shadow-[0_0_0_2px_rgba(16,185,129,0.3)]',
-                  isToday(d) && !selectedDay && 'border border-white/15 text-white'
-                );
+                  const dayClasses = cn(
+                    'group relative grid h-11 w-11 place-items-center rounded-2xl text-sm font-semibold leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 md:h-12 md:w-12 md:text-base lg:h-[3.25rem] lg:w-[3.25rem]',
+                    '[font-variant-numeric:tabular-nums] shadow-none',
+                    isWeekend ? 'text-white/75' : 'text-white/85',
+                    !inMonth && 'cursor-not-allowed text-white/20 opacity-80 hover:bg-transparent',
+                    inMonth && !enabled && 'cursor-not-allowed text-white/35 opacity-70 hover:bg-transparent',
+                    enabled && inMonth && !selectedDay && 'border border-transparent hover:border-white/15 hover:bg-white/5',
+                    selectedDay && 'border border-white/70 bg-white/10 text-white shadow-[0_0_0_2px_rgba(255,255,255,0.25)]',
+                    isToday(d) && !selectedDay && 'border border-white/15 text-white'
+                  );
 
                 return (
                   <div key={ymd} className="flex items-center justify-center">
@@ -522,16 +532,16 @@ const BookDate = () => {
               })}
             </div>
 
-            <p className="mt-5 text-left text-xs text-zinc-400 md:text-sm">Selecciona un día para ver horarios disponibles.</p>
+            <p className="mt-5 text-center text-xs text-zinc-400 md:text-sm">Solo los días en blanco están disponibles.</p>
           </section>
 
-          <aside className="w-full space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5 md:p-6">
+          <aside className="w-full space-y-4 rounded-2xl border border-white/12 bg-background p-5 md:p-6">
             <div className="flex flex-col items-start gap-2">
               <h4 className="text-base font-semibold text-white md:text-lg">Horarios disponibles</h4>
               <p className="text-xs text-zinc-400 md:text-sm">Elige el tramo horario que prefieras para ver los huecos libres.</p>
             </div>
 
-            <div className="inline-flex w-full max-w-[340px] items-center justify-between gap-1 rounded-full border border-emerald-500/20 bg-zinc-900/80 p-1 text-xs text-zinc-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.12)] md:text-sm">
+            <div className="inline-flex w-full max-w-[340px] items-center justify-between gap-1 rounded-full border border-white/15 bg-background p-1 text-xs text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] md:text-sm">
               {([
                 { value: 'morning', label: 'Mañana' },
                 { value: 'afternoon', label: 'Tarde / Noche' },
@@ -543,9 +553,9 @@ const BookDate = () => {
                     type="button"
                     onClick={() => handleRangeChange(value)}
                     className={cn(
-                      'flex-1 rounded-full px-4 py-1.5 font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
+                      'flex-1 rounded-full px-4 py-1.5 font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
                       active
-                        ? 'bg-emerald-500/20 text-emerald-200 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]'
+                        ? 'bg-white/15 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.3)]'
                         : 'text-zinc-400 hover:bg-white/5'
                     )}
                     aria-pressed={active}
@@ -583,12 +593,12 @@ const BookDate = () => {
                       aria-pressed={selectedSlot}
                       data-selected={selectedSlot}
                       className={cn(
-                        'group relative grid h-12 w-full min-w-[120px] place-items-center rounded-xl border border-zinc-700/70 bg-transparent px-5 text-sm font-semibold leading-none text-zinc-100 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
-                        'hover:bg-zinc-800/50',
+                        'group relative grid h-12 w-full min-w-[120px] place-items-center rounded-xl border border-white/12 bg-transparent px-5 text-sm font-semibold leading-none text-zinc-100 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
+                        'hover:bg-white/5',
                         'transform-gpu animate-in fade-in-50 slide-in-from-bottom-1',
-                        selectedSlot && 'scale-[1.03] border-emerald-500/50 bg-emerald-500/15 text-emerald-200 shadow-[0_0_0_2px_rgba(16,185,129,0.3)]',
+                        selectedSlot && 'scale-[1.03] border-white/70 bg-white/10 text-white shadow-[0_0_0_2px_rgba(255,255,255,0.28)]',
                         !selectedSlot && 'scale-[1] opacity-95',
-                        'disabled:cursor-not-allowed disabled:border-zinc-800/70 disabled:text-zinc-500 disabled:hover:bg-transparent disabled:opacity-40'
+                        'disabled:cursor-not-allowed disabled:border-white/10 disabled:text-zinc-500 disabled:hover:bg-transparent disabled:opacity-40'
                       )}
                       style={{ animationDelay }}
                       onClick={() => onSelectSlot(iso)}
@@ -597,7 +607,7 @@ const BookDate = () => {
                       <Check
                         aria-hidden="true"
                         className={cn(
-                          'pointer-events-none absolute right-2 h-3.5 w-3.5 text-emerald-300 opacity-0 transition-all duration-200 ease-out',
+                          'pointer-events-none absolute right-2 h-3.5 w-3.5 text-white opacity-0 transition-all duration-200 ease-out',
                           selectedSlot ? 'translate-y-0 opacity-100' : '-translate-y-1'
                         )}
                       />
@@ -614,7 +624,7 @@ const BookDate = () => {
             )}
 
             {slotsError && !slotsLoading && (
-              <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-center">
+              <div className="flex flex-col gap-2 rounded-xl border border-white/12 bg-background px-4 py-3 text-center">
                 <div className="text-sm text-neutral-100">{slotsError}</div>
                 <Button size="sm" onClick={onRetrySlots}>Reintentar</Button>
               </div>
@@ -629,10 +639,10 @@ const BookDate = () => {
             onClick={onNext}
             aria-disabled={!canContinue}
             className={cn(
-              'inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-transparent px-6 text-sm font-medium text-zinc-100 shadow-[0_10px_30px_-15px_rgba(16,185,129,0.6)] ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 disabled:pointer-events-none disabled:opacity-60 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+              'inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/15 bg-transparent px-6 text-sm font-medium text-zinc-100 shadow-[0_10px_30px_-20px_rgba(255,255,255,0.25)] ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 disabled:pointer-events-none disabled:opacity-60 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
               canContinue
-                ? 'border-emerald-500/50 text-emerald-200 shadow-[0_0_0_1px_rgba(16,185,129,0.35)] hover:border-emerald-500/60 hover:bg-emerald-500/15 focus-visible:ring-emerald-400 data-[ready=true]:animate-[pulse_1.2s_ease-out_1]'
-                : 'hover:border-zinc-600 hover:bg-zinc-800/50'
+                ? 'border-white/60 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.3)] hover:border-white/70 hover:bg-white/10 focus-visible:ring-white/80'
+                : 'hover:border-white/20 hover:bg-white/5'
             )}
           >
             {canContinue ? 'Continuar' : 'Selecciona un horario'}
@@ -644,7 +654,7 @@ const BookDate = () => {
             <div
               role="status"
               aria-live="polite"
-              className="pointer-events-none flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-white/10 bg-zinc-900/85 px-6 py-5 text-center shadow-[0_30px_80px_-45px_rgba(255,255,255,0.35)]"
+              className="pointer-events-none flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-white/12 bg-background px-6 py-5 text-center shadow-[0_30px_80px_-45px_rgba(255,255,255,0.35)]"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10">
                 <Loader2 className="h-7 w-7 animate-spin text-white/90" />
@@ -658,7 +668,7 @@ const BookDate = () => {
         )}
         {daysError && !daysLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[24px] bg-black/70 backdrop-blur">
-            <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl border border-red-500/30 bg-zinc-900/90 px-6 py-5 text-center shadow-[0_30px_80px_-45px_rgba(239,68,68,0.6)]">
+            <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl border border-red-500/30 bg-background px-6 py-5 text-center shadow-[0_30px_80px_-45px_rgba(239,68,68,0.6)]">
               <div className="text-sm font-semibold text-red-200" role="status" aria-live="assertive">
                 {daysError}
               </div>

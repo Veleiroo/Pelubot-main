@@ -47,7 +47,7 @@ export function CalendarNav({
         aria-label="Mes anterior"
         onClick={goPrev}
         disabled={disablePrev}
-        className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:scale-110 hover:bg-slate-700/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-35 md:h-11 md:w-11"
+        className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:scale-110 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050505] disabled:cursor-not-allowed disabled:opacity-35 md:h-11 md:w-11"
       >
         <ChevronLeft className="h-5 w-5" aria-hidden="true" />
       </button>
@@ -59,7 +59,7 @@ export function CalendarNav({
         aria-label="Mes siguiente"
         onClick={goNext}
         disabled={disableNext}
-        className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:scale-110 hover:bg-slate-700/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-35 md:h-11 md:w-11"
+        className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-white/80 transition-all duration-200 hover:scale-110 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050505] disabled:cursor-not-allowed disabled:opacity-35 md:h-11 md:w-11"
       >
         <ChevronRight className="h-5 w-5" aria-hidden="true" />
       </button>

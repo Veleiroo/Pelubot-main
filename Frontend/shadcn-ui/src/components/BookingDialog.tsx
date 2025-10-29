@@ -38,7 +38,8 @@ export function BookingDialog({ background, children }: Props) {
         <DialogPrimitive.Content
           className={cn(
             'fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 pb-8 pt-[6vh] text-sm outline-none',
-            'md:px-6 md:pt-[8vh]'
+            'md:px-6 md:pt-[8vh]',
+            'dark'
           )}
           onPointerDownOutside={(event) => {
             event.preventDefault();
@@ -50,14 +51,14 @@ export function BookingDialog({ background, children }: Props) {
           }}
         >
           <div className="relative mx-auto flex w-full max-w-[960px] justify-center">
-            <div className="relative w-full overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.75)]">
+            <div className="relative w-full overflow-hidden rounded-3xl border border-white/12 bg-background shadow-[0_50px_140px_-55px_rgba(0,0,0,0.85)]">
               <DialogPrimitive.Close
-                className="absolute right-6 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700/70 bg-zinc-900/95 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 md:top-6"
+                className="absolute right-6 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-background/90 text-white/70 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:top-6"
                 aria-label="Cerrar reserva"
               >
                 <X className="h-4 w-4" />
               </DialogPrimitive.Close>
-              <div className="max-h-[85vh] overflow-y-auto overscroll-contain px-5 pb-7 pt-5 md:px-7 md:pb-8 md:pt-6">
+              <div className="max-h-[85vh] overflow-y-auto overscroll-contain bg-background px-5 pb-7 pt-5 md:px-7 md:pb-8 md:pt-6">
                 {children}
               </div>
             </div>

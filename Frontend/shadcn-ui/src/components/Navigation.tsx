@@ -1,203 +1,60 @@
-import { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Menu, X } from '@/lib/icons';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { loadBookDate, loadBookConfirm, loadBookService } from '@/lib/route-imports';
-import { buildBookingState } from '@/lib/booking-route';
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Scissors } from 'lucide-react'
+
+const navLinks = [
+  { href: '#inicio', label: 'Inicio' },
+  { href: '#sobre-nosotros', label: 'Sobre Nosotros' },
+  { href: '#servicios', label: 'Servicios' },
+  { href: '#galeria', label: 'Galería' },
+  { href: '#contacto', label: 'Contacto' },
+]
 
 export default function Navigation() {
-    const [isOpen, setIsOpen] = useState(false);
-    const navigate = useNavigate();
-    const location = useLocation();
-    const mobileMenuRef = useRef<HTMLDivElement | null>(null);
+  const [scrolled, setScrolled] = useState(false)
 
-    const scrollToSection = (sectionId: string) => {
-        const element = document.getElementById(sectionId);
-        if (element) {
-            const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            element.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth' });
-        }
-        setIsOpen(false);
-    };
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20)
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
-    const handleReservation = () => {
-        loadBookService();
-        loadBookDate();
-        loadBookConfirm();
-        navigate('/book/service', { state: buildBookingState(location) });
-    };
+  return (
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled ? 'bg-background/80 backdrop-blur border-b border-border' : 'bg-transparent'
+      }`}
+    >
+      <div className="container mx-auto px-4 lg:px-8">
+        <div className="flex h-20 items-center justify-between">
+          <a href="#inicio" className="flex items-center gap-2 group">
+            <Scissors className="h-6 w-6 text-primary transition-transform group-hover:rotate-12" />
+            <span className="text-xl font-bold tracking-tight">DEINIS BARBER CLUB</span>
+          </a>
 
-    useEffect(() => {
-        if (!isOpen) {
-            document.body.style.removeProperty('overflow');
-            return;
-        }
+          <div className="hidden items-center gap-8 md:flex">
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="relative text-sm font-medium text-muted-foreground transition-colors hover:text-foreground group"
+              >
+                {link.label}
+                <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-primary transition-all group-hover:w-full" />
+              </a>
+            ))}
+          </div>
 
-        document.body.style.setProperty('overflow', 'hidden');
-
-        const menuEl = mobileMenuRef.current;
-        const focusableSelectors = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-        const focusable = menuEl ? Array.from(menuEl.querySelectorAll<HTMLElement>(focusableSelectors)) : [];
-
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (first) first.focus();
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                setIsOpen(false);
-                return;
-            }
-            if (event.key === 'Tab' && focusable.length > 0) {
-                if (event.shiftKey && document.activeElement === first) {
-                    event.preventDefault();
-                    last?.focus();
-                } else if (!event.shiftKey && document.activeElement === last) {
-                    event.preventDefault();
-                    first?.focus();
-                }
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => {
-            document.body.style.removeProperty('overflow');
-            document.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [isOpen]);
-
-    return (
-        <nav className="fixed top-0 w-full bg-black/90 backdrop-blur-sm z-50 border-b border-gray-800">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between items-center h-16">
-                    <div className="flex-shrink-0">
-                        <h1 className="text-2xl font-bold text-white">
-                            <span className="text-brand">Deinis</span> Barber Club
-                        </h1>
-                    </div>
-
-                    {/* Desktop Navigation */}
-                    <div className="hidden md:block">
-                        <div className="ml-10 flex items-baseline space-x-4">
-                            <button
-                                onClick={() => scrollToSection('inicio')}
-                                className="text-gray-300 hover:text-brand px-3 py-2 text-sm font-medium transition-colors"
-                            >
-                                Inicio
-                            </button>
-                            <button
-                                onClick={() => scrollToSection('sobre-nosotros')}
-                                className="text-gray-300 hover:text-brand px-3 py-2 text-sm font-medium transition-colors"
-                            >
-                                Sobre Nosotros
-                            </button>
-                            <button
-                                onClick={() => scrollToSection('servicios')}
-                                className="text-gray-300 hover:text-brand px-3 py-2 text-sm font-medium transition-colors"
-                            >
-                                Servicios
-                            </button>
-                            <button
-                                onClick={() => scrollToSection('galeria')}
-                                className="text-gray-300 hover:text-brand px-3 py-2 text-sm font-medium transition-colors"
-                            >
-                                Galería
-                            </button>
-                            <button
-                                onClick={() => scrollToSection('contacto')}
-                                className="text-gray-300 hover:text-brand px-3 py-2 text-sm font-medium transition-colors"
-                            >
-                                Contacto
-                            </button>
-                            <Button
-                                onClick={handleReservation}
-                                onMouseEnter={() => {
-                                    loadBookService();
-                                    loadBookDate();
-                                }}
-                                onFocus={() => {
-                                    loadBookService();
-                                    loadBookDate();
-                                }}
-                                className="bg-brand hover:bg-[#00B894] text-black font-semibold ml-4"
-                            >
-                                Reserva tu Cita
-                            </Button>
-                        </div>
-                    </div>
-
-                    {/* Mobile menu button */}
-                    <div className="md:hidden">
-                        <button
-                            onClick={() => setIsOpen(!isOpen)}
-                            className="text-gray-300 hover:text-white p-2"
-                            aria-label="Abrir menú"
-                            aria-expanded={isOpen}
-                        >
-                            {isOpen ? <X size={24} /> : <Menu size={24} />}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Mobile Navigation */}
-                {isOpen && (
-                    <>
-                        <div
-                            className="fixed inset-0 bg-black/60 md:hidden"
-                            aria-hidden="true"
-                            onClick={() => setIsOpen(false)}
-                        />
-                        <div className="md:hidden" ref={mobileMenuRef}>
-                            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-black/95 focus:outline-none">
-                                <button
-                                    onClick={() => scrollToSection('inicio')}
-                                    className="text-gray-300 hover:text-brand block px-3 py-2 text-base font-medium w-full text-left transition-colors"
-                                >
-                                    Inicio
-                            </button>
-                            <button
-                                onClick={() => scrollToSection('sobre-nosotros')}
-                                className="text-gray-300 hover:text-brand block px-3 py-2 text-base font-medium w-full text-left transition-colors"
-                            >
-                                Sobre Nosotros
-                            </button>
-                            <button
-                                onClick={() => scrollToSection('servicios')}
-                                className="text-gray-300 hover:text-brand block px-3 py-2 text-base font-medium w-full text-left transition-colors"
-                            >
-                                Servicios
-                            </button>
-                            <button
-                                onClick={() => scrollToSection('galeria')}
-                                className="text-gray-300 hover:text-brand block px-3 py-2 text-base font-medium w-full text-left transition-colors"
-                            >
-                                Galería
-                            </button>
-                            <button
-                                onClick={() => scrollToSection('contacto')}
-                                className="text-gray-300 hover:text-brand block px-3 py-2 text-base font-medium w-full text-left transition-colors"
-                            >
-                                Contacto
-                            </button>
-                            <Button
-                                onClick={() => { setIsOpen(false); handleReservation(); }}
-                                onMouseEnter={() => {
-                                    loadBookService();
-                                    loadBookDate();
-                                }}
-                                onFocus={() => {
-                                    loadBookService();
-                                    loadBookDate();
-                                }}
-                                className="bg-brand hover:bg-[#00B894] text-black font-semibold w-full mt-4"
-                            >
-                                Reserva tu Cita
-                            </Button>
-                        </div>
-                    </div>
-                    </>
-                )}
-            </div>
-        </nav>
-    );
+          <Button
+            asChild
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
+          >
+            <a href="#contacto">Reserva tu Cita</a>
+          </Button>
+        </div>
+      </div>
+    </nav>
+  )
 }

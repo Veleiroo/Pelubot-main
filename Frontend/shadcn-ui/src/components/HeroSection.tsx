@@ -1,90 +1,80 @@
-import { Button } from '@/components/ui/button';
-import { Scissors, Star } from '@/lib/icons';
+import { Button } from '@/components/ui/button'
+import { Calendar, Clock } from 'lucide-react'
 
 export default function HeroSection() {
-    const scrollToServices = () => {
-        const element = document.getElementById('servicios');
-        if (element) {
-            const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            element.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth' });
-        }
-    };
+  const scrollTo = (id: string) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth' })
+  }
 
-    const scrollToContact = () => {
-        const element = document.getElementById('contacto');
-        if (element) {
-            const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            element.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth' });
-        }
-    };
+  return (
+    <section id="inicio" className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20 pb-16">
+      <div
+        className="absolute inset-0 z-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/professional-barber-tools-scissors-clippers-on-dar.jpg')" }}
+      />
+      <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
 
-    return (
-        <section id="inicio" className="relative min-h-screen flex items-center justify-center overflow-hidden">
-            {/* Imagen de fondo */}
-            <div
-                className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-                style={{
-                    backgroundImage: 'url(/assets/hero.jpg)',
-                }}
+      <div className="container relative z-20 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 font-sans">
+        <div className="flex flex-col items-center text-center space-y-8 md:space-y-12">
+          <div className="space-y-4 md:space-y-6 w-full">
+            <div className="space-y-2 md:space-y-3">
+              <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tighter leading-none">
+                <span className="block text-primary font-serif italic">Deinis</span>
+              </h1>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-wide text-white">
+                BARBER CLUB
+              </h2>
+            </div>
+
+            <div className="w-24 sm:w-32 h-1 bg-primary mx-auto" />
+
+            <p className="text-lg sm:text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed font-light px-4">
+              Donde el estilo urbano se encuentra con la tradición
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-stretch sm:items-center px-4">
+            <Button
+              size="lg"
+              className="bg-primary text-black hover:bg-primary/90 font-bold text-base px-10 py-6 rounded-full transition-all hover:scale-105"
+              asChild
             >
-                <div className="absolute inset-0 bg-black/70"></div>
-            </div>
-
-            {/* Contenido */}
-            <div className="relative z-10 text-center px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
-                <div className="flex items-center justify-center mb-6">
-                    <Scissors className="text-brand mr-3" size={48} />
-                    <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                            <Star key={i} className="text-brand fill-current" size={24} />
-                        ))}
-                    </div>
-                </div>
-
-                <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
-                    <span className="text-brand">DEINIS</span>
-                    <br />
-                    BARBER CLUB
-                </h1>
-
-                <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed">
-                    Donde el estilo urbano se encuentra con la tradición.
-                    Cortes profesionales, ambiente único, experiencia inolvidable.
-                </p>
-
-                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                    <Button
-                        onClick={scrollToServices}
-                        size="lg"
-                        className="bg-brand hover:bg-[#00B894] text-black font-bold text-lg px-8 py-4 transition-all duration-300 transform hover:scale-105"
-                    >
-                        RESERVA TU CITA
-                    </Button>
-                    <Button
-                        onClick={scrollToContact}
-                        variant="outline"
-                        size="lg"
-                        className="border-brand text-brand hover:bg-brand hover:text-black font-bold text-lg px-8 py-4 transition-all duration-300"
-                    >
-                        VER HORARIOS
-                    </Button>
-                </div>
-
-                {/* Elementos flotantes */}
-                <div className="absolute top-20 left-10 animate-pulse">
-                    <div className="w-2 h-2 bg-brand rounded-full"></div>
-                </div>
-                <div className="absolute bottom-20 right-10 animate-pulse delay-1000">
-                    <div className="w-3 h-3 bg-brand rounded-full"></div>
-                </div>
-            </div>
-
-            {/* Indicador de scroll */}
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-                <div className="w-6 h-10 border-2 border-brand rounded-full flex justify-center">
-                    <div className="w-1 h-3 bg-brand rounded-full mt-2 animate-pulse"></div>
-                </div>
-            </div>
-        </section>
-    );
+              <a
+                href="#servicios"
+                className="flex items-center justify-center whitespace-nowrap"
+                onClick={(e) => {
+                  e.preventDefault()
+                  scrollTo('servicios')
+                }}
+              >
+                <Calendar className="w-5 h-5 mr-2" />
+                RESERVA TU CITA
+              </a>
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-2 border-white/30 hover:bg-white/10 hover:border-white/50 font-bold text-base px-10 py-6 rounded-full bg-transparent text-white transition-all hover:scale-105"
+              asChild
+            >
+              <a
+                href="#contacto"
+                className="flex items-center justify-center whitespace-nowrap"
+                onClick={(e) => {
+                  e.preventDefault()
+                  scrollTo('contacto')
+                }}
+              >
+                <Clock className="w-5 h-5 mr-2" />
+                VER HORARIOS
+              </a>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
 }
