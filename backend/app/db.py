@@ -78,50 +78,7 @@ def create_db_and_tables() -> None:
             with engine.connect() as conn:
                 # Asegurar foreign_keys on en la sesión de migración
                 conn.exec_driver_sql("PRAGMA foreign_keys = ON;")
-                # Índices para consultas por profesional/servicio y rango temporal
-                conn.exec_driver_sql(
-                    "CREATE INDEX IF NOT EXISTS ix_res_prof_start_end ON reservationdb (professional_id, start, end);"
-                )
-                conn.exec_driver_sql(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_res_prof_start ON reservationdb (professional_id, start);"
-                )
-                conn.exec_driver_sql(
-                    "CREATE INDEX IF NOT EXISTS ix_res_service_start ON reservationdb (service_id, start);"
-                )
-                conn.exec_driver_sql(
-                    "CREATE INDEX IF NOT EXISTS ix_res_sync_status ON reservationdb (sync_status);"
-                )
-                conn.exec_driver_sql(
-                    "CREATE INDEX IF NOT EXISTS ix_res_sync_job ON reservationdb (sync_job_id);"
-                )
-                # Índices de estilistas para consultas frecuentes
-                conn.exec_driver_sql(
-                    "CREATE INDEX IF NOT EXISTS ix_stylist_active ON stylistdb (is_active);"
-                )
-                conn.exec_driver_sql(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_stylist_email ON stylistdb (email);"
-                )
-                conn.exec_driver_sql(
-                    "CREATE INDEX IF NOT EXISTS ix_calendar_jobs_status_available ON calendar_sync_jobs (status, available_at);"
-                )
-                conn.exec_driver_sql(
-                    "CREATE INDEX IF NOT EXISTS ix_calendar_jobs_reservation ON calendar_sync_jobs (reservation_id);"
-                )
-                # Trigger updated_at: actualiza solo si no lo ha actualizado ya la capa ORM
-                # Evita bucle usando condición sobre OLD/NEW
-                conn.exec_driver_sql(
-                    """
-                    CREATE TRIGGER IF NOT EXISTS trg_reservationdb_updated
-                    AFTER UPDATE ON reservationdb
-                    FOR EACH ROW
-                    WHEN NEW.updated_at <= OLD.updated_at
-                    BEGIN
-                      UPDATE reservationdb SET updated_at = CURRENT_TIMESTAMP
-                      WHERE id = NEW.id AND NEW.updated_at <= OLD.updated_at;
-                    END;
-                    """
-                )
-                # Añadir columnas nuevas si la tabla proviene de esquemas antiguos (sin Alembic todavía)
+                # Asegurar columnas nuevas antes de crear índices que dependan de ellas
                 try:
                     cols = conn.exec_driver_sql("PRAGMA table_info('reservationdb');").fetchall()
                     existing_cols = {row[1] for row in cols}
@@ -139,6 +96,36 @@ def create_db_and_tables() -> None:
                             conn.exec_driver_sql(f"ALTER TABLE reservationdb ADD COLUMN {col} {ddl};")
                 except Exception:
                     pass
+                # Índices para consultas por profesional/servicio y rango temporal
+                for statement in (
+                    "CREATE INDEX IF NOT EXISTS ix_res_prof_start_end ON reservationdb (professional_id, start, end);",
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_res_prof_start ON reservationdb (professional_id, start);",
+                    "CREATE INDEX IF NOT EXISTS ix_res_service_start ON reservationdb (service_id, start);",
+                    "CREATE INDEX IF NOT EXISTS ix_res_sync_status ON reservationdb (sync_status);",
+                    "CREATE INDEX IF NOT EXISTS ix_res_sync_job ON reservationdb (sync_job_id);",
+                    "CREATE INDEX IF NOT EXISTS ix_stylist_active ON stylistdb (is_active);",
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_stylist_email ON stylistdb (email);",
+                    "CREATE INDEX IF NOT EXISTS ix_calendar_jobs_status_available ON calendar_sync_jobs (status, available_at);",
+                    "CREATE INDEX IF NOT EXISTS ix_calendar_jobs_reservation ON calendar_sync_jobs (reservation_id);",
+                ):
+                    try:
+                        conn.exec_driver_sql(statement)
+                    except Exception:
+                        pass
+                # Trigger updated_at: actualiza solo si no lo ha actualizado ya la capa ORM
+                # Evita bucle usando condición sobre OLD/NEW
+                conn.exec_driver_sql(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS trg_reservationdb_updated
+                    AFTER UPDATE ON reservationdb
+                    FOR EACH ROW
+                    WHEN NEW.updated_at <= OLD.updated_at
+                    BEGIN
+                      UPDATE reservationdb SET updated_at = CURRENT_TIMESTAMP
+                      WHERE id = NEW.id AND NEW.updated_at <= OLD.updated_at;
+                    END;
+                    """
+                )
                 try:
                     cols = conn.exec_driver_sql("PRAGMA table_info('calendar_sync_jobs');").fetchall()
                     existing_cols = {row[1] for row in cols}

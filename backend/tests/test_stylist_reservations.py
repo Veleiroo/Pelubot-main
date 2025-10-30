@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -181,3 +181,72 @@ def test_stylist_reschedule_forbidden_for_other_professional(app_client: TestCli
         stored = session.get(ReservationDB, reservation.id)
         assert stored is not None
         assert stored.start.hour == 10
+
+
+def test_stylist_reservations_history_filters(app_client: TestClient):
+    engine = app_client.app.state.test_engine
+    _seed_stylist(engine, services=["corte_cabello", "corte_barba"])
+    base_date = date(2050, 6, 1)
+    _seed_reservation(
+        engine,
+        reservation_id="hist-1",
+        professional_id="deinis",
+        start=datetime(2050, 6, 1, 10, 0, tzinfo=TZ),
+        customer_name="Ana Cliente",
+        customer_phone="+34000000001",
+        status="confirmada",
+        service_id="corte_cabello",
+    )
+    _seed_reservation(
+        engine,
+        reservation_id="hist-2",
+        professional_id="deinis",
+        start=datetime(2050, 6, 5, 12, 0, tzinfo=TZ),
+        customer_name="Luis Cliente",
+        customer_phone="+34000000002",
+        status="cancelada",
+        service_id="corte_barba",
+    )
+    _seed_reservation(
+        engine,
+        reservation_id="hist-3",
+        professional_id="deinis",
+        start=datetime(2050, 6, 10, 9, 30, tzinfo=TZ),
+        customer_name="Carlos Test",
+        customer_phone="+34000000003",
+        status="asistida",
+        service_id="corte_cabello",
+    )
+
+    _login(app_client, "deinis", "1234")
+    resp = app_client.get("/pros/reservations/history")
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["total"] == 3
+    items = payload["items"]
+    # Orden descendente por fecha
+    assert [item["id"] for item in items] == ["hist-3", "hist-2", "hist-1"]
+
+    # Filtro por estado
+    resp_status = app_client.get("/pros/reservations/history", params={"status": "cancelada"})
+    assert resp_status.status_code == 200
+    data_status = resp_status.json()
+    assert data_status["total"] == 1
+    assert data_status["items"][0]["id"] == "hist-2"
+
+    # Búsqueda por nombre
+    resp_search = app_client.get("/pros/reservations/history", params={"search": "luis"})
+    assert resp_search.status_code == 200
+    data_search = resp_search.json()
+    assert data_search["total"] == 1
+    assert data_search["items"][0]["id"] == "hist-2"
+
+    # Rango de fechas
+    resp_range = app_client.get(
+        "/pros/reservations/history",
+        params={"date_from": base_date.isoformat(), "date_to": (base_date + timedelta(days=4)).isoformat()},
+    )
+    assert resp_range.status_code == 200
+    data_range = resp_range.json()
+    assert data_range["total"] == 1
+    assert data_range["items"][0]["id"] == "hist-1"

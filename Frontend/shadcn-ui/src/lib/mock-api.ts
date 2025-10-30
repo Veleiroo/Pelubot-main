@@ -436,6 +436,66 @@ const parseNumberParam = (value: string | null | undefined) => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+const parseDateParam = (value: string | null | undefined) => {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
+const makeHistoryPayload = (url: URL) => {
+  const page = clampNumber(parseNumberParam(url.searchParams.get('page')) ?? 1, 1, 1000);
+  const pageSize = clampNumber(parseNumberParam(url.searchParams.get('page_size')) ?? 25, 1, 100);
+  const statuses = url.searchParams.getAll('status');
+  const serviceIds = url.searchParams.getAll('service_id');
+  const search = (url.searchParams.get('search') ?? '').trim().toLowerCase();
+  const dateFrom = parseDateParam(url.searchParams.get('date_from'));
+  const dateTo = parseDateParam(url.searchParams.get('date_to'));
+
+  const store = ensureReservationsStore();
+  let filtered = store.slice();
+  if (statuses.length > 0) {
+    const set = new Set(statuses);
+    filtered = filtered.filter((item) => set.has(item.status));
+  }
+  if (serviceIds.length > 0) {
+    const set = new Set(serviceIds);
+    filtered = filtered.filter((item) => set.has(item.service_id));
+  }
+  if (search) {
+    filtered = filtered.filter((item) => {
+      const target = [
+        item.customer_name?.toLowerCase() ?? '',
+        item.customer_phone?.toLowerCase() ?? '',
+        item.id.toLowerCase(),
+      ].join(' ');
+      return target.includes(search);
+    });
+  }
+  if (dateFrom) {
+    filtered = filtered.filter((item) => new Date(item.start) >= dateFrom);
+  }
+  if (dateTo) {
+    const inclusive = new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate(), 23, 59, 59, 999);
+    filtered = filtered.filter((item) => new Date(item.start) <= inclusive);
+  }
+
+  filtered.sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime());
+
+  const total = filtered.length;
+  const startIndex = (page - 1) * pageSize;
+  const items = filtered.slice(startIndex, startIndex + pageSize);
+
+  return {
+    total,
+    page,
+    page_size: pageSize,
+    items: items.map((item) => ({
+      ...item,
+      service_name: item.service_name ?? findService(item.service_id)?.name ?? item.service_id,
+    })),
+  };
+};
+
 export function mockHttp(path: string, init?: RequestInit) {
   const method = (init?.method ?? 'GET').toUpperCase();
   const body = init?.body ? tryParseBody(init.body) : undefined;
@@ -532,6 +592,14 @@ export function mockHttp(path: string, init?: RequestInit) {
           throw new MockHttpError(401, 'No active session', 'No active session (mock)');
         }
         return makeOverviewMock();
+      }
+      break;
+    case '/pros/reservations/history':
+      if (method === 'GET') {
+        if (!hasProsSession) {
+          throw new MockHttpError(401, 'No active session', 'No active session (mock)');
+        }
+        return makeHistoryPayload(url);
       }
       break;
     case '/pros/reservations':

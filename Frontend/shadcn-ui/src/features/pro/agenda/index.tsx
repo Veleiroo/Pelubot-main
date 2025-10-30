@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Clock,
   Loader2,
-  Mail,
   Phone,
   Plus,
   RefreshCcw,
@@ -45,6 +44,7 @@ import {
 } from '../shared/components/reschedule-appointment-dialog';
 import { NewAppointmentModal, type NewAppointmentFormValues } from '../overview/components/new-appointment-modal';
 import type { AgendaSummary, Appointment } from '../shared/types';
+import { ReservationHistoryCard } from './components/ReservationHistoryCard';
 import { useAgendaActions } from './hooks/useAgendaActions';
 import { useAgendaData } from './hooks/useAgendaData';
 import { useAgendaState } from './hooks/useAgendaState';
@@ -72,9 +72,8 @@ const timeRangeLabel = (appointment: Appointment) =>
 
 const contactLabel = (appointment: Appointment) => {
   const phone = appointment.clientPhone?.trim();
-  const email = appointment.clientEmail?.trim();
-  if (!phone && !email) return null;
-  return { phone, email };
+  if (!phone) return null;
+  return { phone };
 };
 
 export const ProsAgendaView = () => {
@@ -188,7 +187,6 @@ export const ProsAgendaView = () => {
         durationMinutes: values.durationMinutes,
         clientName: values.client,
         clientPhone: values.clientPhone,
-        clientEmail: values.clientEmail,
         notes: values.notes,
       });
       toast({
@@ -340,6 +338,13 @@ export const ProsAgendaView = () => {
             onAction={handleAppointmentAction}
           />
         </section>
+
+        <ReservationHistoryCard
+          services={availableServices}
+          onAction={handleAppointmentAction}
+          isRescheduling={isRescheduling}
+          isCancelling={isCancelling}
+        />
       </div>
 
       <NewAppointmentModal
@@ -687,12 +692,6 @@ const AppointmentsListPanel = ({
                             {contactInfo.phone}
                           </span>
                         ) : null}
-                        {contactInfo.email ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <Mail className="h-3.5 w-3.5" />
-                            {contactInfo.email}
-                          </span>
-                        ) : null}
                       </div>
                     ) : null}
                     {appointment.notes ? (
@@ -767,10 +766,8 @@ const CancelAppointmentDialog = ({
         <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-white/80 sm:rounded-2xl sm:p-4 sm:text-sm">
           <p className="text-sm font-semibold text-white sm:text-base">{appointment.service}</p>
           {service && <p>Duración estimada: {service.duration_min} minutos.</p>}
-          {(appointment.clientPhone || appointment.clientEmail) && (
-            <p className="text-[10px] text-white/60 sm:text-xs">
-              {[appointment.clientPhone, appointment.clientEmail].filter(Boolean).join(' · ')}
-            </p>
+          {appointment.clientPhone && (
+            <p className="text-[10px] text-white/60 sm:text-xs">{appointment.clientPhone}</p>
           )}
           {appointment.notes && <p className="text-[10px] text-white/60 sm:text-xs">Notas: {appointment.notes}</p>}
         </div>

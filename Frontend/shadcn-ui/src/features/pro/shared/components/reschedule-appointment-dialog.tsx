@@ -171,10 +171,8 @@ export const RescheduleAppointmentDialog = ({
           <div className="rounded-xl border border-border bg-secondary/40 p-4 sm:rounded-2xl">
             <p className="text-base font-semibold text-foreground sm:text-lg">{appointment.service}</p>
             <p className="text-sm text-muted-foreground">{appointment.client}</p>
-            {(appointment.clientPhone || appointment.clientEmail) && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {[appointment.clientPhone, appointment.clientEmail].filter(Boolean).join(' · ')}
-              </p>
+            {appointment.clientPhone && (
+              <p className="mt-1 text-xs text-muted-foreground">{appointment.clientPhone}</p>
             )}
           </div>
 

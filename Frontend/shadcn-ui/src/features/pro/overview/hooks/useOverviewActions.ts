@@ -12,7 +12,6 @@ type CreateAppointmentPayload = {
   endISO: string;
   clientName: string;
   clientPhone: string;
-  clientEmail?: string;
   notes?: string;
 };
 
@@ -34,7 +33,6 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
         start: payload.startISO,
         customer_name: payload.clientName,
         customer_phone: payload.clientPhone,
-        ...(payload.clientEmail ? { customer_email: payload.clientEmail } : {}),
         ...(payload.notes ? { notes: payload.notes } : {}),
       });
 
@@ -48,7 +46,6 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
         status: 'confirmada',
         customer_name: payload.clientName,
         customer_phone: payload.clientPhone,
-        customer_email: payload.clientEmail,
         notes: payload.notes,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

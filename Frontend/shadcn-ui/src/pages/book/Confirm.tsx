@@ -14,7 +14,6 @@ import { buildBookingState } from '@/lib/booking-route';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const formatDateTime = (iso: string) => `${fmtDateLong(iso)}, ${fmtTime(iso)}h`;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 type ConfirmLocationState = {
   serviceId?: string;
@@ -39,11 +38,9 @@ const BookConfirm = () => {
     setSlot,
     customerName,
     customerPhone,
-    customerEmail,
     notes,
     setCustomerName,
     setCustomerPhone,
-    setCustomerEmail,
     setNotes,
   } = useBooking();
 
@@ -54,17 +51,15 @@ const BookConfirm = () => {
   const [services, setServices] = useState<{ id: string; name: string; duration_min: number; price_eur: number }[]>([]);
   const [pros, setPros] = useState<{ id: string; name: string; services?: string[] }[]>([]);
   const [catalogReady, setCatalogReady] = useState(false);
-  const [formErrors, setFormErrors] = useState<{ name?: string; phone?: string; email?: string }>({});
+  const [formErrors, setFormErrors] = useState<{ name?: string; phone?: string }>({});
 
   const trimmedName = useMemo(() => customerName.trim(), [customerName]);
   const trimmedPhone = useMemo(() => customerPhone.trim(), [customerPhone]);
   const phoneDigits = useMemo(() => trimmedPhone.replace(/\D+/g, ''), [trimmedPhone]);
-  const trimmedEmail = useMemo(() => (customerEmail ?? '').trim(), [customerEmail]);
   const trimmedNotes = useMemo(() => (notes ?? '').trim(), [notes]);
   const nameValid = trimmedName.length >= 2;
   const phoneValid = phoneDigits.length >= 6;
-  const emailValid = trimmedEmail === '' || EMAIL_REGEX.test(trimmedEmail);
-  const contactReady = nameValid && phoneValid && emailValid;
+  const contactReady = nameValid && phoneValid;
 
   const params = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const serviceNameParam = params.get('service_name') || undefined;
@@ -99,7 +94,9 @@ const BookConfirm = () => {
   const service = useMemo(() => services.find((s) => s.id === serviceId), [services, serviceId]);
   const professional = useMemo(() => pros.find((p) => p.id === professionalId), [pros, professionalId]);
   const serviceLabel = service?.name || serviceNameParam || locationState?.serviceName || serviceName || serviceId;
-  const professionalLabel = professional?.name || proNameParam || locationState?.professionalName || professionalName || (professionalId ? professionalId : 'Cualquiera disponible');
+  const professionalLabel = 'Deinis';
+  const durationText = service?.duration_min != null ? `${service.duration_min} min` : 'Duración por confirmar';
+  const priceText = service?.price_eur != null ? fmtEuro(service.price_eur) : 'Precio a confirmar';
   const summaryLoading = !catalogReady;
 
   useEffect(() => {
@@ -173,10 +170,9 @@ const BookConfirm = () => {
     setOk(null);
     setReservationId(null);
 
-    const errors: { name?: string; phone?: string; email?: string } = {};
+    const errors: { name?: string; phone?: string } = {};
     if (!nameValid) errors.name = 'Introduce un nombre con al menos 2 caracteres.';
     if (!phoneValid) errors.phone = 'Introduce un teléfono de contacto válido.';
-    if (!emailValid) errors.email = 'Introduce un correo electrónico válido o deja el campo vacío.';
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -187,7 +183,6 @@ const BookConfirm = () => {
     setFormErrors({});
     setCustomerName(trimmedName);
     setCustomerPhone(trimmedPhone);
-    setCustomerEmail(trimmedEmail ? trimmedEmail : null);
     setNotes(trimmedNotes ? trimmedNotes : null);
 
     setLoading(true);
@@ -198,7 +193,6 @@ const BookConfirm = () => {
         start: slotStart,
         customer_name: trimmedName,
         customer_phone: trimmedPhone,
-        ...(trimmedEmail ? { customer_email: trimmedEmail } : {}),
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
       };
 
@@ -262,7 +256,7 @@ const BookConfirm = () => {
 
   if (!serviceId || !slotStart) {
     return (
-      <BookingLayout title="Confirmar reserva" subtitle="Revisa los detalles antes de confirmar">
+      <BookingLayout className="rounded-[28px] bg-background px-5 py-5 shadow-[0_50px_120px_-65px_rgba(0,0,0,0.85)] md:px-7 md:py-6">
         <div className="mx-auto max-w-2xl rounded-2xl border border-amber-400/30 bg-amber-400/10 p-10 text-center shadow-soft">
           <div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full border border-amber-400/40 bg-amber-400/15">
             <Calendar className="h-10 w-10 text-amber-300" />
@@ -283,29 +277,22 @@ const BookConfirm = () => {
     : null;
 
   return (
-    <BookingLayout
-      title="Confirmar reserva"
-      subtitle="Revisa los detalles antes de confirmar tu cita"
-      summary={`Servicio seleccionado: ${serviceLabel}`}
-    >
-      <div className="mx-auto w-full max-w-[960px]">
-        <div className="relative rounded-3xl border border-zinc-800/70 bg-zinc-900/85 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.8)]">
-          <div className="px-5 pb-8 pt-8 md:px-8 md:pb-10 md:pt-10">
-            <div className="space-y-2 text-center">
-              <h3 className="text-xl font-semibold text-white md:text-2xl">Revisa y confirma tu reserva</h3>
-              <p className="text-sm text-zinc-400">Comprueba los detalles y completa tus datos de contacto para finalizar.</p>
-            </div>
-
-            <div className="mt-8 grid gap-8 lg:grid-cols-[1.65fr,1fr]">
-              <section className="space-y-6 rounded-2xl border border-zinc-800/80 bg-zinc-900/65 p-6">
+    <BookingLayout className="rounded-[28px] bg-background px-5 py-5 shadow-[0_50px_120px_-65px_rgba(0,0,0,0.85)] md:px-7 md:py-6">
+      <div className="relative mx-auto flex w-full flex-col gap-4">
+        <div className="rounded-3xl bg-background shadow-[0_35px_90px_-55px_rgba(0,0,0,0.7)]">
+          <div className="px-4 pb-4 pt-3 md:px-6 md:pb-5 md:pt-4">
+            <div className="flex flex-col gap-3">
+              <section className="rounded-2xl border border-white/10 bg-background px-5 py-4 md:px-6 md:py-5">
                 <header className="space-y-1 text-left">
-                  <h3 className="text-lg font-semibold text-white md:text-xl">Datos de contacto</h3>
-                  <p className="text-sm text-zinc-400">Necesitamos un nombre y un teléfono por si debemos avisarte de cambios.</p>
+                  <h3 className="text-base font-semibold uppercase tracking-wide text-white/80">Datos de contacto</h3>
+                  <p className="text-xs text-white/55 md:text-sm">
+                    Por favor indícanos tu nombre y un teléfono para confirmar la cita o avisarte de cambios.
+                  </p>
                 </header>
 
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="customer-name" className="text-sm font-medium text-zinc-200">
+                <div className="mt-2 grid gap-3 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="customer-name" className="text-xs font-semibold uppercase tracking-wide text-white/70">
                       Nombre completo <span className="text-red-400">*</span>
                     </Label>
                     <Input
@@ -316,14 +303,15 @@ const BookConfirm = () => {
                       aria-invalid={!nameValid || Boolean(formErrors.name)}
                       aria-describedby={formErrors.name ? 'customer-name-error' : undefined}
                       required
+                      className="h-11 rounded-xl border-white/15 bg-background px-4 text-sm text-white placeholder:text-white/35 focus:border-white/40 focus:ring-white/40"
                     />
                     {formErrors.name && (
                       <p id="customer-name-error" className="text-xs text-red-300">{formErrors.name}</p>
                     )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="customer-phone" className="text-sm font-medium text-zinc-200">
+                  <div className="space-y-2">
+                    <Label htmlFor="customer-phone" className="text-xs font-semibold uppercase tracking-wide text-white/70">
                       Teléfono <span className="text-red-400">*</span>
                     </Label>
                     <Input
@@ -331,61 +319,43 @@ const BookConfirm = () => {
                       type="tel"
                       inputMode="tel"
                       autoComplete="tel"
-                      placeholder="Ej. +34 600 123 456"
+                      placeholder="Ej. 600 123 456"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       aria-invalid={!phoneValid || Boolean(formErrors.phone)}
                       aria-describedby={formErrors.phone ? 'customer-phone-error' : undefined}
                       required
+                      className="h-11 rounded-xl border-white/15 bg-background px-4 text-sm text-white placeholder:text-white/35 focus:border-white/40 focus:ring-white/40"
                     />
                     {formErrors.phone && (
                       <p id="customer-phone-error" className="text-xs text-red-300">{formErrors.phone}</p>
                     )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="customer-email" className="text-sm font-medium text-zinc-200">Correo electrónico</Label>
-                    <Input
-                      id="customer-email"
-                      type="email"
-                      autoComplete="email"
-                      value={customerEmail ?? ''}
-                      onChange={(e) => setCustomerEmail(e.target.value ? e.target.value : null)}
-                      aria-invalid={!emailValid || Boolean(formErrors.email)}
-                      aria-describedby={formErrors.email ? 'customer-email-error' : 'customer-email-helper'}
-                      placeholder="Opcional"
-                    />
-                    {formErrors.email ? (
-                      <p id="customer-email-error" className="text-xs text-red-300">{formErrors.email}</p>
-                    ) : (
-                      <p id="customer-email-helper" className="text-xs text-zinc-500">Te avisaremos también por email si lo facilitas.</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5 md:col-span-2">
-                    <Label htmlFor="customer-notes" className="text-sm font-medium text-zinc-200">Notas para la barbería</Label>
+                  <div className="space-y-2 md:col-span-3">
+                    <Label htmlFor="customer-notes" className="text-xs font-semibold uppercase tracking-wide text-white/70">Notas para la barbería</Label>
                     <Textarea
                       id="customer-notes"
                       rows={3}
                       value={notes ?? ''}
                       onChange={(e) => setNotes(e.target.value ? e.target.value : null)}
                       placeholder="Opcional: ¿algo que debamos saber?"
+                      className="min-h-[68px] rounded-xl border-white/15 bg-background px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-white/40 focus:ring-white/40"
                     />
-                    <p className="text-xs text-zinc-500">Ejemplo: alergias, preferencias, si vienes acompañado, etc.</p>
                   </div>
                 </div>
               </section>
 
-              <aside className="flex flex-col gap-5 rounded-2xl border border-emerald-500/25 bg-zinc-900/70 p-6">
+              <aside className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-background px-5 py-4 md:px-6 md:py-5">
                 <div className="space-y-1 text-left">
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">Resumen de la cita</h4>
-                  <p className="text-xs text-emerald-100/70">Confirma que todos los detalles son correctos antes de enviar.</p>
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-white/80">Resumen de la cita</h4>
+                  <p className="text-xs text-white/60">Confirma que todos los detalles son correctos antes de enviar.</p>
                 </div>
 
                 {summaryLoading ? (
-                  <div className="space-y-4" role="status" aria-live="polite">
+                  <div className="space-y-3" role="status" aria-live="polite">
                     {Array.from({ length: 3 }).map((_, index) => (
-                      <div key={index} className="flex items-center gap-4 rounded-xl border border-zinc-800/70 bg-zinc-900/80 p-4">
+                      <div key={index} className="flex items-center gap-4 rounded-xl border border-white/10 bg-background p-4">
                         <Skeleton className="h-10 w-10 rounded-xl" />
                         <div className="flex-1 space-y-2">
                           <Skeleton className="h-4 w-28 rounded" />
@@ -395,20 +365,20 @@ const BookConfirm = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-4 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4">
-                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-500/15 text-emerald-200">
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-4 rounded-xl border border-white/10 bg-background p-4">
+                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-white/5 text-white">
                         <Scissors className="h-5 w-5" aria-hidden="true" />
                       </div>
                       <div className="flex-1 space-y-1">
-                        <p className="text-xs font-medium uppercase tracking-wide text-emerald-200/80">Servicio</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-white/50">Servicio</p>
                         <p className="text-base font-semibold text-white">{serviceLabel}</p>
-                        <p className="text-sm text-emerald-100/75">{service?.duration_min} min · {fmtEuro(service?.price_eur)}</p>
+                        <p className="text-sm text-white/70">{durationText} · {priceText}</p>
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-4 rounded-xl border border-zinc-800/70 bg-zinc-900/80 p-4">
-                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-zinc-800/80 text-emerald-200">
+                    <div className="flex items-start gap-4 rounded-xl border border-white/10 bg-background p-4">
+                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-white/5 text-white">
                         <User className="h-5 w-5" aria-hidden="true" />
                       </div>
                       <div className="flex-1 space-y-1">
@@ -417,8 +387,8 @@ const BookConfirm = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-4 rounded-xl border border-zinc-800/70 bg-zinc-900/80 p-4">
-                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-zinc-800/80 text-emerald-200">
+                    <div className="flex items-start gap-4 rounded-xl border border-white/10 bg-background p-4">
+                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-white/5 text-white">
                         <Calendar className="h-5 w-5" aria-hidden="true" />
                       </div>
                       <div className="flex-1 space-y-1">
@@ -430,11 +400,9 @@ const BookConfirm = () => {
                 )}
 
                 {!summaryLoading && (
-                  <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-xs text-emerald-200">
-                    <p className="font-medium uppercase tracking-wide">Recuerda</p>
-                    <p className="mt-1 text-emerald-100/80">
-                      Podrás modificar o cancelar tu cita respondiendo al correo de confirmación.
-                    </p>
+                  <div className="rounded-xl border border-white/10 bg-background px-4 py-3 text-xs text-white/70">
+                    <p className="font-medium uppercase tracking-wide text-white/80">Recuerda</p>
+                    <p className="mt-1">Si necesitas hacer cambios, contáctanos por teléfono o WhatsApp.</p>
                   </div>
                 )}
               </aside>
@@ -453,25 +421,22 @@ const BookConfirm = () => {
             )}
 
             {ok && (
-              <div className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4" role="status" aria-live="polite">
+              <div className="mt-5 rounded-xl border border-white/12 bg-background px-4 py-3" role="status" aria-live="polite">
                 <div className="flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400" aria-hidden="true" />
+                  <CheckCircle2 className="h-5 w-5 text-white" aria-hidden="true" />
                   <div className="space-y-1">
-                    <p className="font-semibold text-emerald-200">¡Reserva creada!</p>
-                    <p className="break-all text-sm text-emerald-100">{ok}</p>
-                    {reservationId && (
-                      <p className="text-xs text-emerald-200/80" data-testid="reservation-id">
-                        ID: {reservationId}
-                      </p>
-                    )}
+                    <p className="font-semibold text-white">¡Reserva creada!</p>
+                    <p className="text-sm text-white/70">
+                      Gracias por reservar con nosotros. Te confirmaremos los detalles por teléfono en breve.
+                    </p>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="sticky bottom-0 mt-8 -mx-5 flex flex-col gap-4 border-t border-zinc-800/70 bg-zinc-900/85 px-5 py-5 backdrop-blur-sm md:-mx-8 md:flex-row md:items-center md:justify-between md:px-8 rounded-b-3xl">
+            <div className="mt-4 flex flex-col gap-3 border-t border-white/10 bg-background px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6 rounded-b-3xl">
               {contactHint && !ok && (
-                <p className="text-xs text-zinc-400 md:max-w-sm" role="status" aria-live="polite">
+                <p className="text-xs text-white/60 md:max-w-sm" role="status" aria-live="polite">
                   {contactHint}
                 </p>
               )}
@@ -482,16 +447,16 @@ const BookConfirm = () => {
                     <Button
                       onClick={() => {
                         reset();
-                        navigate('/book/service', { state: buildBookingState(location) });
+                        navigate('/', { replace: true });
                       }}
-                      className="h-10 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-5 text-emerald-200 transition hover:bg-emerald-500/20"
+                      className="h-10 rounded-xl border border-white/30 bg-white/10 px-5 text-white transition hover:bg-white/15"
                     >
-                      Crear otra reserva
+                      Ver servicios
                     </Button>
                     <Button
                       variant="outline"
                       onClick={goHome}
-                      className="h-10 rounded-xl border-zinc-700 bg-zinc-900 px-5 text-zinc-100 transition hover:border-emerald-400/60"
+                      className="h-10 rounded-xl border-white/15 bg-background px-5 text-white transition hover:border-white/35 hover:bg-white/5"
                     >
                       <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" /> Volver al inicio
                     </Button>
@@ -502,7 +467,7 @@ const BookConfirm = () => {
                       variant="outline"
                       onClick={handleBack}
                       disabled={loading}
-                      className="h-10 rounded-xl border-zinc-700 bg-zinc-900 px-5 text-zinc-100 transition hover:border-emerald-400/60 disabled:opacity-40"
+                      className="h-10 rounded-xl border-white/15 bg-background px-5 text-white transition hover:border-white/35 hover:bg-white/5 disabled:opacity-40"
                     >
                       <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" /> Volver
                     </Button>
@@ -510,7 +475,7 @@ const BookConfirm = () => {
                       onClick={onConfirm}
                       disabled={actionsDisabled}
                       aria-disabled={actionsDisabled}
-                      className="h-10 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-5 text-emerald-200 shadow-soft transition hover:bg-emerald-500/25 disabled:pointer-events-none disabled:opacity-40"
+                      className="h-10 rounded-xl border border-white/30 bg-white/10 px-5 text-white transition hover:bg-white/15 disabled:pointer-events-none disabled:opacity-40"
                     >
                       {loading ? 'Confirmando…' : 'Confirmar reserva'}
                     </Button>

@@ -28,8 +28,7 @@ type CreateAppointmentPayload = {
   serviceName: string;
   durationMinutes?: number;
   clientName: string;
-  clientPhone?: string;
-  clientEmail?: string;
+  clientPhone: string;
   notes?: string;
 };
 
@@ -63,8 +62,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         professional_id: professionalId,
         start: startIso,
         customer_name: payload.clientName,
-        customer_phone: payload.clientPhone || '',
-        ...(payload.clientEmail ? { customer_email: payload.clientEmail } : {}),
+        customer_phone: payload.clientPhone,
         ...(payload.notes ? { notes: payload.notes } : {}),
       });
 
@@ -78,7 +76,6 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         status: 'confirmada',
         customer_name: payload.clientName,
         customer_phone: payload.clientPhone,
-        customer_email: payload.clientEmail,
         notes: payload.notes,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

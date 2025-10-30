@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Mail, Phone, CalendarIcon, Trash2, Plus, Filter } from 'lucide-react';
+import { Clock, Phone, CalendarIcon, Trash2, Plus, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -189,12 +189,6 @@ export function AgendaAppointments({
                       <div className="flex items-center gap-2 hover:text-foreground transition-colors">
                         <Phone className="w-4 h-4" />
                         <span>{apt.clientPhone}</span>
-                      </div>
-                    )}
-                    {apt.clientEmail && (
-                      <div className="flex items-center gap-2 hover:text-foreground transition-colors">
-                        <Mail className="w-4 h-4" />
-                        <span className="truncate">{apt.clientEmail}</span>
                       </div>
                     )}
                   </div>

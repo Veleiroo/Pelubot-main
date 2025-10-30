@@ -4,7 +4,6 @@ import {
   Calendar,
   Clock,
   Loader2,
-  Mail,
   Phone,
   Scissors,
   User,
@@ -13,17 +12,18 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { api, type Service } from '@/lib/api';
+import { format } from 'date-fns';
 
 export type NewAppointmentFormValues = {
   client: string;
   clientPhone: string;
-  clientEmail?: string;
   date: string;
   time: string;
   serviceId: string;
@@ -40,32 +40,8 @@ type NewAppointmentModalProps = {
   services?: Service[];
   servicesLoading?: boolean;
   onConfirm?: (values: NewAppointmentFormValues) => void | Promise<void>;
+  professionalId?: string | null;
 };
-
-const AVAILABLE_SLOTS = [
-  '09:00',
-  '09:30',
-  '10:00',
-  '10:30',
-  '11:00',
-  '11:30',
-  '12:00',
-  '12:30',
-  '13:00',
-  '13:30',
-  '14:00',
-  '14:30',
-  '15:00',
-  '15:30',
-  '16:00',
-  '16:30',
-  '17:00',
-  '17:30',
-  '18:00',
-  '18:30',
-  '19:00',
-  '19:30',
-];
 
 const isPromiseLike = (value: unknown): value is PromiseLike<unknown> =>
   value !== null && typeof value === 'object' && typeof (value as PromiseLike<unknown>).then === 'function';
@@ -77,6 +53,8 @@ const formatSuggestedDate = (value?: string | Date | null) => {
   return parsed.toISOString().slice(0, 10);
 };
 
+const DEFAULT_MANUAL_TIME = '09:00';
+
 export const NewAppointmentModal = ({
   open,
   onOpenChange,
@@ -85,15 +63,19 @@ export const NewAppointmentModal = ({
   services: providedServices,
   servicesLoading,
   onConfirm,
+  professionalId,
 }: NewAppointmentModalProps) => {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedClientPhone, setSelectedClientPhone] = useState('');
-  const [selectedClientEmail, setSelectedClientEmail] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const [slotRange, setSlotRange] = useState<SlotRange>(() =>
+    SLOT_GROUPS.morning.length > 0 ? 'morning' : 'afternoon'
+  );
 
   // Cargar servicios reales del backend
   const shouldFetchServices = typeof providedServices === 'undefined';
@@ -110,34 +92,101 @@ export const NewAppointmentModal = ({
   const selectedService = services.find(s => s.id === selectedServiceId);
 
   const formattedSuggestedDate = useMemo(() => formatSuggestedDate(suggestedDate), [suggestedDate]);
+  const minSelectableDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+
+  const canFetchSlots = useMemo(
+    () => !manualMode && Boolean(selectedServiceId && selectedDate && professionalId),
+    [manualMode, selectedServiceId, selectedDate, professionalId]
+  );
+
+  const {
+    data: slotsData,
+    isFetching: isFetchingSlots,
+    error: slotsError,
+  } = useQuery({
+    queryKey: ['pros', 'slots', selectedServiceId, selectedDate, professionalId],
+    enabled: canFetchSlots,
+    staleTime: 30_000,
+    retry: 1,
+    queryFn: async () => {
+      if (!selectedServiceId || !selectedDate) return { slots: [] };
+      return await api.getSlots({
+        service_id: selectedServiceId,
+        date: selectedDate,
+        professional_id: professionalId ?? undefined,
+      });
+    },
+  });
+
+  const availableSlots = useMemo(() => slotsData?.slots ?? [], [slotsData]);
+  const slotErrorMessage = useMemo(() => {
+    if (!slotsError) return null;
+    if (slotsError instanceof Error) return slotsError.message;
+    return 'No se pudo cargar la disponibilidad.';
+  }, [slotsError]);
+
+  const slotLabel = (iso: string) => {
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return iso;
+    return format(dt, 'HH:mm');
+  };
 
   useEffect(() => {
     if (open) {
-      setSelectedDate(formattedSuggestedDate);
-      setSelectedServiceId(current => {
+      setManualMode(false);
+      const initialDate = formattedSuggestedDate || minSelectableDate;
+      setSelectedDate(initialDate);
+      setSelectedServiceId((current) => {
         if (suggestedService) return suggestedService;
-        if (current) return current;
+        if (current && services.some((svc) => svc.id === current)) return current;
         return services[0]?.id ?? '';
       });
+      setSelectedClient('');
       setSelectedClientPhone('');
-      setSelectedClientEmail('');
+      setNotes('');
+      setSelectedTime('');
+      setIsSubmitting(false);
     } else {
       setSelectedTime('');
       setSelectedClient('');
       setSelectedClientPhone('');
-      setSelectedClientEmail('');
       setSelectedServiceId('');
       setSelectedDate('');
       setNotes('');
+      setManualMode(false);
       setIsSubmitting(false);
     }
-  }, [open, formattedSuggestedDate, suggestedService, services]);
+  }, [open, formattedSuggestedDate, suggestedService, services, minSelectableDate]);
+
+  useEffect(() => {
+    if (!manualMode && selectedDate && selectedDate < minSelectableDate) {
+      setSelectedDate(minSelectableDate);
+    }
+  }, [manualMode, selectedDate, minSelectableDate]);
+
+  useEffect(() => {
+    if (manualMode) return;
+    if (availableSlots.length > 0) {
+      const exists = availableSlots.some((slot) => slotLabel(slot) === selectedTime);
+      if (!exists) {
+        const first = availableSlots[0];
+        setSelectedTime(slotLabel(first));
+      }
+    } else {
+      if (selectedTime) {
+        setSelectedTime('');
+      }
+    }
+  }, [manualMode, availableSlots, selectedTime]);
 
   const handleClose = () => onOpenChange(false);
 
+  const trimmedClient = selectedClient.trim();
+  const trimmedPhone = selectedClientPhone.trim();
+
   const isConfirmDisabled =
-    !selectedClient ||
-    !selectedClientPhone ||
+    !trimmedClient ||
+    !trimmedPhone ||
     !selectedDate ||
     !selectedTime ||
     !selectedServiceId ||
@@ -148,9 +197,8 @@ export const NewAppointmentModal = ({
     if (isConfirmDisabled || !selectedService) return;
 
     const payload: NewAppointmentFormValues = {
-      client: selectedClient,
-      clientPhone: selectedClientPhone,
-      clientEmail: selectedClientEmail || undefined,
+      client: trimmedClient,
+      clientPhone: trimmedPhone,
       date: selectedDate,
       time: selectedTime,
       serviceId: selectedServiceId,
@@ -182,30 +230,22 @@ export const NewAppointmentModal = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto border-border bg-card">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Nueva cita</DialogTitle>
-          <DialogDescription>
-            Completa los detalles para crear una nueva cita en tu agenda.
-          </DialogDescription>
-        </DialogHeader>
-
         <div className="mt-4 space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="client" className="flex items-center gap-2 text-sm font-medium">
-              <User className="h-4 w-4" aria-hidden="true" />
-              Nombre del cliente *
-            </Label>
-            <Input
-              id="client"
-              placeholder="Nombre completo del cliente"
-              value={selectedClient}
-              onChange={(event) => setSelectedClient(event.target.value)}
-              className="border-border bg-secondary/50"
-              required
-            />
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="client" className="flex items-center gap-2 text-sm font-medium">
+                <User className="h-4 w-4" aria-hidden="true" />
+                Nombre del cliente *
+              </Label>
+              <Input
+                id="client"
+                placeholder="Nombre completo del cliente"
+                value={selectedClient}
+                onChange={(event) => setSelectedClient(event.target.value)}
+                className="border-border focus-visible:ring-primary/30"
+                required
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="client-phone" className="flex items-center gap-2 text-sm font-medium">
                 <Phone className="h-4 w-4" aria-hidden="true" />
@@ -217,23 +257,8 @@ export const NewAppointmentModal = ({
                 placeholder="+34 600 000 000"
                 value={selectedClientPhone}
                 onChange={(event) => setSelectedClientPhone(event.target.value)}
-                className="border-border bg-secondary/50"
+                className="border-border focus-visible:ring-primary/30"
                 required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="client-email" className="flex items-center gap-2 text-sm font-medium">
-                <Mail className="h-4 w-4" aria-hidden="true" />
-                Email
-              </Label>
-              <Input
-                id="client-email"
-                type="email"
-                placeholder="cliente@ejemplo.com"
-                value={selectedClientEmail}
-                onChange={(event) => setSelectedClientEmail(event.target.value)}
-                className="border-border bg-secondary/50"
               />
             </div>
           </div>
@@ -247,8 +272,16 @@ export const NewAppointmentModal = ({
               id="date"
               type="date"
               value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
-              className="border-border bg-secondary/50"
+              min={manualMode ? undefined : minSelectableDate}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (!manualMode && next && next < minSelectableDate) {
+                  setSelectedDate(minSelectableDate);
+                } else {
+                  setSelectedDate(next);
+                }
+              }}
+              className="border-border focus-visible:ring-primary/30"
               required
             />
           </div>
@@ -256,24 +289,59 @@ export const NewAppointmentModal = ({
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm font-medium">
               <Clock className="h-4 w-4" aria-hidden="true" />
-              Horario disponible
+              Horarios disponibles
             </Label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-              {AVAILABLE_SLOTS.map((slot) => (
-                <Button
-                  key={slot}
-                  type="button"
-                  size="sm"
-                  variant={selectedTime === slot ? 'default' : 'outline'}
-                  onClick={() => setSelectedTime(slot)}
-                  className={cn(
-                    'bg-secondary/50 text-xs transition',
-                    selectedTime === slot ? 'bg-accent text-accent-foreground hover:bg-accent/90' : 'hover:bg-secondary'
-                  )}
-                >
-                  {slot}
-                </Button>
-              ))}
+            <div className="space-y-3">
+              <div className="inline-flex w-full max-w-[320px] items-center justify-between gap-1 rounded-full border border-border/60 bg-card/70 p-1 text-xs text-muted-foreground shadow-inner sm:text-sm">
+                {SLOT_RANGE_OPTIONS.map(({ value, label }) => {
+                  const active = slotRange === value;
+                  const disabled = value === 'morning' ? morningDisabled : afternoonDisabled;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => !disabled && setSlotRange(value)}
+                      className={cn(
+                        'flex-1 rounded-full px-4 py-1.5 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                        active ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-primary/5',
+                        disabled && 'cursor-not-allowed opacity-40'
+                      )}
+                      aria-pressed={active}
+                      disabled={disabled}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {displayedSlots.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border/60 px-4 py-3 text-sm text-muted-foreground">
+                  No hay horarios disponibles en este tramo.
+                </p>
+              ) : (
+                <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2 sm:gap-3">
+                  {displayedSlots.map((slot) => {
+                    const isSelected = selectedTime === slot;
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setSelectedTime(slot)}
+                        className={cn(
+                          'h-11 w-full rounded-lg border border-border/60 bg-card/80 px-4 text-sm font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                          isSelected
+                            ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                            : 'hover:border-primary/40 hover:bg-primary/5'
+                        )}
+                        aria-pressed={isSelected}
+                      >
+                        {slot}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -301,8 +369,8 @@ export const NewAppointmentModal = ({
                       }
                     }}
                     className={cn(
-                      'cursor-pointer border-border bg-secondary/50 p-3 transition-all hover:bg-secondary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-accent',
-                      selectedServiceId === service.id && 'border-accent bg-accent/20'
+                      'cursor-pointer border border-border bg-card/80 p-3 transition-all hover:border-primary/40 hover:bg-primary/5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40',
+                      selectedServiceId === service.id && 'border-primary bg-primary/10 shadow-sm'
                     )}
                   >
                     <div className="flex items-center justify-between">
@@ -325,7 +393,7 @@ export const NewAppointmentModal = ({
             <Textarea
               id="notes"
               placeholder="Preferencias del cliente, detalles especiales..."
-              className="min-h-[80px] border-border bg-secondary/50"
+              className="min-h-[80px] border-border focus-visible:ring-primary/30"
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
             />

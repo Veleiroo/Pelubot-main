@@ -85,6 +85,13 @@ export type ProReservationsResponse = {
   reservations: ProReservation[];
 };
 
+export type ProReservationHistoryResponse = {
+  total: number;
+  page: number;
+  page_size: number;
+  items: ProReservation[];
+};
+
 export type ProsReschedulePayload = {
   new_date?: string;
   new_time?: string;
@@ -400,6 +407,28 @@ export const api = {
     const qs = search.toString();
     const path = qs ? `/pros/reservations?${qs}` : "/pros/reservations";
     return http<ProReservationsResponse>(path);
+  },
+
+  prosReservationHistory: (params: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    status?: ReservationStatus[];
+    serviceIds?: string[];
+    dateFrom?: string;
+    dateTo?: string;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.set('page', String(params.page));
+    if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
+    if (params.search) searchParams.set('search', params.search);
+    params.status?.forEach((value) => searchParams.append('status', value));
+    params.serviceIds?.forEach((value) => searchParams.append('service_id', value));
+    if (params.dateFrom) searchParams.set('date_from', params.dateFrom);
+    if (params.dateTo) searchParams.set('date_to', params.dateTo);
+    const qs = searchParams.toString();
+    const path = qs ? `/pros/reservations/history?${qs}` : '/pros/reservations/history';
+    return http<ProReservationHistoryResponse>(path);
   },
 
   prosCancelReservation: (reservationId: string) =>

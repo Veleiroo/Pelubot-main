@@ -4,10 +4,10 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta, date
-from typing import Optional
+from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Body
-from sqlalchemy import or_, text as _sql_text
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Body, Query
+from sqlalchemy import or_, text as _sql_text, func
 from sqlalchemy.exc import InvalidRequestError
 from sqlmodel import Session, select
 
@@ -42,6 +42,8 @@ from app.models import (
     StylistStatsRetentionBucket,
     StylistStatsInsight,
     ReservationSyncStatusOut,
+    StylistReservationHistoryPage,
+    ReservationStatus,
 )
 from app.services.logic import (
     find_reservation,
@@ -235,6 +237,87 @@ def stylist_reservations(
             )
         )
     return StylistReservationsOut(reservations=reservations)
+
+
+@router.get("/reservations/history", response_model=StylistReservationHistoryPage)
+def stylist_reservations_history(
+    stylist: StylistDB = Depends(get_current_stylist),
+    session: Session = Depends(get_session),
+    search: Optional[str] = Query(default=None, min_length=1),
+    status: Optional[List[ReservationStatus]] = Query(default=None),
+    service_id: Optional[List[str]] = Query(default=None),
+    date_from: Optional[date] = Query(default=None),
+    date_to: Optional[date] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+) -> StylistReservationHistoryPage:
+    filters: list = [ReservationDB.professional_id == stylist.id]
+    if status:
+        filters.append(ReservationDB.status.in_(status))
+    if service_id:
+        filters.append(ReservationDB.service_id.in_(service_id))
+    if date_from:
+        start_boundary = datetime.combine(date_from, datetime.min.time(), tzinfo=timezone.utc)
+        filters.append(ReservationDB.start >= start_boundary)
+    if date_to:
+        end_boundary = datetime.combine(date_to, datetime.max.time(), tzinfo=timezone.utc)
+        filters.append(ReservationDB.start <= end_boundary)
+    if search:
+        normalized = f"%{search.strip().lower()}%"
+        filters.append(
+            or_(
+                func.lower(func.coalesce(ReservationDB.customer_name, "")).like(normalized),
+                func.lower(func.coalesce(ReservationDB.customer_phone, "")).like(normalized),
+                func.lower(ReservationDB.id).like(normalized),
+            )
+        )
+
+    count_stmt = select(func.count()).select_from(ReservationDB).where(*filters)
+    total = session.exec(count_stmt).one() or 0
+
+    stmt = (
+        select(ReservationDB)
+        .where(*filters)
+        .order_by(ReservationDB.start.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    rows = session.exec(stmt).all()
+
+    items: list[StylistReservationOut] = []
+    for row in rows:
+        try:
+            service = get_service_by_id(row.service_id)
+        except KeyError:
+            service = None
+        start_local = _to_local(getattr(row, "start", None))
+        end_local = _to_local(getattr(row, "end", None))
+        created_local = _to_local(getattr(row, "created_at", None))
+        updated_local = _to_local(getattr(row, "updated_at", None))
+        items.append(
+            StylistReservationOut(
+                id=row.id,
+                service_id=row.service_id,
+                service_name=service.name if service else row.service_id,
+                professional_id=row.professional_id,
+                start=start_local or row.start,
+                end=end_local or row.end,
+                status=getattr(row, "status", "confirmada"),
+                customer_name=row.customer_name,
+                customer_email=row.customer_email,
+                customer_phone=row.customer_phone,
+                notes=row.notes,
+                created_at=created_local or getattr(row, "created_at", None),
+                updated_at=updated_local or getattr(row, "updated_at", None),
+            )
+        )
+
+    return StylistReservationHistoryPage(
+        total=int(total),
+        page=page,
+        page_size=page_size,
+        items=items,
+    )
 
 
 @router.get("/overview", response_model=StylistOverviewOut)

@@ -266,6 +266,13 @@ docker-rebuild:
 	$(DOCKER) build --no-cache frontend
 	$(DOCKER) up -d frontend
 
+docker-redeploy:
+	# Rebuild backend y frontend sin tocar el volumen de la BD (pelubot_db)
+	$(DOCKER) build backend
+	$(DOCKER) build --no-cache frontend
+	$(DOCKER) up -d backend frontend
+	@echo "Redeploy completado sin borrar la base de datos. Backend: http://localhost:$${BACKEND_PORT:-8776} | Frontend: http://localhost:$${FRONTEND_PORT:-8080}"
+
 e2e:
 	# Ensure app is up before running E2E (prefer start to avoid recreate on compose v1)
 	-$(DOCKER) start backend frontend >/dev/null 2>&1 || $(DOCKER) up -d backend frontend
@@ -423,4 +430,3 @@ release-zip:
 	@if ! command -v zip >/dev/null 2>&1; then echo "zip no instalado"; exit 1; fi
 	@zip -r pelubot-release.zip . -x@release.exclude
 	@echo "Hecho: pelubot-release.zip"
-

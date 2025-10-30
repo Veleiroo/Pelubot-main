@@ -37,8 +37,8 @@ export function BookingDialog({ background, children }: Props) {
         />
         <DialogPrimitive.Content
           className={cn(
-            'fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 pb-8 pt-[6vh] text-sm outline-none',
-            'md:px-6 md:pt-[8vh]',
+            'fixed inset-0 z-50 flex items-start justify-center overflow-y-hidden px-4 py-6 text-sm outline-none',
+            'md:px-6 md:py-10',
             'dark'
           )}
           onPointerDownOutside={(event) => {
@@ -51,14 +51,14 @@ export function BookingDialog({ background, children }: Props) {
           }}
         >
           <div className="relative mx-auto flex w-full max-w-[960px] justify-center">
-            <div className="relative w-full overflow-hidden rounded-3xl border border-white/12 bg-background shadow-[0_50px_140px_-55px_rgba(0,0,0,0.85)]">
+            <div className="relative flex w-full max-h-[calc(100vh-48px)] flex-col overflow-hidden rounded-3xl border border-white/12 bg-background shadow-[0_50px_140px_-55px_rgba(0,0,0,0.85)] md:max-h-[calc(100vh-80px)]">
               <DialogPrimitive.Close
                 className="absolute right-6 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-background/90 text-white/70 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:top-6"
                 aria-label="Cerrar reserva"
               >
                 <X className="h-4 w-4" />
               </DialogPrimitive.Close>
-              <div className="max-h-[85vh] overflow-y-auto overscroll-contain bg-background px-5 pb-7 pt-5 md:px-7 md:pb-8 md:pt-6">
+              <div className="flex-1 overflow-y-auto overscroll-contain bg-background px-5 pb-7 pt-5 md:px-7 md:pb-8 md:pt-6">
                 {children}
               </div>
             </div>

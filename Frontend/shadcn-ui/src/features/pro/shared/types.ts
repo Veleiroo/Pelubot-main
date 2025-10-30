@@ -7,7 +7,6 @@ export type Appointment = {
   endTime?: string; // HH:mm
   client: string;
   clientPhone?: string;
-  clientEmail?: string;
   service: string;
   serviceId?: string;
   status: AppointmentStatus;

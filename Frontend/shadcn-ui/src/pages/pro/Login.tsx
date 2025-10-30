@@ -41,40 +41,13 @@ const LoginPage = () => {
     }
   }, [currentSession, navigate]);
 
-  const checkSession = useQuery({
+  // Verificación silenciosa de sesión remota (solo si el backend puede hacer /pros/me sin cookie)
+  useQuery({
     queryKey: ['pros', 'me'],
     queryFn: api.prosMe,
-    enabled: !currentSession,
+    enabled: false,
     retry: false,
   });
-
-  useEffect(() => {
-    if (checkSession.data) {
-      setSession({
-        stylist: checkSession.data.stylist,
-        sessionExpiresAt: checkSession.data.session_expires_at,
-      });
-      navigate('/pros', { replace: true });
-    }
-  }, [checkSession.data, navigate, setSession]);
-
-  useEffect(() => {
-    if (!checkSession.error) return;
-    if (checkSession.error instanceof ApiError) {
-      if (checkSession.error.status === 401) {
-        return;
-      }
-      toast({
-        title: 'Sin conexión con el portal',
-        description: checkSession.error.message,
-      });
-      return;
-    }
-    toast({
-      title: 'Sin conexión con el portal',
-      description: 'No pudimos verificar tu sesión.',
-    });
-  }, [checkSession.error, toast]);
 
   const login = useMutation<{ stylist: StylistPublic; session_expires_at: string }, ApiError, LoginValues>({
     mutationFn: ({ identifier, password }) => api.prosLogin({ identifier, password }),
@@ -102,7 +75,7 @@ const LoginPage = () => {
     }
   };
 
-  const isBusy = checkSession.isLoading || login.isPending;
+  const isBusy = login.isPending;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-900/20 via-background to-blue-900/20 px-6">
@@ -194,16 +167,6 @@ const LoginPage = () => {
           </CardContent>
         </Card>
 
-        {/* Support Link */}
-        <p className="text-center text-sm text-muted-foreground">
-          ¿Necesitas ayuda?{' '}
-          <a
-            className="text-primary hover:underline"
-            href="mailto:soporte@pelubot.com"
-          >
-            soporte@pelubot.com
-          </a>
-        </p>
       </div>
     </div>
   );

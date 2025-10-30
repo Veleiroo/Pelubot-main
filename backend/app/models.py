@@ -176,6 +176,13 @@ class StylistReservationsOut(BaseModel):
     reservations: List[StylistReservationOut]
 
 
+class StylistReservationHistoryPage(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[StylistReservationOut]
+
+
 class StylistOverviewSummary(BaseModel):
     total: int
     confirmadas: int

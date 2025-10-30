@@ -24,7 +24,6 @@ const mapReservation = (reservation: ProReservation): Appointment | null => {
     endTime: end && isValid(end) ? format(end, 'HH:mm') : undefined,
     client,
     clientPhone: reservation.customer_phone ?? undefined,
-    clientEmail: reservation.customer_email ?? undefined,
     service,
     serviceId: reservation.service_id,
     status,

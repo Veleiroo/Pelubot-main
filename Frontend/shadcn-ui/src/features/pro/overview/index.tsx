@@ -124,7 +124,6 @@ export const ProsOverviewView = () => {
             endTime,
             client: entry.client,
             clientPhone: entry.raw.client_phone ?? undefined,
-            clientEmail: entry.raw.client_email ?? undefined,
             service: entry.service,
             serviceId: entry.raw.service_id ?? undefined,
             status: entry.status,
@@ -203,7 +202,7 @@ export const ProsOverviewView = () => {
   );
 
   const handleConfirmNewAppointment = useCallback(
-    async ({ client, clientPhone, clientEmail, date, time, serviceId, serviceName, durationMinutes, notes }: NewAppointmentFormValues) => {
+    async ({ client, clientPhone, date, time, serviceId, serviceName, durationMinutes, notes }: NewAppointmentFormValues) => {
       try {
         // Construir fecha/hora ISO
         const startDate = new Date(`${date}T${time}:00`);
@@ -222,7 +221,6 @@ export const ProsOverviewView = () => {
           endISO,
           clientName: client,
           clientPhone,
-          clientEmail,
           notes: notes || undefined,
         });
 
