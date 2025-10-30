@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Service, ProReservation, ReservationStatus } from '@/lib/api';
 import type { Appointment } from '../../shared/types';
 import { useReservationHistory } from '../hooks/useReservationHistory';
@@ -87,26 +86,32 @@ export const ReservationHistoryCard = ({
     setPage(1);
   }, [deferredSearch, statusFilter, serviceFilter, dateFrom, dateTo]);
 
+  const requestedPageSize = DEFAULT_PAGE_SIZE;
+
   const filters: ReservationHistoryFilters = useMemo(
     () => ({
       page,
-      pageSize: DEFAULT_PAGE_SIZE,
+      pageSize: requestedPageSize,
       search: deferredSearch || undefined,
       statuses: statusFilter === 'all' ? [] : [statusFilter],
       services: serviceFilter === 'all' ? [] : [serviceFilter],
       dateFrom,
       dateTo,
     }),
-    [page, deferredSearch, statusFilter, serviceFilter, dateFrom, dateTo]
+    [page, deferredSearch, statusFilter, serviceFilter, dateFrom, dateTo, requestedPageSize]
   );
 
   const { data, isLoading, isFetching } = useReservationHistory(filters);
 
   const total = data?.total ?? 0;
-  const hasNextPage = page * DEFAULT_PAGE_SIZE < total;
+  const pageSize = data?.page_size ?? requestedPageSize;
+  const hasNextPage = page * pageSize < total;
   const hasPrevPage = page > 1;
 
   const displayed = data?.items ?? [];
+  const startIndex = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endIndex = Math.min(page * pageSize, total);
+  const skeletonCount = filters.pageSize;
 
   return (
     <Card className="border-border/60 bg-card/50">
@@ -182,93 +187,90 @@ export const ReservationHistoryCard = ({
         </div>
 
         <div className="rounded-xl border border-border/50">
-          <ScrollArea className="max-h-[420px]">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <TableRow key={`history-row-skeleton-${index}`}>
-                      <TableCell className="text-muted-foreground/60">Cargando…</TableCell>
-                      <TableCell />
-                      <TableCell />
-                      <TableCell />
-                      <TableCell />
-                      <TableCell className="text-right" />
-                    </TableRow>
-                  ))
-                ) : displayed.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                      No encontramos citas con los filtros seleccionados.
-                    </TableCell>
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead>Cliente</TableHead>
+                <TableHead>Servicio</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Teléfono</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: skeletonCount }).map((_, index) => (
+                  <TableRow key={`history-row-skeleton-${index}`}>
+                    <TableCell className="text-muted-foreground/60">Cargando…</TableCell>
+                    <TableCell />
+                    <TableCell />
+                    <TableCell />
+                    <TableCell />
+                    <TableCell className="text-right" />
                   </TableRow>
-                ) : (
-                  displayed.map((reservation) => {
-                    const appointment = toAppointment(reservation);
-                    return (
-                      <TableRow key={reservation.id}>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium text-foreground">{reservation.customer_name ?? 'Cliente sin nombre'}</span>
-                            <span className="text-xs text-muted-foreground">{reservation.id}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{reservation.service_name ?? reservation.service_id}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-col text-sm text-muted-foreground">
-                            <span>{formatIsoDate(reservation.start)}</span>
-                            <span>{formatIsoTime(reservation.start)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{reservation.customer_phone ?? '—'}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={STATUS_BADGE_STYLES[reservation.status]}>
-                            {STATUS_LABELS[reservation.status]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="space-x-2 text-right">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="text-xs"
-                            onClick={() => onAction('reschedule', appointment)}
-                            disabled={isRescheduling}
-                          >
-                            Reprogramar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs text-destructive"
-                            onClick={() => onAction('cancel', appointment)}
-                            disabled={isCancelling}
-                          >
-                            Cancelar
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+                ))
+              ) : displayed.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                    No encontramos citas con los filtros seleccionados.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                displayed.map((reservation) => {
+                  const appointment = toAppointment(reservation);
+                  return (
+                    <TableRow key={reservation.id}>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-foreground">{reservation.customer_name ?? 'Cliente sin nombre'}</span>
+                          <span className="text-xs text-muted-foreground">{reservation.id}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{reservation.service_name ?? reservation.service_id}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col text-sm text-muted-foreground">
+                          <span>{formatIsoDate(reservation.start)}</span>
+                          <span>{formatIsoTime(reservation.start)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{reservation.customer_phone ?? '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={STATUS_BADGE_STYLES[reservation.status]}>
+                          {STATUS_LABELS[reservation.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="space-x-2 text-right">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="text-xs"
+                          onClick={() => onAction('reschedule', appointment)}
+                          disabled={isRescheduling}
+                        >
+                          Reprogramar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs text-destructive"
+                          onClick={() => onAction('cancel', appointment)}
+                          disabled={isCancelling}
+                        >
+                          Cancelar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
         </div>
 
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-muted-foreground">
-            Mostrando {(total === 0 ? 0 : (page - 1) * DEFAULT_PAGE_SIZE + 1)}-
-            {Math.min(page * DEFAULT_PAGE_SIZE, total)} de {total} resultados
+            Mostrando {startIndex}-{endIndex} de {total} resultados
             {isFetching ? ' · Actualizando…' : ''}
           </p>
           <div className="flex items-center gap-2">

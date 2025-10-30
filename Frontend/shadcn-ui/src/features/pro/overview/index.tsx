@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { useToast } from '@/hooks/use-toast';
+import { ApiError } from '@/lib/api';
 import { useProSession } from '@/store/pro';
 
 import {
@@ -202,15 +203,15 @@ export const ProsOverviewView = () => {
   );
 
   const handleConfirmNewAppointment = useCallback(
-    async ({ client, clientPhone, date, time, serviceId, serviceName, durationMinutes, notes }: NewAppointmentFormValues) => {
+    async ({ client, clientPhone, date, time, serviceId, serviceName, durationMinutes, notes, slotStartIso }: NewAppointmentFormValues) => {
       try {
         // Construir fecha/hora ISO
-        const startDate = new Date(`${date}T${time}:00`);
+        const startDate = slotStartIso ? new Date(slotStartIso) : new Date(`${date}T${time}:00`);
         if (Number.isNaN(startDate.getTime())) {
           throw new Error('Fecha u hora inválida');
         }
 
-        const startISO = startDate.toISOString();
+        const startISO = slotStartIso ?? startDate.toISOString();
         const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
         const endISO = endDate.toISOString();
 
@@ -235,11 +236,20 @@ export const ProsOverviewView = () => {
           }).format(startDate)} a las ${time} h`,
         });
       } catch (error) {
+        let description = 'No se pudo crear la cita. Inténtalo de nuevo.';
+        if (error instanceof ApiError) {
+          description = error.detail ?? error.message ?? description;
+        } else if (error instanceof Error) {
+          description = error.message || description;
+        }
+
         toast({
-          title: 'Error al crear la cita',
-          description: error instanceof Error ? error.message : 'No se pudo crear la cita',
+          title: 'No se pudo crear la cita',
+          description,
           variant: 'destructive',
         });
+
+        throw error instanceof Error ? error : new Error(description);
       }
     },
     [createAppointment, toast]
@@ -285,6 +295,7 @@ export const ProsOverviewView = () => {
         onOpenChange={handleNewAppointmentModalChange}
         suggestedDate={upcomingAppointment?.raw.start ?? null}
         suggestedService={upcomingAppointment?.service ?? null}
+        professionalId={stylist?.id ?? null}
         onConfirm={handleConfirmNewAppointment}
       />
 

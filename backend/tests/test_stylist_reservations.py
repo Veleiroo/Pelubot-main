@@ -137,7 +137,10 @@ def test_stylist_reschedule_updates_reservation(app_client: TestClient):
 def test_stylist_reservation_sync_status_endpoint(app_client: TestClient):
     engine = app_client.app.state.test_engine
     _seed_stylist(engine)
-    start = (now_tz() + timedelta(days=10)).replace(hour=9, minute=0, second=0, microsecond=0)
+    start = now_tz() + timedelta(days=10)
+    while start.weekday() >= 5:  # evita fin de semana
+        start += timedelta(days=1)
+    start = start.replace(hour=9, minute=30, second=0, microsecond=0)
     reservation = _seed_reservation(
         engine,
         reservation_id="res-sync-1",
@@ -151,7 +154,7 @@ def test_stylist_reservation_sync_status_endpoint(app_client: TestClient):
     # Reprogramar para encolar un job y luego consultar el estado
     resp = app_client.post(
         f"/pros/reservations/{reservation.id}/reschedule",
-        json={"new_time": "10:00"},
+        json={"new_time": "10:30"},
     )
     assert resp.status_code == 200
 
@@ -201,7 +204,7 @@ def test_stylist_reservations_history_filters(app_client: TestClient):
         engine,
         reservation_id="hist-2",
         professional_id="deinis",
-        start=datetime(2050, 6, 5, 12, 0, tzinfo=TZ),
+        start=datetime(2050, 6, 6, 12, 0, tzinfo=TZ),
         customer_name="Luis Cliente",
         customer_phone="+34000000002",
         status="cancelada",

@@ -30,6 +30,7 @@ type CreateAppointmentPayload = {
   clientName: string;
   clientPhone: string;
   notes?: string;
+  slotStartIso?: string;
 };
 
 type ReschedulePayload = {
@@ -52,8 +53,9 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
     mutationFn: async (payload: CreateAppointmentPayload) => {
       if (!professionalId) throw new Error('No hay profesional activo para crear la reserva.');
 
-      const startDate = combineDateAndTime(payload.date, payload.time);
-      const startIso = startDate.toISOString();
+      const startDate = payload.slotStartIso ? new Date(payload.slotStartIso) : combineDateAndTime(payload.date, payload.time);
+      if (Number.isNaN(startDate.getTime())) throw new Error('Fecha u hora inválida');
+      const startIso = payload.slotStartIso ?? startDate.toISOString();
       const durationMs = minutesToMs(payload.durationMinutes);
       const endIso = new Date(startDate.getTime() + durationMs).toISOString();
 

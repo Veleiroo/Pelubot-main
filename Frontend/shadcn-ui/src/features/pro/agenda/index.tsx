@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { format, isValid, parseISO } from 'date-fns';
+import {
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isAfter,
+  isBefore,
+  isSameDay,
+  isSameMonth,
+  isToday,
+  isValid,
+  parseISO,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   Calendar as CalendarIcon,
@@ -29,7 +43,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
@@ -65,6 +78,8 @@ const STATUS_BORDER_ACCENTS: Record<Appointment['status'], string> = {
   no_asistida: 'border-l-red-400',
   cancelada: 'border-l-rose-400',
 };
+
+const WEEKDAY_LABELS = ['lu', 'ma', 'mi', 'ju', 'vi', 'sá', 'do'];
 
 
 const timeRangeLabel = (appointment: Appointment) =>
@@ -111,7 +126,6 @@ export const ProsAgendaView = () => {
     previousMonthCandidate,
     nextMonthCandidate,
     handleSelectDay,
-    handleMonthChange,
     goToMonth,
     isTodaySelected,
   } = useAgendaState(appointments);
@@ -171,7 +185,11 @@ export const ProsAgendaView = () => {
   };
 
   const handleCreateConfirm = async (values: NewAppointmentFormValues) => {
+    const slotDate = values.slotStartIso ? new Date(values.slotStartIso) : null;
     const targetDate = (() => {
+      if (slotDate && !Number.isNaN(slotDate.getTime())) {
+        return slotDate;
+      }
       if (values.date) {
         const parsed = new Date(`${values.date}T00:00:00`);
         if (!Number.isNaN(parsed.getTime())) return parsed;
@@ -188,6 +206,7 @@ export const ProsAgendaView = () => {
         clientName: values.client,
         clientPhone: values.clientPhone,
         notes: values.notes,
+        slotStartIso: values.slotStartIso,
       });
       toast({
         title: 'Cita creada',
@@ -317,16 +336,15 @@ export const ProsAgendaView = () => {
             selectedDate={selectedDate}
             currentMonth={currentMonth}
             today={today}
-            busyDates={busyDates}
-            fromMonth={fromMonth}
-            toMonth={toMonth}
-            disablePrev={disablePrevNav}
-            disableNext={disableNextNav}
-            onSelectDay={handleSelectDay}
-            onMonthChange={handleMonthChange}
-            onPrev={handlePrevNav}
-            onNext={handleNextNav}
-          />
+          busyDates={busyDates}
+          fromMonth={fromMonth}
+          toMonth={toMonth}
+          disablePrev={disablePrevNav}
+          disableNext={disableNextNav}
+          onSelectDay={handleSelectDay}
+          onPrev={handlePrevNav}
+          onNext={handleNextNav}
+        />
 
           <AppointmentsListPanel
             dayLabel={formattedDayLabel}
@@ -353,6 +371,7 @@ export const ProsAgendaView = () => {
         suggestedDate={selectedDate ?? new Date()}
         services={availableServices}
         servicesLoading={isLoadingServices}
+        professionalId={stylist?.id ?? null}
         onConfirm={handleCreateConfirm}
       />
 
@@ -394,7 +413,6 @@ type AgendaCalendarPanelProps = {
   disablePrev: boolean;
   disableNext: boolean;
   onSelectDay: (day?: Date) => void;
-  onMonthChange: (month: Date) => void;
   onPrev: () => void;
   onNext: () => void;
 };
@@ -409,18 +427,93 @@ const AgendaCalendarPanel = ({
   disablePrev,
   disableNext,
   onSelectDay,
-  onMonthChange,
   onPrev,
   onNext,
 }: AgendaCalendarPanelProps) => {
   const [highlightBusy, setHighlightBusy] = useState(true);
 
   const busyModifierDates = useMemo(() => (highlightBusy ? busyDates : []), [busyDates, highlightBusy]);
+  const busyDateSet = useMemo(() => {
+    const set = new Set<string>();
+    busyModifierDates.forEach((date) => {
+      set.add(format(date, 'yyyy-MM-dd'));
+    });
+    return set;
+  }, [busyModifierDates]);
+
+  const calendarWeeks = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+
+    const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+    const weeks: Date[][] = [];
+    for (let index = 0; index < days.length; index += 7) {
+      weeks.push(days.slice(index, index + 7));
+    }
+    return weeks;
+  }, [currentMonth]);
+
+  const minSelectable = useMemo(() => startOfMonth(fromMonth), [fromMonth]);
+  const maxSelectable = useMemo(() => endOfMonth(toMonth), [toMonth]);
 
   const monthLabel = useMemo(() => {
     const monthName = currentMonth.toLocaleDateString('es-ES', { month: 'long' });
     return `${capitalize(monthName)} ${currentMonth.getFullYear()}`;
   }, [currentMonth]);
+
+  const renderDay = (day: Date) => {
+    const iso = format(day, 'yyyy-MM-dd');
+    const inMonth = isSameMonth(day, currentMonth);
+    const outsideBounds = isBefore(day, minSelectable) || isAfter(day, maxSelectable);
+    const isOutside = !inMonth;
+    const selectable = !outsideBounds && !isOutside;
+    const isSelected = isSameDay(day, selectedDate);
+    const isTodayDay = isToday(day);
+    const hasAppointments = busyDateSet.has(iso);
+    const showHighlight = selectable && !isSelected && hasAppointments;
+    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+
+    const dayClasses = cn(
+      'group relative grid h-11 w-11 place-items-center rounded-2xl text-sm font-semibold leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:h-12 md:w-12 md:text-base',
+      '[font-variant-numeric:tabular-nums]',
+      isOutside && 'text-muted-foreground/30',
+      outsideBounds && 'cursor-not-allowed opacity-40 text-muted-foreground/40',
+      selectable && !isSelected && !showHighlight && 'text-muted-foreground hover:bg-muted/40',
+      selectable && showHighlight && 'border border-primary/40 bg-primary/10 text-primary shadow-sm hover:bg-primary/15',
+      selectable && isWeekend && !showHighlight && !isSelected && 'text-muted-foreground/70',
+      selectable && isSelected && 'border border-primary bg-primary text-primary-foreground shadow-[0_0_0_2px_rgba(var(--primary-rgb,59,130,246),0.24)]',
+      selectable && isTodayDay && !isSelected && 'border border-primary/40 text-primary'
+    );
+
+    return (
+      <div key={iso} className="flex items-center justify-center">
+        <button
+          type="button"
+          aria-label={format(day, "d 'de' MMMM yyyy", { locale: es })}
+          aria-selected={isSelected}
+          aria-disabled={!selectable}
+          data-has-appointments={hasAppointments}
+          data-today={isTodayDay}
+          disabled={!selectable}
+          onClick={() => {
+            if (!selectable) return;
+            onSelectDay(day);
+          }}
+          className={dayClasses}
+        >
+          <span>{day.getDate()}</span>
+          {showHighlight && (
+            <span className="absolute inset-0 rounded-2xl border border-primary/40" aria-hidden="true" />
+          )}
+          {hasAppointments && !isSelected && (
+            <span className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-primary/80" aria-hidden="true" />
+          )}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <Card className="flex h-full flex-col gap-4 border border-border/50 bg-card p-4 shadow-lg">
@@ -456,52 +549,29 @@ const AgendaCalendarPanel = ({
           </Button>
         </div>
 
-        <Calendar
-          mode="single"
-          selected={selectedDate}
-          month={currentMonth}
-          onSelect={onSelectDay}
-          onMonthChange={onMonthChange}
-          fromMonth={fromMonth}
-          toMonth={toMonth}
-          showOutsideDays
-          modifiers={{
-            busy: busyModifierDates,
-            today: today ? [today] : [],
-          }}
-          modifiersClassNames={{
-            busy:
-              'after:absolute after:bottom-2 after:left-1/2 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-primary/80 after:content-[""]',
-            today: 'border border-primary/50 text-primary',
-            selected:
-              'rounded-full bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-            outside: 'pointer-events-none text-muted-foreground/40',
-            disabled: 'pointer-events-none opacity-40',
-          }}
-          className="w-full"
-          classNames={{
-            months: 'flex w-full flex-col gap-4',
-            month: 'space-y-4',
-            caption: 'hidden',
-            month_caption: 'sr-only',
-            caption_label: 'sr-only',
-            month_grid: 'space-y-2',
-            weekdays:
-              'grid grid-cols-7 text-center text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground sm:text-[0.7rem]',
-            weekday: 'py-2',
-            week: 'grid grid-cols-7 gap-1',
-            day: 'flex items-center justify-center',
-            day_button:
-              'relative inline-flex h-11 w-11 items-center justify-center rounded-full text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-            day_selected:
-              'rounded-full bg-primary text-primary-foreground font-semibold hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-            day_today: 'border border-primary/50 text-primary',
-            day_outside: 'pointer-events-none text-muted-foreground/40',
-            day_disabled: 'pointer-events-none opacity-40',
-            day_hidden: 'invisible',
-            nav: 'hidden',
-          }}
-        />
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-7 gap-1.5 text-center text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground sm:text-[0.7rem]">
+            {WEEKDAY_LABELS.map((label) => (
+              <div key={label} className="grid h-7 place-items-center rounded-lg bg-muted/30 text-xs font-semibold text-muted-foreground/80 md:h-8">
+                {label}
+              </div>
+            ))}
+          </div>
+
+          <div
+            role="grid"
+            aria-label={format(currentMonth, 'LLLL yyyy', { locale: es })}
+            className="grid gap-2 md:gap-2.5 lg:gap-3"
+          >
+            {calendarWeeks.map((week, index) => (
+              <div key={`${week[0].toISOString()}-${index}`} className="grid grid-cols-7 gap-1.5 md:gap-2 lg:gap-3">
+                {week.map((day) => renderDay(day))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="pt-1 text-center text-xs text-muted-foreground">Los días resaltados indican que hay citas registradas.</p>
       </div>
 
       <div className="flex items-center justify-between border-t border-border/50 pt-4">

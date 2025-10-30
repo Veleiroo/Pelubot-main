@@ -30,6 +30,7 @@ export type NewAppointmentFormValues = {
   serviceName: string;
   durationMinutes: number;
   notes: string;
+  slotStartIso?: string;
 };
 
 type NewAppointmentModalProps = {
@@ -53,7 +54,75 @@ const formatSuggestedDate = (value?: string | Date | null) => {
   return parsed.toISOString().slice(0, 10);
 };
 
-const DEFAULT_MANUAL_TIME = '09:00';
+const WEEKDAY_MANUAL_SLOTS = [
+  '09:30',
+  '10:00',
+  '10:30',
+  '11:00',
+  '11:30',
+  '12:00',
+  '12:30',
+  '13:00',
+  '16:30',
+  '17:00',
+  '17:30',
+  '18:00',
+  '18:30',
+  '19:00',
+  '19:30',
+  '20:00',
+] as const;
+
+const SATURDAY_MANUAL_SLOTS = [
+  '09:00',
+  '09:30',
+  '10:00',
+  '10:30',
+  '11:00',
+  '11:30',
+  '12:00',
+  '12:30',
+  '13:00',
+  '13:30',
+] as const;
+
+const SLOT_RANGE_OPTIONS = [
+  { value: 'morning', label: 'Mañana' },
+  { value: 'afternoon', label: 'Tarde / Noche' },
+] as const;
+
+type SlotRange = (typeof SLOT_RANGE_OPTIONS)[number]['value'];
+
+const groupSlotsByRange = (slots: string[]): Record<SlotRange, string[]> => {
+  const groups: Record<SlotRange, string[]> = {
+    morning: [],
+    afternoon: [],
+  };
+
+  for (const slot of slots) {
+    const [hoursPart] = slot.split(':');
+    const hour = Number.parseInt(hoursPart ?? '', 10);
+    if (!Number.isNaN(hour) && hour < 15) {
+      groups.morning.push(slot);
+    } else {
+      groups.afternoon.push(slot);
+    }
+  }
+
+  return groups;
+};
+
+const normalizePhone = (value: string) => value.replace(/\s+/g, ' ').trim();
+
+const getPhoneDigits = (value: string) => normalizePhone(value).replace(/\D/g, '');
+
+const validatePhone = (value: string) => {
+  const digits = getPhoneDigits(value);
+  if (digits.length < 9) {
+    return 'Introduce un teléfono válido (al menos 9 dígitos).';
+  }
+  return null;
+};
 
 export const NewAppointmentModal = ({
   open,
@@ -73,9 +142,21 @@ export const NewAppointmentModal = ({
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [manualMode, setManualMode] = useState(false);
-  const [slotRange, setSlotRange] = useState<SlotRange>(() =>
-    SLOT_GROUPS.morning.length > 0 ? 'morning' : 'afternoon'
-  );
+  const [slotRange, setSlotRange] = useState<SlotRange>('morning');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+
+  const manualSlotOptions = useMemo(() => {
+    if (!selectedDate) return [...WEEKDAY_MANUAL_SLOTS];
+    const parsed = new Date(`${selectedDate}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return [...WEEKDAY_MANUAL_SLOTS];
+    const day = parsed.getDay();
+    if (day === 0) return [];
+    if (day === 6) return [...SATURDAY_MANUAL_SLOTS];
+    return [...WEEKDAY_MANUAL_SLOTS];
+  }, [selectedDate]);
+
+  const manualSlotGroups = useMemo(() => groupSlotsByRange(manualSlotOptions), [manualSlotOptions]);
 
   // Cargar servicios reales del backend
   const shouldFetchServices = typeof providedServices === 'undefined';
@@ -94,10 +175,13 @@ export const NewAppointmentModal = ({
   const formattedSuggestedDate = useMemo(() => formatSuggestedDate(suggestedDate), [suggestedDate]);
   const minSelectableDate = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
 
-  const canFetchSlots = useMemo(
-    () => !manualMode && Boolean(selectedServiceId && selectedDate && professionalId),
-    [manualMode, selectedServiceId, selectedDate, professionalId]
-  );
+  const canFetchSlots = useMemo(() => {
+    if (manualMode) return false;
+    if (!selectedServiceId || !selectedDate) return false;
+    const requiresProfessional = professionalId !== undefined;
+    if (requiresProfessional && !professionalId) return false;
+    return true;
+  }, [manualMode, professionalId, selectedServiceId, selectedDate]);
 
   const {
     data: slotsData,
@@ -118,22 +202,68 @@ export const NewAppointmentModal = ({
     },
   });
 
-  const availableSlots = useMemo(() => slotsData?.slots ?? [], [slotsData]);
+  const {
+    automaticSlotLabels,
+    automaticSlotGroups,
+    automaticSlotMap,
+  } = useMemo(() => {
+    const map = new Map<string, string>();
+    const labels: string[] = [];
+
+    if (slotsData?.slots) {
+      const entries = slotsData.slots
+        .map((iso) => {
+          const parsed = new Date(iso);
+          if (Number.isNaN(parsed.getTime())) return null;
+          const label = format(parsed, 'HH:mm');
+          const minutes = parsed.getHours() * 60 + parsed.getMinutes();
+          return { iso, label, minutes };
+        })
+        .filter(Boolean) as Array<{ iso: string; label: string; minutes: number }>;
+
+      entries
+        .sort((a, b) => {
+          const diff = a.minutes - b.minutes;
+          if (diff !== 0) return diff;
+          return a.iso.localeCompare(b.iso);
+        })
+        .forEach(({ label, iso }) => {
+          if (!map.has(label)) {
+            map.set(label, iso);
+            labels.push(label);
+          }
+        });
+    }
+
+    return {
+      automaticSlotLabels: labels,
+      automaticSlotGroups: groupSlotsByRange(labels),
+      automaticSlotMap: map,
+    };
+  }, [slotsData]);
+  const isLoadingSlots = !manualMode && isFetchingSlots;
+  const slotGroups = manualMode ? manualSlotGroups : automaticSlotGroups;
+  const morningDisabled = manualMode
+    ? slotGroups.morning.length === 0
+    : isLoadingSlots || slotGroups.morning.length === 0;
+  const afternoonDisabled = manualMode
+    ? slotGroups.afternoon.length === 0
+    : isLoadingSlots || slotGroups.afternoon.length === 0;
+  const displayedSlots = manualMode
+    ? slotGroups[slotRange] ?? []
+    : isLoadingSlots
+      ? []
+      : slotGroups[slotRange] ?? [];
+
   const slotErrorMessage = useMemo(() => {
     if (!slotsError) return null;
-    if (slotsError instanceof Error) return slotsError.message;
     return 'No se pudo cargar la disponibilidad.';
   }, [slotsError]);
-
-  const slotLabel = (iso: string) => {
-    const dt = new Date(iso);
-    if (Number.isNaN(dt.getTime())) return iso;
-    return format(dt, 'HH:mm');
-  };
 
   useEffect(() => {
     if (open) {
       setManualMode(false);
+      setSlotRange('morning');
       const initialDate = formattedSuggestedDate || minSelectableDate;
       setSelectedDate(initialDate);
       setSelectedServiceId((current) => {
@@ -143,6 +273,8 @@ export const NewAppointmentModal = ({
       });
       setSelectedClient('');
       setSelectedClientPhone('');
+      setPhoneError(null);
+      setPhoneTouched(false);
       setNotes('');
       setSelectedTime('');
       setIsSubmitting(false);
@@ -150,10 +282,13 @@ export const NewAppointmentModal = ({
       setSelectedTime('');
       setSelectedClient('');
       setSelectedClientPhone('');
+      setPhoneError(null);
+      setPhoneTouched(false);
       setSelectedServiceId('');
       setSelectedDate('');
       setNotes('');
       setManualMode(false);
+      setSlotRange('morning');
       setIsSubmitting(false);
     }
   }, [open, formattedSuggestedDate, suggestedService, services, minSelectableDate]);
@@ -165,46 +300,95 @@ export const NewAppointmentModal = ({
   }, [manualMode, selectedDate, minSelectableDate]);
 
   useEffect(() => {
-    if (manualMode) return;
-    if (availableSlots.length > 0) {
-      const exists = availableSlots.some((slot) => slotLabel(slot) === selectedTime);
-      if (!exists) {
-        const first = availableSlots[0];
-        setSelectedTime(slotLabel(first));
+    if (manualMode) {
+      const availableSlots = slotGroups[slotRange];
+      if (availableSlots.length > 0) {
+        if (!availableSlots.includes(selectedTime)) {
+          setSelectedTime(availableSlots[0]);
+        }
+        return;
       }
-    } else {
-      if (selectedTime) {
-        setSelectedTime('');
+
+      if (manualSlotOptions.length === 0) {
+        if (selectedTime) setSelectedTime('');
+        return;
       }
+
+      if (!selectedTime || !manualSlotOptions.includes(selectedTime)) {
+        setSelectedTime(manualSlotOptions[0]);
+      }
+      return;
     }
-  }, [manualMode, availableSlots, selectedTime]);
+
+    if (automaticSlotLabels.length === 0) {
+      if (selectedTime) setSelectedTime('');
+      return;
+    }
+
+    if (!automaticSlotLabels.includes(selectedTime)) {
+      setSelectedTime(automaticSlotLabels[0]);
+    }
+  }, [manualMode, automaticSlotLabels, manualSlotOptions, selectedTime, slotGroups, slotRange]);
+
+  useEffect(() => {
+    if (isLoadingSlots) return;
+
+    const activeGroups = manualMode ? manualSlotGroups : automaticSlotGroups;
+    if (activeGroups.morning.length === 0 && activeGroups.afternoon.length === 0) return;
+    if (activeGroups[slotRange].length > 0) return;
+
+    if (activeGroups.morning.length > 0) {
+      setSlotRange('morning');
+      return;
+    }
+
+    if (activeGroups.afternoon.length > 0) {
+      setSlotRange('afternoon');
+    }
+  }, [automaticSlotGroups, manualSlotGroups, isLoadingSlots, manualMode, slotRange]);
 
   const handleClose = () => onOpenChange(false);
 
   const trimmedClient = selectedClient.trim();
   const trimmedPhone = selectedClientPhone.trim();
+  const phoneValidationMessage = validatePhone(trimmedPhone);
+  const isPhoneValid = !phoneValidationMessage;
+  const sanitizedPhone = normalizePhone(trimmedPhone);
+
+  const hasSelectedSlot = manualMode ? Boolean(selectedTime) : Boolean(selectedTime && automaticSlotMap.has(selectedTime));
 
   const isConfirmDisabled =
     !trimmedClient ||
-    !trimmedPhone ||
     !selectedDate ||
-    !selectedTime ||
+    !hasSelectedSlot ||
     !selectedServiceId ||
     !selectedService ||
+    !isPhoneValid ||
     isSubmitting;
 
   const handleConfirm = async () => {
     if (isConfirmDisabled || !selectedService) return;
 
+    const slotStartIso = manualMode ? undefined : automaticSlotMap.get(selectedTime);
+
+    if (!isPhoneValid) {
+      setPhoneTouched(true);
+      setPhoneError(phoneValidationMessage ?? 'Introduce un teléfono válido (al menos 9 dígitos).');
+      return;
+    }
+
+    setPhoneError(null);
+
     const payload: NewAppointmentFormValues = {
       client: trimmedClient,
-      clientPhone: trimmedPhone,
+      clientPhone: sanitizedPhone,
       date: selectedDate,
       time: selectedTime,
       serviceId: selectedServiceId,
       serviceName: selectedService.name,
       durationMinutes: selectedService.duration_min,
       notes,
+      slotStartIso,
     };
 
     if (!onConfirm) {
@@ -256,10 +440,27 @@ export const NewAppointmentModal = ({
                 type="tel"
                 placeholder="+34 600 000 000"
                 value={selectedClientPhone}
-                onChange={(event) => setSelectedClientPhone(event.target.value)}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setSelectedClientPhone(next);
+                  if (phoneTouched) {
+                    setPhoneError(validatePhone(next));
+                  }
+                }}
+                onBlur={(event) => {
+                  setPhoneTouched(true);
+                  setPhoneError(validatePhone(event.target.value));
+                }}
                 className="border-border focus-visible:ring-primary/30"
+                aria-invalid={phoneTouched && Boolean(phoneError)}
+                aria-describedby={phoneTouched && phoneError ? 'client-phone-error' : undefined}
                 required
               />
+              {phoneTouched && phoneError ? (
+                <p id="client-phone-error" className="text-xs text-destructive">
+                  {phoneError}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -283,6 +484,23 @@ export const NewAppointmentModal = ({
               }}
               className="border-border focus-visible:ring-primary/30"
               required
+            />
+          </div>
+
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-border/60 bg-card/70 px-4 py-3">
+            <div className="space-y-1">
+              <Label htmlFor="manual-mode" className="text-sm font-medium">
+                Permitir fechas pasadas
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Activa el modo manual para registrar citas fuera de la disponibilidad publicada. Horario estándar: L-V 09:30–13:30 y 16:30–20:30; sábados 09:00–14:00.
+              </p>
+            </div>
+            <Switch
+              id="manual-mode"
+              checked={manualMode}
+              onCheckedChange={setManualMode}
+              aria-label="Permitir crear citas en fechas pasadas"
             />
           </div>
 
@@ -315,9 +533,16 @@ export const NewAppointmentModal = ({
                 })}
               </div>
 
-              {displayedSlots.length === 0 ? (
+              {!manualMode && isLoadingSlots ? (
+                <p className="flex items-center gap-2 rounded-lg border border-dashed border-border/60 px-4 py-3 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Cargando disponibilidad…
+                </p>
+              ) : displayedSlots.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border/60 px-4 py-3 text-sm text-muted-foreground">
-                  No hay horarios disponibles en este tramo.
+                  {manualMode
+                    ? 'No hay horarios manuales disponibles para este día.'
+                    : 'No hay horarios disponibles en este tramo.'}
                 </p>
               ) : (
                 <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2 sm:gap-3">
@@ -341,6 +566,12 @@ export const NewAppointmentModal = ({
                     );
                   })}
                 </div>
+              )}
+
+              {slotErrorMessage && !manualMode && !isLoadingSlots && (
+                <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {slotErrorMessage}
+                </p>
               )}
             </div>
           </div>

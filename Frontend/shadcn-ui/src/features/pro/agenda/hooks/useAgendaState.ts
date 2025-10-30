@@ -49,10 +49,6 @@ export const useAgendaState = (appointments: Appointment[]) => {
     setCurrentMonth(startOfMonth(normalized));
   };
 
-  const handleMonthChange = (nextMonth: Date) => {
-    setCurrentMonth(startOfMonth(nextMonth));
-  };
-
   const goToMonth = (target: Date) => {
     setCurrentMonth(startOfMonth(target));
   };
@@ -80,7 +76,6 @@ export const useAgendaState = (appointments: Appointment[]) => {
     previousMonthCandidate,
     nextMonthCandidate,
     handleSelectDay,
-    handleMonthChange,
     goToMonth,
     setCurrentMonth,
     isTodaySelected,

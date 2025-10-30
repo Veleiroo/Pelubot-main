@@ -166,12 +166,12 @@ def get_service_map(*, session: Optional[Session] = None, use_cache: bool = True
 
 
 WEEKLY_SCHEDULE = {
-    0: [(dt_time(10, 0), dt_time(14, 0)), (dt_time(16, 0), dt_time(20, 0))],
-    1: [(dt_time(10, 0), dt_time(14, 0)), (dt_time(16, 0), dt_time(20, 0))],
-    2: [(dt_time(10, 0), dt_time(14, 0)), (dt_time(16, 0), dt_time(20, 0))],
-    3: [(dt_time(10, 0), dt_time(14, 0)), (dt_time(16, 0), dt_time(20, 0))],
-    4: [(dt_time(10, 0), dt_time(14, 0)), (dt_time(16, 0), dt_time(20, 0))],
-    5: [(dt_time(10, 0), dt_time(14, 0))],
+    0: [(dt_time(9, 30), dt_time(13, 30)), (dt_time(16, 30), dt_time(20, 30))],
+    1: [(dt_time(9, 30), dt_time(13, 30)), (dt_time(16, 30), dt_time(20, 30))],
+    2: [(dt_time(9, 30), dt_time(13, 30)), (dt_time(16, 30), dt_time(20, 30))],
+    3: [(dt_time(9, 30), dt_time(13, 30)), (dt_time(16, 30), dt_time(20, 30))],
+    4: [(dt_time(9, 30), dt_time(13, 30)), (dt_time(16, 30), dt_time(20, 30))],
+    5: [(dt_time(9, 0), dt_time(14, 0))],
     6: [],
 }
 
