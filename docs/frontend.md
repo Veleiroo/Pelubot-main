@@ -35,7 +35,7 @@ En la raíz:
 ### Mantenimiento rápido
 
 - Scripts adicionales (desde `Makefile` o `package.json`): `pnpm run test:e2e:preview`, `pnpm run test:e2e:dev`.
-- Ajusta `VITE_API_BASE_URL`, `VITE_API_KEY`, `VITE_ENABLE_DEBUG`, `VITE_USE_GCAL` mediante `.env` en `Frontend/shadcn-ui/`.
+- Ajusta `VITE_API_BASE_URL`, `VITE_ENABLE_DEBUG`, `VITE_USE_GCAL` mediante `.env` en `Frontend/shadcn-ui/`.
 
 ## Flujo público de reservas
 
@@ -79,7 +79,6 @@ En la raíz:
 | Variable | Descripción |
 | --- | --- |
 | `VITE_API_BASE_URL` | URL absoluta del backend. Si falta, se usa el mismo origen del navegador (con `VITE_API_BASE_PATH` opcional). |
-| `VITE_API_KEY` | Clave enviada en `X-API-Key` para endpoints protegidos. |
 | `VITE_ENABLE_DEBUG` | Habilita la ruta `/debug` y logs adicionales. |
 | `VITE_USE_GCAL` | Fuerza al frontend a pedir disponibilidad consultando Google Calendar. |
 | `PLAYWRIGHT_MODE`, `PLAYWRIGHT_PORT` | Configuran cómo Playwright arranca el servidor (`preview`/`dev`). |

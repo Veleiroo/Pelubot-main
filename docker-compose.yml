@@ -10,7 +10,8 @@ services:
     environment:
       # Valores por defecto; pueden sobreescribirse en .env
       TZ: ${TZ:-Europe/Madrid}
-      API_KEY: ${API_KEY:-changeme}
+      API_KEY: ${API_KEY?Define API_KEY en .env}
+      PUBLIC_RESERVATIONS_ENABLED: ${PUBLIC_RESERVATIONS_ENABLED:-false}
       USE_GCAL_BUSY: ${USE_GCAL_BUSY:-false}
       # Para desarrollo puedes forzar cliente de Google Calendar falso (sin llamadas externas)
       PELUBOT_FAKE_GCAL: ${PELUBOT_FAKE_GCAL:-0}
@@ -32,9 +33,6 @@ services:
       args:
         # El frontend compila con base '/api' que nginx proxya al backend
         API_BASE: ${FRONT_API_BASE:-/api}
-        # Inyecta API key en build para que la SPA autorice /reservations, etc.
-        # Se usa la misma API_KEY del backend; si necesitas otra, define FRONT_API_KEY y cambia aquí.
-        VITE_API_KEY: ${FRONT_API_KEY:-}
         # Habilita la ruta de debug y logs de red en la SPA (solo para desarrollo)
         VITE_ENABLE_DEBUG: ${FRONT_ENABLE_DEBUG:-1}
         # Controla uso de Google Calendar (1=activo, 0=desactivado)
@@ -52,13 +50,15 @@ services:
     environment:
       # El navegador accede a localhost:8776 desde tu máquina
       - VITE_API_BASE_URL=http://localhost:${BACKEND_PORT:-8776}
-      - VITE_API_KEY=${API_KEY}
       - VITE_ENABLE_DEBUG=1
       - VITE_USE_GCAL=${FRONT_USE_GCAL:-0}
       - CHOKIDAR_USEPOLLING=1
     volumes:
       - ./Frontend/shadcn-ui:/app
-    command: sh -lc "corepack enable && corepack prepare pnpm@8.10.0 --activate && pnpm i && pnpm dev --host 0.0.0.0"
+      - frontend_node_modules:/app/node_modules
+    command: >-
+      sh -lc "corepack enable && corepack prepare pnpm@8.10.0 --activate && \
+      ([ -d node_modules ] || pnpm install --frozen-lockfile) && pnpm dev --host 0.0.0.0"
     ports:
       - "${FRONTEND_PORT:-8080}:5173"
     depends_on:
@@ -81,3 +81,5 @@ services:
 volumes:
   backend_data:
     name: pelubot_db
+  frontend_node_modules:
+    name: pelubot_frontend_node_modules

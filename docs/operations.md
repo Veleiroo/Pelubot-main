@@ -11,7 +11,7 @@
 Archivo `.env` en la raíz (ejemplo):
 
 ```
-API_KEY=changeme
+API_KEY=<define-una-clave-segura>
 TZ=Europe/Madrid
 DATABASE_URL=sqlite:////app/backend/data/pelubot.db
 BACKEND_PORT=8776
@@ -23,8 +23,8 @@ GOOGLE_OAUTH_JSON=/app/backend/oauth_tokens.json
 
 Opcionales:
 
-- `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_IMPERSONATE_EMAIL` para cuentas de servicio.
-- `FRONT_API_KEY`, `FRONT_ENABLE_DEBUG` para builds específicos del frontend.
+ - `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_IMPERSONATE_EMAIL` para cuentas de servicio.
+ - `FRONT_API_BASE`, `FRONT_ENABLE_DEBUG`, `FRONT_USE_GCAL` para builds específicos del frontend.
 
 ## Despliegues con Docker Compose
 

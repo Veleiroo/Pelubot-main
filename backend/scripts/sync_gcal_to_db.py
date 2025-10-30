@@ -45,7 +45,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 API_BASE = os.getenv("VITE_API_BASE_URL", "http://127.0.0.1:8000")
-API_KEY = os.getenv("VITE_API_KEY", os.getenv("API_KEY", "changeme"))
+API_KEY = os.getenv("API_KEY")
+
+if not API_KEY or API_KEY.lower() == "changeme":
+    raise RuntimeError("API_KEY debe estar definido con un valor seguro antes de usar sync_gcal_to_db.py")
 
 
 def sync_calendar(

@@ -21,6 +21,9 @@ const sortReservations = (reservations: ProReservation[]) =>
 const upsertReservation = (reservations: ProReservation[], reservation: ProReservation) =>
   sortReservations(reservations.filter((item) => item.id !== reservation.id).concat(reservation));
 
+const ensureReservationsArray = (payload?: ProReservationsResponse | null) =>
+  Array.isArray(payload?.reservations) ? payload!.reservations : [];
+
 type CreateAppointmentPayload = {
   date: Date;
   time: string;
@@ -88,7 +91,8 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
     onSuccess: ({ reservation }) => {
       queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
         if (!previous) return previous;
-        return { reservations: upsertReservation(previous.reservations, reservation) };
+        const current = ensureReservationsArray(previous);
+        return { reservations: upsertReservation(current, reservation) };
       });
       void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
@@ -112,7 +116,8 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
     onSuccess: ({ reservationId, startIso, endIso }) => {
       queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
         if (!previous) return previous;
-        const next = previous.reservations.map((reservation) =>
+        const current = ensureReservationsArray(previous);
+        const next = current.map((reservation) =>
           reservation.id === reservationId
             ? {
                 ...reservation,
@@ -137,8 +142,8 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
     onSuccess: ({ reservationId }) => {
       queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
         if (!previous) return previous;
-        // Actualizar el status a 'cancelada' en lugar de eliminar
-        const updated = previous.reservations.map((r) =>
+        const current = ensureReservationsArray(previous);
+        const updated = current.map((r) =>
           r.id === reservationId ? { ...r, status: 'cancelada' as const } : r
         );
         return { reservations: updated };
@@ -156,7 +161,8 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
     onSuccess: ({ reservationId }) => {
       queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
         if (!previous) return previous;
-        const updated = previous.reservations.map((r) =>
+        const current = ensureReservationsArray(previous);
+        const updated = current.map((r) =>
           r.id === reservationId ? { ...r, status: 'asistida' as const } : r
         );
         return { reservations: updated };
@@ -174,7 +180,8 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
     onSuccess: ({ reservationId }) => {
       queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
         if (!previous) return previous;
-        const updated = previous.reservations.map((r) =>
+        const current = ensureReservationsArray(previous);
+        const updated = current.map((r) =>
           r.id === reservationId ? { ...r, status: 'no_asistida' as const } : r
         );
         return { reservations: updated };

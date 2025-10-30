@@ -31,7 +31,6 @@ const MOCK_MODE = (() => {
 const IS_DEV_RUNTIME = import.meta.env.DEV;
 const MOCK_FORCE = MOCK_MODE === 'force';
 const USE_MOCKS = MOCK_FORCE || (IS_DEV_RUNTIME && MOCK_MODE !== 'off');
-const API_KEY = String(import.meta.env?.VITE_API_KEY ?? '').trim();
 
 export type Service = { id: string; name: string; duration_min: number; price_eur: number };
 export type Professional = { id: string; name: string; services?: string[] };
@@ -237,11 +236,11 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     'Content-Type': 'application/json',
     ...(init?.headers as Record<string, string> ?? {}),
   };
-  if (API_KEY && !headers['X-API-Key']) {
-    headers['X-API-Key'] = API_KEY;
-  }
   const url = `${BASE}${path}`;
-  const started = performance.now();
+  const perf = typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance
+    : { now: () => Date.now() };
+  const started = perf.now();
 
   if (DEBUG) {
     console.debug('HTTP', init?.method || 'GET', url, init?.body ? JSON.parse(String(init.body)) : undefined);
@@ -259,7 +258,7 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
       credentials: init?.credentials ?? 'include',
       ...init,
     });
-    const ms = Math.round(performance.now() - started);
+    const ms = Math.round(perf.now() - started);
 
     if (!res.ok) {
       let text = '';
@@ -280,7 +279,7 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 
       const rid = res.headers.get('X-Request-ID') || undefined;
       const fallback = `HTTP ${res.status}${rid ? ` [rid=${rid}]` : ''}`;
-      const message = (detail && String(detail)) || (text ? `${fallback}: ${text.slice(0, 200)}` : fallback);
+      const message = detail?.toString() || (text ? `${fallback}: ${text.slice(0, 200)}` : fallback);
 
       if (DEBUG) console.warn('HTTP ERR', res.status, target, `${ms}ms`, { detail, rid, text: text.slice(0, 200) });
       throw new ApiError(message, { status: res.status, detail: detail ? String(detail) : undefined, requestId: rid, rawBody: text || undefined });

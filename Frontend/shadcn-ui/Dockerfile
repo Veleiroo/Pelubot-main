@@ -21,13 +21,11 @@ COPY Frontend/shadcn-ui/tailwind.config.ts ./
 COPY Frontend/shadcn-ui/postcss.config.js ./
 COPY Frontend/shadcn-ui/components.json ./
 
-# Base pública para API (proxy en nginx a /api), API key y flag de debug
+# Base pública para API (proxy en nginx a /api) y flags de build
 ARG API_BASE=/api
-ARG VITE_API_KEY
 ARG VITE_ENABLE_DEBUG=1
 ARG VITE_USE_GCAL=0
 ENV VITE_API_BASE_URL=${API_BASE}
-ENV VITE_API_KEY=${VITE_API_KEY}
 ENV VITE_ENABLE_DEBUG=${VITE_ENABLE_DEBUG}
 ENV VITE_USE_GCAL=${VITE_USE_GCAL}
 

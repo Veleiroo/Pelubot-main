@@ -56,7 +56,8 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
     onSuccess: ({ reservation }) => {
       queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
         if (!previous) return previous;
-        const filtered = previous.reservations.filter((item) => item.id !== reservation.id);
+        const existing = Array.isArray(previous.reservations) ? previous.reservations : [];
+        const filtered = existing.filter((item) => item.id !== reservation.id);
         const updated = [...filtered, reservation].sort(
           (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
         );

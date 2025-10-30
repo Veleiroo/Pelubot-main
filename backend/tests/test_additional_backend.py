@@ -87,6 +87,15 @@ def test_public_reservations_enabled_without_key(app_client, monkeypatch):
     )
 
 
+def test_public_reservations_listing_without_key(app_client, monkeypatch):
+    import app.api.routes as routes
+
+    monkeypatch.setattr(routes, "PUBLIC_RESERVATIONS_ENABLED", True)
+    r = app_client.get("/reservations")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
 def test_admin_sync_propagates_errors(app_client, monkeypatch):
     import app.api.routes as routes
 
@@ -152,7 +161,7 @@ def test_reservations_order_and_created_at_tz(app_client):
     res_id2 = r2.json().get("reservation_id")
 
     # listar y validar orden y created_at con tz
-    rlist = app_client.get("/reservations")
+    rlist = app_client.get("/reservations", headers={"X-API-Key": API_KEY})
     assert rlist.status_code == 200
     items = rlist.json()
     assert len(items) >= 2

@@ -51,12 +51,12 @@ QUEUE_JOB_TOTAL = Counter(
 def _set_queue_gauges(pending: int, processing: int) -> None:
     try:
         QUEUE_PENDING_GAUGE.set(max(pending, 0))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("No se pudo actualizar la métrica de trabajos pendientes: %s", exc)
     try:
         QUEUE_PROCESSING_GAUGE.set(max(processing, 0))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("No se pudo actualizar la métrica de trabajos en proceso: %s", exc)
 
 
 def refresh_queue_metrics(engine_override=None) -> tuple[int, int]:
@@ -75,8 +75,10 @@ def refresh_queue_metrics(engine_override=None) -> tuple[int, int]:
                 .select_from(CalendarSyncJobDB)
                 .where(CalendarSyncJobDB.status == "processing")
             ) or 0
-    except Exception:
-        pending, processing = 0, 0
+    except Exception as exc:
+        logger.exception("No se pudieron refrescar las métricas de la cola de Google Calendar")
+        _set_queue_gauges(0, 0)
+        raise
     _set_queue_gauges(pending, processing)
     return pending, processing
 
@@ -231,8 +233,10 @@ class CalendarSyncWorker:
         if not self._thread:
             return
         self._stop_event.set()
-        with suppress(Exception):
+        try:
             self._thread.join(timeout=timeout)
+        except Exception as exc:  # noqa: BLE001 - registramos errores de parada
+            logger.warning("Error al detener el worker de Google Calendar: %s", exc)
         self.worker_id = None
         logger.info("Worker de sincronización Google Calendar detenido.")
 
@@ -322,7 +326,8 @@ class CalendarSyncWorker:
                 .select_from(CalendarSyncJobDB)
                 .where(CalendarSyncJobDB.status == "processing")
             ) or 0
-        except Exception:
+        except Exception as exc:
+            logger.warning("No se pudieron obtener métricas de la cola desde la sesión actual: %s", exc)
             return
         _set_queue_gauges(int(pending), int(processing))
 
@@ -386,8 +391,8 @@ class CalendarSyncWorker:
         try:
             QUEUE_JOB_TOTAL.labels(action=action, result=result_label).inc()
             QUEUE_JOB_DURATION.labels(action=action, result=result_label).observe(duration)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("No se pudieron actualizar métricas de trabajos de Google Calendar: %s", exc)
 
         with Session(self._engine) as session:
             job = session.get(CalendarSyncJobDB, job_id)

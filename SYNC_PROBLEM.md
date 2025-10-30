@@ -210,7 +210,7 @@ El script muestra:
 1. **Modo `import`** es seguro - solo lee de GCal, no modifica nada
 2. **Modo `push`** puede sobrescribir eventos en GCal - usar con cuidado
 3. **Modo `both`** sincroniza en ambas direcciones - puede resolver conflictos
-4. **API Key requerida:** Asegúrate de configurar `VITE_API_KEY` en `.env`
+4. **API Key requerida:** Asegúrate de configurar `API_KEY` en `.env`
 
 ## 🔗 ARCHIVOS RELACIONADOS
 

@@ -52,7 +52,6 @@ import { useProSession } from '@/store/pro';
 import { AppointmentStatusPill } from '../shared/components/appointment-status-pill';
 import {
   RescheduleAppointmentDialog,
-  RESCHEDULE_TIME_OPTIONS,
   type RescheduleFormValues,
 } from '../shared/components/reschedule-appointment-dialog';
 import { NewAppointmentModal, type NewAppointmentFormValues } from '../overview/components/new-appointment-modal';
@@ -382,8 +381,8 @@ export const ProsAgendaView = () => {
         }}
         appointment={rescheduleTarget}
         service={rescheduleService}
-        timeOptions={RESCHEDULE_TIME_OPTIONS}
         isSubmitting={isRescheduling}
+        professionalId={stylist?.id ?? null}
         onSubmit={handleRescheduleSubmit}
       />
 

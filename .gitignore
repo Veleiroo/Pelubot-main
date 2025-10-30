@@ -41,6 +41,7 @@ backend/autorizacion.json
 
 # Dev runtime files
 backend/uvicorn*.pid
+uvicorn*.pid
 
 # Test coverage
 .coverage
@@ -51,6 +52,10 @@ dist/
 build/
 *.egg-info/
 
+# Disposable assets
+pro-frontend/
+*.ipynb
+
 # Environment files (use secrets/CI vars instead of committing)
 .env
 backend/.env
@@ -60,6 +65,7 @@ Frontend/shadcn-ui/.env
 Frontend/shadcn-ui/node_modules/
 Frontend/shadcn-ui/dist/
 Frontend/shadcn-ui/build/
+Frontend/shadcn-ui/test-results/
 
 # E2E artifacts
 e2e/artifacts/

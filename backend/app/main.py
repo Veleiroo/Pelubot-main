@@ -29,6 +29,8 @@ from app.db import engine
 from app.services.logic import sync_from_gcal_range
 from app.services.calendar_queue import start_worker, stop_worker
 
+logger = logging.getLogger("pelubot.main")
+
 from app.core.logging_config import setup_logging
 from app.core.middleware import RequestIDMiddleware
 from app.core.errors import install_exception_handlers
@@ -43,24 +45,30 @@ async def lifespan(app: FastAPI):
     create_db_and_tables()
 
     worker_started = False
-    try:
-        if os.getenv("AUTO_SYNC_FROM_GCAL", "false").lower() in ("1","true","yes","si","sí","y"):
+    if os.getenv("AUTO_SYNC_FROM_GCAL", "false").lower() in ("1","true","yes","si","sí","y"):
+        try:
             days = int(os.getenv("AUTO_SYNC_FROM_GCAL_DAYS", "7"))
-            default_service = os.getenv("DEFAULT_SERVICE_FOR_SYNC", "corte_cabello")
-            start = date.today()
-            end = start + timedelta(days=max(0, days-1))
-            with Session(engine) as s:
-                sync_from_gcal_range(s, start, end, default_service=default_service, by_professional=True)
-    except Exception:
-        pass
+        except ValueError as exc:
+            raise RuntimeError("AUTO_SYNC_FROM_GCAL_DAYS debe ser un entero") from exc
 
-    try:
-        disable_worker = os.getenv("PELUBOT_DISABLE_GCAL_WORKER", "").lower() in {"1", "true", "yes", "si", "sí"}
-        if not disable_worker and not os.getenv("PYTEST_CURRENT_TEST"):
+        default_service = os.getenv("DEFAULT_SERVICE_FOR_SYNC", "corte_cabello")
+        start_date = date.today()
+        end_date = start_date + timedelta(days=max(0, days - 1))
+        try:
+            with Session(engine) as s:
+                sync_from_gcal_range(s, start_date, end_date, default_service=default_service, by_professional=True)
+        except Exception as exc:  # noqa: BLE001 - queremos hacer visible el fallo de arranque
+            logger.exception("Error sincronizando con Google Calendar al iniciar")
+            raise
+
+    disable_worker = os.getenv("PELUBOT_DISABLE_GCAL_WORKER", "").lower() in {"1", "true", "yes", "si", "sí"}
+    if not disable_worker and not os.getenv("PYTEST_CURRENT_TEST"):
+        try:
             start_worker()
             worker_started = True
-    except Exception:
-        pass
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("No se pudo iniciar el worker de Google Calendar")
+            raise
 
     if not API_KEY or API_KEY == "changeme":
         logging.getLogger("pelubot.main").warning("API_KEY no configurada o usando valor por defecto; define una clave segura en .env")
@@ -70,8 +78,8 @@ async def lifespan(app: FastAPI):
     if worker_started:
         try:
             stop_worker()
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 - registramos el fallo pero no impide la finalización
+            logger.exception("No se pudo detener el worker de Google Calendar correctamente: %s", exc)
 
 
 def create_app() -> FastAPI:

@@ -161,6 +161,7 @@ def list_professionals():
 
 @router.get("/reservations")
 def list_reservations(
+    request: Request,
     session: Session = Depends(get_session),
     professional_id: Optional[str] = Query(default=None, description="Filtra por profesional"),
     status: Optional[str] = Query(default=None, description="Filtra por estado"),
@@ -170,6 +171,8 @@ def list_reservations(
     offset: int = Query(default=0, ge=0),
 ):
     """Lista reservas con filtros básicos y paginación."""
+    if not PUBLIC_RESERVATIONS_ENABLED:
+        require_api_key(request)
     stmt = select(ReservationDB)
     if professional_id:
         stmt = stmt.where(ReservationDB.professional_id == professional_id)

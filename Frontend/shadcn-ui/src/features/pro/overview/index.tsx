@@ -8,7 +8,6 @@ import { useProSession } from '@/store/pro';
 
 import {
   RescheduleAppointmentDialog,
-  RESCHEDULE_TIME_OPTIONS,
   type RescheduleFormValues,
 } from '../shared/components/reschedule-appointment-dialog';
 import type { Appointment } from '../shared/types';
@@ -307,8 +306,8 @@ export const ProsOverviewView = () => {
           }
         }}
         appointment={rescheduleTarget}
-        timeOptions={RESCHEDULE_TIME_OPTIONS}
         isSubmitting={isRescheduling}
+        professionalId={stylist?.id ?? null}
         onSubmit={handleRescheduleConfirm}
       />
     </>
