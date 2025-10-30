@@ -3,14 +3,15 @@ Rutas y endpoints de la API (estructura nueva).
 """
 from __future__ import annotations
 from datetime import datetime, date, timedelta, timezone
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
 import os
 import uuid
 import logging
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Body, Query
+from pydantic import BaseModel, Field
 from sqlmodel import Session, select
-from sqlalchemy import delete as sa_delete, text as _sql_text, func
+from sqlalchemy import delete as sa_delete, text as _sql_text, func, inspect as sa_inspect
 
 from app.data import (
     get_services,
@@ -701,8 +702,96 @@ def create_reservation(
     logger.info("Reservation created: id=%s calendar=%s start=%s end=%s", res_id, cal_id, start.isoformat(), end.isoformat())
     return payload_out
 
-# Admin
-from pydantic import BaseModel
+class AdminSqlRequest(BaseModel):
+    statement: str = Field(..., min_length=1, max_length=10_000)
+    params: Dict[str, Any] | None = None
+
+
+class AdminSqlResponse(BaseModel):
+    statement: str
+    rows: List[Dict[str, Any]] | None = None
+    rowcount: int | None = None
+    last_insert_rowid: int | None = None
+
+
+class AdminSqlTablesOut(BaseModel):
+    tables: List[str]
+
+
+class AdminTableQueryOut(BaseModel):
+    table: str
+    rows: List[Dict[str, Any]]
+    rowcount: int
+    limit: int
+    offset: int
+
+
+def _list_database_tables(connection) -> List[str]:
+    try:
+        inspector = sa_inspect(connection)
+        tables = inspector.get_table_names()
+    except Exception:  # noqa: BLE001
+        tables = []
+    return sorted(tables)
+
+
+@router.get("/admin/sql/tables", response_model=AdminSqlTablesOut)
+def admin_sql_tables(_=Depends(require_api_key)):
+    with engine.connect() as conn:
+        tables = _list_database_tables(conn)
+    return AdminSqlTablesOut(tables=tables)
+
+
+@router.get("/admin/sql/tables/{table_name}", response_model=AdminTableQueryOut)
+def admin_sql_table_dump(
+    table_name: str,
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    _=Depends(require_api_key),
+):
+    with engine.connect() as conn:
+        tables = _list_database_tables(conn)
+        if table_name not in tables:
+            raise HTTPException(status_code=404, detail=f"La tabla '{table_name}' no existe")
+        safe_table = table_name.replace('"', '""')
+        stmt = _sql_text(f'SELECT * FROM "{safe_table}" LIMIT :limit OFFSET :offset')
+        rows = conn.execute(stmt, {"limit": limit, "offset": offset}).fetchall()
+    data = [dict(row._mapping) for row in rows]
+    return AdminTableQueryOut(table=table_name, rows=data, rowcount=len(data), limit=limit, offset=offset)
+
+
+@router.post("/admin/sql", response_model=AdminSqlResponse)
+def admin_sql_execute(
+    payload: AdminSqlRequest,
+    _=Depends(require_api_key),
+):
+    statement = payload.statement.strip()
+    if not statement:
+        raise HTTPException(status_code=400, detail="La sentencia SQL no puede estar vacía")
+    params = payload.params or {}
+    if not isinstance(params, dict):
+        raise HTTPException(status_code=400, detail="`params` debe ser un objeto con parámetros nombrados")
+
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(_sql_text(statement), params)
+            if result.returns_rows:
+                rows = [dict(row._mapping) for row in result.fetchall()]
+                return AdminSqlResponse(statement=statement, rows=rows, rowcount=len(rows))
+
+            rowcount = result.rowcount if result.rowcount is not None else 0
+            last_insert_rowid: Optional[int] = None
+            try:
+                last_insert_rowid = conn.exec_driver_sql("SELECT last_insert_rowid()").scalar()  # type: ignore[attr-defined]
+            except Exception:
+                last_insert_rowid = None
+            return AdminSqlResponse(statement=statement, rowcount=rowcount, last_insert_rowid=last_insert_rowid)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Error ejecutando SQL administrativo")
+        raise HTTPException(status_code=400, detail=f"Error al ejecutar la sentencia: {exc}") from exc
+
 
 class AdminSyncIn(BaseModel):
     mode: str | None = None

@@ -42,6 +42,18 @@ Servicios expuestos:
 
 Modo debug de la SPA (`/debug`) se activa con `VITE_ENABLE_DEBUG=1`.
 
+### Acceso administrativo
+
+- Protege las operaciones sensibles con la `X-API-Key`. Sin la cabecera el backend responderá con 401.
+- `POST /admin/sql` permite ejecutar sentencias SQL arbitrarias (consulta o escritura) usando parámetros nombrados:
+  ```bash
+  curl -X POST "$BACKEND_URL/admin/sql" \
+    -H "Content-Type: application/json" \
+    -H "X-API-Key: $API_KEY" \
+    -d '{"statement": "INSERT INTO stylistdb (id, name, password_hash, is_active) VALUES (:id, :name, :pwd, 1)", "params": {"id": "deinis", "name": "Deinis Barber", "pwd": "...hash..."}}'
+  ```
+- `GET /admin/sql/tables` lista las tablas disponibles y `GET /admin/sql/tables/<tabla>?limit=100` devuelve su contenido paginado.
+
 ### Logs y mantenimiento
 
 ```bash
