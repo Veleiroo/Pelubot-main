@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import base64
-import os
 import sys
 from pathlib import Path
 
@@ -27,7 +26,6 @@ def decode_base64_file(source: Path, target: Path, overwrite: bool) -> None:
         )
 
     target.parent.mkdir(parents=True, exist_ok=True)
-    os.chmod(target.parent, 0o777)  # Ensure write permissions for the directory
 
     raw = source.read_text(encoding="utf-8")
     try:

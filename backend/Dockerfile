@@ -5,6 +5,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     TZ=Europe/Madrid
 
+# Herramientas necesarias para la descarga del seed
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Dependencias
@@ -15,9 +20,13 @@ RUN pip install --upgrade pip && \
 # Código
 COPY backend /app/backend
 
+COPY backend/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 WORKDIR /app/backend
 
 EXPOSE 8776
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8776", "--workers", "2", "--log-level", "info"]
+ENV DATABASE_URL=sqlite:////data/pelubot.db
 
+ENTRYPOINT ["/entrypoint.sh"]
