@@ -168,6 +168,7 @@ def stylist_login(
     return StylistAuthOut(
         stylist=_to_public(stylist),
         session_expires_at=expires_at,
+        session_token=token,
     )
 
 
@@ -185,7 +186,7 @@ def stylist_me(
     # Renovamos el token para extender la sesión de forma silenciosa
     token, expires_at = create_stylist_session_token(stylist.id)
     set_stylist_session_cookie(response, token, expires_at)
-    return StylistAuthOut(stylist=_to_public(stylist), session_expires_at=expires_at)
+    return StylistAuthOut(stylist=_to_public(stylist), session_expires_at=expires_at, session_token=token)
 
 
 @router.get("/reservations", response_model=StylistReservationsOut)

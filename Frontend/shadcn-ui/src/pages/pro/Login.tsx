@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Loader2, Scissors } from 'lucide-react';
 
-import { api, ApiError, type StylistPublic } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
@@ -20,6 +20,8 @@ const loginSchema = z.object({
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
+
+type ProsSessionResponse = Awaited<ReturnType<typeof api.prosLogin>>;
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -49,7 +51,7 @@ const LoginPage = () => {
     retry: false,
   });
 
-  const login = useMutation<{ stylist: StylistPublic; session_expires_at: string }, ApiError, LoginValues>({
+  const login = useMutation<ProsSessionResponse, ApiError, LoginValues>({
     mutationFn: ({ identifier, password }) => api.prosLogin({ identifier, password }),
   });
 
@@ -57,7 +59,7 @@ const LoginPage = () => {
     form.clearErrors();
     try {
       const data = await login.mutateAsync(values);
-      setSession({ stylist: data.stylist, sessionExpiresAt: data.session_expires_at });
+      setSession({ stylist: data.stylist, sessionExpiresAt: data.session_expires_at, sessionToken: data.session_token });
       toast({
         title: `¡Hola ${data.stylist.display_name ?? data.stylist.name}!`,
         description: 'Has accedido correctamente al portal profesional.',

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode } from 'react';
 import { useNavigate, type Location as RouterLocation } from 'react-router-dom';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from '@/lib/icons';
@@ -19,14 +19,6 @@ export function BookingDialog({ background, children }: Props) {
       navigate(targetPath, { replace: true });
     }
   };
-
-  useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previous || '';
-    };
-  }, []);
 
   return (
     <DialogPrimitive.Root open onOpenChange={handleOpenChange}>

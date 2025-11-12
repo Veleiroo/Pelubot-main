@@ -154,6 +154,7 @@ class StylistAuthOut(BaseModel):
 
     stylist: StylistPublic
     session_expires_at: datetime
+    session_token: str
 
 
 class StylistReservationOut(BaseModel):

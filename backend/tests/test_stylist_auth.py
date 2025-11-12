@@ -36,9 +36,12 @@ def test_stylist_login_success_sets_cookie(app_client: TestClient):
     assert resp.status_code == 200
     body = resp.json()
     assert body["stylist"]["id"] == "deinis"
+    session_token = body["session_token"]
+    assert isinstance(session_token, str) and session_token
     assert COOKIE_NAME in resp.cookies
     token = resp.cookies.get(COOKIE_NAME)
     assert token
+    assert token == session_token
 
     # Forzamos el jar del cliente en tests porque la cookie real se marca como "Secure" en ENV=prod
     app_client.cookies.set(COOKIE_NAME, token)
@@ -46,6 +49,22 @@ def test_stylist_login_success_sets_cookie(app_client: TestClient):
     me = app_client.get("/pros/me")
     assert me.status_code == 200
     assert me.json()["stylist"]["id"] == "deinis"
+
+
+def test_stylist_me_accepts_header_token(app_client: TestClient):
+    engine = app_client.app.state.test_engine
+    _seed_stylist(engine)
+
+    resp = app_client.post("/pros/login", json={"identifier": "deinis", "password": "1234"})
+    assert resp.status_code == 200
+    token = resp.json()["session_token"]
+    assert token
+
+    app_client.cookies.clear()
+    me = app_client.get("/pros/me", headers={"X-Pro-Session": token})
+    assert me.status_code == 200
+    body = me.json()
+    assert body["stylist"]["id"] == "deinis"
 
 
 def test_stylist_login_rejects_invalid_password(app_client: TestClient):

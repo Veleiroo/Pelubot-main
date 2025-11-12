@@ -10,6 +10,8 @@ import { useProSession } from '@/store/pro';
 
 import { ProsHeader } from './ProsHeader';
 
+type ProsSessionResponse = Awaited<ReturnType<typeof api.prosMe>>;
+
 export const ProsShell = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -24,7 +26,7 @@ export const ProsShell = () => {
     clearSession();
   }, [clearSession, queryClient]);
 
-  const sessionQuery = useQuery<{ stylist: StylistPublic; session_expires_at: string }, ApiError>({
+  const sessionQuery = useQuery<ProsSessionResponse, ApiError>({
     queryKey: ['pros', 'me'],
     queryFn: api.prosMe,
     retry: false,
@@ -35,9 +37,13 @@ export const ProsShell = () => {
   useEffect(() => {
     const data = sessionQuery.data;
     if (!data) return;
-    const { stylist, session_expires_at } = data;
-    if (!session || session.stylist.id !== stylist.id || session.sessionExpiresAt !== session_expires_at) {
-      setSession({ stylist, sessionExpiresAt: session_expires_at });
+    const { stylist, session_expires_at, session_token } = data;
+    if (!session || session.stylist.id !== stylist.id || session.sessionExpiresAt !== session_expires_at || session.sessionToken !== session_token) {
+      setSession({
+        stylist,
+        sessionExpiresAt: session_expires_at,
+        sessionToken: session_token ?? session?.sessionToken ?? null,
+      });
     }
   }, [sessionQuery.data, session, setSession]);
 

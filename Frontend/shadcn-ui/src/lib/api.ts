@@ -1,4 +1,6 @@
 import { mockHttp, MockHttpError } from './mock-api';
+import { useProSession } from '@/store/pro';
+import type { StylistPublic } from '@/types/stylist';
 
 // Base de API: prioriza VITE_API_BASE_URL y, si falta, recurre al mismo origen.
 const BASE = (() => {
@@ -205,6 +207,7 @@ type SlotsOut = { service_id: string; date: string; professional_id?: string | n
 type ActionResult = { ok: boolean; message: string };
 type ReservationCreateOut = ActionResult & { reservation_id: string; google_event_id?: string | null };
 type DaysAvailabilityOut = { service_id: string; start: string; end: string; professional_id?: string | null; available_days: string[] };
+type ProsSessionResponse = { stylist: StylistPublic; session_expires_at: string; session_token: string };
 export type ReservationCreatePayload = {
   service_id: string;
   professional_id: string;
@@ -236,6 +239,14 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     'Content-Type': 'application/json',
     ...(init?.headers as Record<string, string> ?? {}),
   };
+  try {
+    const token = useProSession.getState().session?.sessionToken;
+    if (token) {
+      headers['X-Pro-Session'] = token;
+    }
+  } catch {
+    /* noop - store not ready (SSR) */
+  }
   const url = `${BASE}${path}`;
   const perf = typeof performance !== 'undefined' && typeof performance.now === 'function'
     ? performance
@@ -375,7 +386,7 @@ export const api = {
       signal: opts?.signal,
     }),
   prosLogin: (payload: { identifier: string; password: string }) =>
-    http<{ stylist: StylistPublic; session_expires_at: string }>("/pros/login", {
+    http<ProsSessionResponse>("/pros/login", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
@@ -385,7 +396,7 @@ export const api = {
       method: "POST",
     }),
 
-  prosMe: () => http<{ stylist: StylistPublic; session_expires_at: string }>("/pros/me"),
+  prosMe: () => http<ProsSessionResponse>("/pros/me"),
 
   prosOverview: () => http<ProOverview>("/pros/overview"),
   
@@ -462,13 +473,4 @@ export const api = {
   prosStats: () => http<ProStatsResponse>("/pros/stats"),
 };
 
-export type StylistPublic = {
-  id: string;
-  name: string;
-  services: string[];
-  display_name?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  calendar_id?: string | null;
-  use_gcal_busy?: boolean;
-};
+export type { StylistPublic } from '@/types/stylist';

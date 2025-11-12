@@ -245,15 +245,6 @@ const BookConfirm = () => {
     navigate('/book/date', { state: buildBookingState(location) });
   }, [navigate, location]);
 
-  useEffect(() => {
-    if (typeof document === 'undefined') return undefined;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, []);
-
   if (!serviceId || !slotStart) {
     return (
       <BookingLayout className="rounded-[28px] bg-background px-5 py-5 shadow-[0_50px_120px_-65px_rgba(0,0,0,0.85)] md:px-7 md:py-6">
