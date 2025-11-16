@@ -29,7 +29,7 @@ export function BookingDialog({ background, children }: Props) {
         />
         <DialogPrimitive.Content
           className={cn(
-            'fixed inset-0 z-50 flex items-start justify-center overflow-y-hidden px-4 py-6 text-sm outline-none',
+            'fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-3 py-4 text-sm outline-none sm:px-4 sm:py-6',
             'md:px-6 md:py-10',
             'dark'
           )}
@@ -43,7 +43,7 @@ export function BookingDialog({ background, children }: Props) {
           }}
         >
           <div className="relative mx-auto flex w-full max-w-[960px] justify-center">
-            <div className="relative flex w-full max-h-[calc(100vh-48px)] flex-col overflow-hidden rounded-3xl border border-white/12 bg-background shadow-[0_50px_140px_-55px_rgba(0,0,0,0.85)] md:max-h-[calc(100vh-80px)]">
+            <div className="relative flex w-full max-h-[calc(100vh-32px)] flex-col overflow-hidden rounded-3xl border border-white/12 bg-background shadow-[0_50px_140px_-55px_rgba(0,0,0,0.85)] sm:max-h-[calc(100vh-48px)] md:max-h-[calc(100vh-80px)]">
               <DialogPrimitive.Close
                 className="absolute right-6 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-background/90 text-white/70 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:top-6"
                 aria-label="Cerrar reserva"
