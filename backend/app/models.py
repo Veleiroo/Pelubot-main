@@ -538,3 +538,16 @@ class ReservationSyncStatusOut(BaseModel):
     sync_job_id: Optional[int] = None
     sync_last_error: Optional[str] = None
     sync_updated_at: Optional[datetime] = None
+
+
+class BackupEntry(BaseModel):
+    id: str
+    filename: str
+    created_at: datetime
+    size_bytes: int
+    checksum: Optional[str] = None
+    note: Optional[str] = None
+
+
+class BackupListOut(BaseModel):
+    backups: List[BackupEntry]

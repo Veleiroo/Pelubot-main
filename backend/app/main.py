@@ -2,6 +2,7 @@
 Punto de entrada del backend de PeluBot (FastAPI).
 Incluye configuración de CORS, logging, middleware y ciclo de vida.
 """
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -28,6 +29,7 @@ from datetime import date, timedelta
 from app.db import engine
 from app.services.logic import sync_from_gcal_range
 from app.services.calendar_queue import start_worker, stop_worker
+from app.services import backup as backup_service
 
 logger = logging.getLogger("pelubot.main")
 
@@ -45,6 +47,7 @@ async def lifespan(app: FastAPI):
     create_db_and_tables()
 
     worker_started = False
+    backup_task = None
     if os.getenv("AUTO_SYNC_FROM_GCAL", "false").lower() in ("1","true","yes","si","sí","y"):
         try:
             days = int(os.getenv("AUTO_SYNC_FROM_GCAL_DAYS", "7"))
@@ -70,6 +73,25 @@ async def lifespan(app: FastAPI):
             logger.exception("No se pudo iniciar el worker de Google Calendar")
             raise
 
+    enable_auto_backups = os.getenv("PELUBOT_AUTO_BACKUPS", "true").lower() in ("1","true","yes","si","sí","y")
+    if enable_auto_backups and not os.getenv("PYTEST_CURRENT_TEST"):
+        try:
+            interval_minutes = int(os.getenv("PELUBOT_BACKUP_INTERVAL_MINUTES", "1440"))
+        except ValueError:
+            interval_minutes = 1440
+        interval_minutes = max(5, interval_minutes)
+        try:
+            backup_task = asyncio.create_task(
+                backup_service.periodic_backup_loop(
+                    interval_minutes * 60,
+                    initial_delay=30,
+                    note="auto",
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("No se pudo iniciar el scheduler de backups automáticos")
+            raise
+
     if not API_KEY or API_KEY == "changeme":
         logging.getLogger("pelubot.main").warning("API_KEY no configurada o usando valor por defecto; define una clave segura en .env")
 
@@ -80,6 +102,12 @@ async def lifespan(app: FastAPI):
             stop_worker()
         except Exception as exc:  # noqa: BLE001 - registramos el fallo pero no impide la finalización
             logger.exception("No se pudo detener el worker de Google Calendar correctamente: %s", exc)
+    if backup_task:
+        backup_task.cancel()
+        try:
+            await backup_task
+        except asyncio.CancelledError:
+            pass
 
 
 def create_app() -> FastAPI:

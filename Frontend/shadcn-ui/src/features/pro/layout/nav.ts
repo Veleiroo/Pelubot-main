@@ -8,6 +8,7 @@ export type ProsNavItem = {
 const CORE_NAV_ITEMS: ProsNavItem[] = [
   { label: 'Resumen', to: '/pros' },
   { label: 'Agenda', to: '/pros/agenda' },
+  { label: 'Backups', to: '/pros/backups' },
 ];
 
 // Páginas futuras (solo visibles en desarrollo para demos)

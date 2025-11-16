@@ -52,6 +52,24 @@ type AgendaActionsOptions = {
 export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
   const queryClient = useQueryClient();
 
+  const reservationsQueryFilter = {
+    predicate: (query: { queryKey: unknown }) =>
+      Array.isArray(query.queryKey) &&
+      query.queryKey.length >= 2 &&
+      query.queryKey[0] === 'pros' &&
+      query.queryKey[1] === 'reservations',
+  };
+
+  const updateReservationsCache = (
+    updater: (payload: ProReservationsResponse | undefined) => ProReservationsResponse | undefined
+  ) => {
+    queryClient.setQueriesData<ProReservationsResponse>(reservationsQueryFilter, updater);
+  };
+
+  const invalidateReservationsCache = () => {
+    void queryClient.invalidateQueries(reservationsQueryFilter);
+  };
+
   const createMutation = useMutation({
     mutationFn: async (payload: CreateAppointmentPayload) => {
       if (!professionalId) throw new Error('No hay profesional activo para crear la reserva.');
@@ -89,12 +107,12 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
       return { response, reservation };
     },
     onSuccess: ({ reservation }) => {
-      queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
+      updateReservationsCache((previous) => {
         if (!previous) return previous;
         const current = ensureReservationsArray(previous);
         return { reservations: upsertReservation(current, reservation) };
       });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });
@@ -114,7 +132,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
       return { response, reservationId: payload.reservationId, startIso, endIso };
     },
     onSuccess: ({ reservationId, startIso, endIso }) => {
-      queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
+      updateReservationsCache((previous) => {
         if (!previous) return previous;
         const current = ensureReservationsArray(previous);
         const next = current.map((reservation) =>
@@ -129,7 +147,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         );
         return { reservations: sortReservations(next) };
       });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });
@@ -140,7 +158,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
       return { response, reservationId: payload.reservationId };
     },
     onSuccess: ({ reservationId }) => {
-      queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
+      updateReservationsCache((previous) => {
         if (!previous) return previous;
         const current = ensureReservationsArray(previous);
         const updated = current.map((r) =>
@@ -148,7 +166,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         );
         return { reservations: updated };
       });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });
@@ -159,7 +177,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
       return { response, reservationId };
     },
     onSuccess: ({ reservationId }) => {
-      queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
+      updateReservationsCache((previous) => {
         if (!previous) return previous;
         const current = ensureReservationsArray(previous);
         const updated = current.map((r) =>
@@ -167,7 +185,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         );
         return { reservations: updated };
       });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });
@@ -178,7 +196,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
       return { response, reservationId };
     },
     onSuccess: ({ reservationId }) => {
-      queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
+      updateReservationsCache((previous) => {
         if (!previous) return previous;
         const current = ensureReservationsArray(previous);
         const updated = current.map((r) =>
@@ -186,7 +204,7 @@ export const useAgendaActions = ({ professionalId }: AgendaActionsOptions) => {
         );
         return { reservations: updated };
       });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });

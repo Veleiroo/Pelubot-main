@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta, date
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Body, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import or_, text as _sql_text, func
 from sqlalchemy.exc import InvalidRequestError
 from sqlmodel import Session, select
@@ -44,6 +45,8 @@ from app.models import (
     ReservationSyncStatusOut,
     StylistReservationHistoryPage,
     ReservationStatus,
+    BackupEntry,
+    BackupListOut,
 )
 from app.services.logic import (
     find_reservation,
@@ -52,6 +55,7 @@ from app.services.logic import (
     get_calendar_for_professional,
 )
 from app.services.calendar_queue import CalendarSyncAction, try_enqueue_calendar_job
+from app.services import backup as backup_service
 
 
 from app.utils.date import now_tz, TZ, validate_target_dt
@@ -1146,3 +1150,70 @@ def stylist_delete_reservation(
     if sync_note:
         message += sync_note
     return ActionResult(ok=True, message=message)
+
+
+def _serialize_backup_entry(info: backup_service.BackupInfo) -> BackupEntry:
+    return BackupEntry(**info.__dict__)
+
+
+def _serialize_backup_entries(infos: List[backup_service.BackupInfo]) -> List[BackupEntry]:
+    return [_serialize_backup_entry(info) for info in infos]
+
+
+@router.get("/backups", response_model=BackupListOut)
+def stylist_list_backups(stylist: StylistDB = Depends(get_current_stylist)) -> BackupListOut:
+    backups = _serialize_backup_entries(backup_service.list_backups())
+    return BackupListOut(backups=backups)
+
+
+@router.delete("/backups/{backup_id}", response_model=ActionResult)
+def stylist_delete_backup(
+    backup_id: str,
+    stylist: StylistDB = Depends(get_current_stylist),
+) -> ActionResult:
+    try:
+        info = backup_service.delete_backup(backup_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backup no encontrado")
+    return ActionResult(ok=True, message=f"Backup {info.filename} eliminado.")
+
+
+@router.post("/backups/{backup_id}/restore", response_model=ActionResult)
+def stylist_restore_backup(
+    backup_id: str,
+    stylist: StylistDB = Depends(get_current_stylist),
+) -> ActionResult:
+    try:
+        info = backup_service.restore_backup(backup_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backup no encontrado")
+    except Exception as exc:
+        logger.exception("No se pudo restaurar el backup %s", backup_id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo restaurar el backup") from exc
+    return ActionResult(ok=True, message=f"Backup {info.filename} restaurado. Reinicia el portal si es necesario.")
+
+
+@router.post("/backups", response_model=BackupEntry)
+def stylist_create_backup(
+    stylist: StylistDB = Depends(get_current_stylist),
+) -> BackupEntry:
+    try:
+        info = backup_service.create_backup(note=f"manual:{stylist.id}")
+    except FileNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Base de datos no encontrada para generar backup")
+    except Exception as exc:
+        logger.exception("No se pudo crear el backup manual solicitado por %s", stylist.id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo crear el backup") from exc
+    return _serialize_backup_entry(info)
+
+
+@router.get("/backups/{backup_id}/download")
+def stylist_download_backup(
+    backup_id: str,
+    stylist: StylistDB = Depends(get_current_stylist),
+):
+    try:
+        path = backup_service.open_backup_file(backup_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backup no encontrado")
+    return FileResponse(path, media_type="application/octet-stream", filename=path.name)

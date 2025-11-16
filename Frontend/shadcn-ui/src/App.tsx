@@ -16,6 +16,7 @@ import {
     loadProsAgenda,
     loadProsClients,
     loadProsStats,
+    loadProsBackups,
 } from '@/lib/route-imports';
 const BookDate = lazy(loadBookDate);
 const BookConfirm = lazy(loadBookConfirm);
@@ -26,6 +27,7 @@ const ProsShell = lazy(loadProsShell);
 const ProsAgenda = lazy(loadProsAgenda);
 const ProsClients = lazy(loadProsClients);
 const ProsStats = lazy(loadProsStats);
+const ProsBackups = lazy(loadProsBackups);
 import Loading from '@/components/Loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import BookingDialog from '@/components/BookingDialog';
@@ -60,6 +62,7 @@ const AppRoutes = () => {
                     <Route path="agenda" element={renderWithSuspense(ProsAgenda)} />
                     <Route path="clientes" element={renderWithSuspense(ProsClients)} />
                     <Route path="estadisticas" element={renderWithSuspense(ProsStats)} />
+                    <Route path="backups" element={renderWithSuspense(ProsBackups)} />
                 </Route>
                 {DEBUG && <Route path="/debug" element={renderWithSuspense(DebugPage)} />}
                 <Route path="*" element={<NotFound />} />

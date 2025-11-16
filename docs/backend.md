@@ -79,6 +79,11 @@
 - `make dev-demo` — demo end-to-end.
 - `make conflicts` — detecta conflictos en rango.
 
+### Backups automáticos
+- El backend genera copias de `pelubot.db` en `BACKUPS_DIR` (por defecto `backend/data/backups`) usando un scheduler interno. Se habilita si `PELUBOT_AUTO_BACKUPS=true` y el intervalo (minutos) se controla con `PELUBOT_BACKUP_INTERVAL_MINUTES` (default 1440). Puedes forzar otro path con `PELUBOT_BACKUPS_DIR=/ruta/externa` y limitar la retención con `PELUBOT_BACKUP_RETAIN` (número máximo de archivos; por defecto infinito).
+- El portal profesional expone `/pros/backups` (listar), `POST /pros/backups` (crear al instante), `DELETE /pros/backups/{id}`, `POST /pros/backups/{id}/restore` y `GET /pros/backups/{id}/download`. Todos requieren sesión de estilista.
+- Para restaurar manualmente fuera del portal puedes copiar el `.db` desde `backend/data/backups/` al volumen de datos y reiniciar el backend; en Railway conviene descargar la última copia desde la sección de Backups de PeluBot Pro y subirla al volumen persistente.
+
 ## Variables y comandos clave
 
 - `.env`:

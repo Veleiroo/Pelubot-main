@@ -33,6 +33,13 @@ const MOCK_MODE = (() => {
 const IS_DEV_RUNTIME = import.meta.env.DEV;
 const MOCK_FORCE = MOCK_MODE === 'force';
 const USE_MOCKS = MOCK_FORCE || (IS_DEV_RUNTIME && MOCK_MODE !== 'off');
+const getSessionToken = () => {
+  try {
+    return useProSession.getState().session?.sessionToken ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 export type Service = { id: string; name: string; duration_min: number; price_eur: number };
 export type Professional = { id: string; name: string; services?: string[] };
@@ -208,6 +215,15 @@ type ActionResult = { ok: boolean; message: string };
 type ReservationCreateOut = ActionResult & { reservation_id: string; google_event_id?: string | null };
 type DaysAvailabilityOut = { service_id: string; start: string; end: string; professional_id?: string | null; available_days: string[] };
 type ProsSessionResponse = { stylist: StylistPublic; session_expires_at: string; session_token: string };
+export type ProBackupEntry = {
+  id: string;
+  filename: string;
+  created_at: string;
+  size_bytes: number;
+  checksum?: string | null;
+  note?: string | null;
+};
+type ProsBackupsResponse = { backups: ProBackupEntry[] };
 export type ReservationCreatePayload = {
   service_id: string;
   professional_id: string;
@@ -239,13 +255,9 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     'Content-Type': 'application/json',
     ...(init?.headers as Record<string, string> ?? {}),
   };
-  try {
-    const token = useProSession.getState().session?.sessionToken;
-    if (token) {
-      headers['X-Pro-Session'] = token;
-    }
-  } catch {
-    /* noop - store not ready (SSR) */
+  const sessionToken = getSessionToken();
+  if (sessionToken) {
+    headers['X-Pro-Session'] = sessionToken;
   }
   const url = `${BASE}${path}`;
   const perf = typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -471,6 +483,90 @@ export const api = {
   prosClients: () => http<ProClientsResponse>("/pros/clients"),
 
   prosStats: () => http<ProStatsResponse>("/pros/stats"),
+
+  prosListBackups: () => http<ProsBackupsResponse>('/pros/backups'),
+
+  prosDeleteBackup: (backupId: string) =>
+    http<ActionResult>(`/pros/backups/${encodeURIComponent(backupId)}`, {
+      method: 'DELETE',
+    }),
+
+  prosRestoreBackup: (backupId: string) =>
+    http<ActionResult>(`/pros/backups/${encodeURIComponent(backupId)}/restore`, {
+      method: 'POST',
+    }),
+
+  prosDownloadBackup: async (backupId: string) => {
+    const path = `/pros/backups/${encodeURIComponent(backupId)}/download`;
+    const headers: Record<string, string> = {};
+    const token = getSessionToken();
+    if (token) {
+      headers['X-Pro-Session'] = token;
+    }
+
+    const url = `${BASE}${path}`;
+    const target = url || path;
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12_000);
+
+    try {
+      const res = await fetch(target, {
+        method: 'GET',
+        headers,
+        signal: ctrl.signal,
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        let text = '';
+        let detail: string | undefined;
+        try {
+          text = await res.text();
+          if (text) {
+            try {
+              const parsed = JSON.parse(text);
+              if (parsed && typeof parsed === 'object') {
+                detail = parsed.detail ?? parsed.message ?? undefined;
+              }
+            } catch {
+              /* texto plano */
+            }
+          }
+        } catch {
+          /* noop */
+        }
+        const rid = res.headers.get('X-Request-ID') || undefined;
+        const fallback = `HTTP ${res.status}${rid ? ` [rid=${rid}]` : ''}`;
+        const message = detail || (text ? `${fallback}: ${text.slice(0, 200)}` : fallback);
+        throw new ApiError(message, { status: res.status, detail, requestId: rid, rawBody: text || undefined });
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') ?? '';
+      let filename: string | undefined;
+
+      const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+      if (encoded?.[1]) {
+        try {
+          filename = decodeURIComponent(encoded[1]);
+        } catch {
+          filename = encoded[1];
+        }
+      } else {
+        const simple = disposition.match(/filename="?([^";]+)"?/i);
+        if (simple?.[1]) {
+          filename = simple[1];
+        }
+      }
+
+      return { blob, filename };
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
+  prosCreateBackup: () => http<ProBackupEntry>('/pros/backups', { method: 'POST' }),
 };
 
 export type { StylistPublic } from '@/types/stylist';

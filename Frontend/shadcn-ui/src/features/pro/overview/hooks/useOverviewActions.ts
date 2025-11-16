@@ -23,6 +23,18 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const reservationsQueryFilter = {
+    predicate: (query: { queryKey: unknown }) =>
+      Array.isArray(query.queryKey) &&
+      query.queryKey.length >= 2 &&
+      query.queryKey[0] === 'pros' &&
+      query.queryKey[1] === 'reservations',
+  };
+
+  const invalidateReservationsCache = () => {
+    void queryClient.invalidateQueries(reservationsQueryFilter);
+  };
+
   const createMutation = useMutation({
     mutationFn: async (payload: CreateAppointmentPayload) => {
       if (!professionalId) throw new Error('No hay profesional activo para crear la reserva.');
@@ -54,7 +66,7 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
       return { response, reservation };
     },
     onSuccess: ({ reservation }) => {
-      queryClient.setQueriesData<ProReservationsResponse>({ queryKey: ['pros', 'reservations'] }, (previous) => {
+      queryClient.setQueriesData<ProReservationsResponse>(reservationsQueryFilter, (previous) => {
         if (!previous) return previous;
         const existing = Array.isArray(previous.reservations) ? previous.reservations : [];
         const filtered = existing.filter((item) => item.id !== reservation.id);
@@ -63,7 +75,7 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
         );
         return { reservations: updated };
       });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
     },
   });
@@ -75,7 +87,7 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
     onSuccess: () => {
       // Invalidar ambas queries: overview y reservations
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
     },
   });
 
@@ -85,7 +97,7 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
     },
   });
 
@@ -95,7 +107,7 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
     },
   });
 
@@ -118,7 +130,7 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
     },
     onSuccess: ({ payload }) => {
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
 
       const label = formatRescheduleDialogDate(payload.date);
       const subject = payload.clientName ?? 'La cita';
@@ -136,7 +148,7 @@ export const useOverviewActions = ({ professionalId }: OverviewActionsOptions) =
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['pros', 'overview'] });
-      void queryClient.invalidateQueries({ queryKey: ['pros', 'reservations'] });
+      invalidateReservationsCache();
     },
   });
 
