@@ -92,12 +92,10 @@ export default function ServicesSection() {
                 <div className="rounded-lg border border-white/10 bg-black/70 p-2.5 transition-colors group-hover:border-white/70">
                   {service.icon}
                 </div>
-                <span className="inline-flex items-center rounded-full bg-brand/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand sm:text-sm">
-                  {service.price}
-                </span>
+                <span className="text-2xl font-bold text-white sm:text-3xl">{service.price}</span>
               </div>
 
-              <div className="mt-5 space-y-2">
+              <div className="mt-5 space-y-2 text-center">
                 <h3 className="text-lg font-semibold text-white">{service.title}</h3>
                 <p className="text-sm leading-relaxed text-gray-400">{service.description}</p>
               </div>
