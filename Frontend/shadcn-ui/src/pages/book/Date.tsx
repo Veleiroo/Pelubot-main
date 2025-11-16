@@ -618,7 +618,7 @@ const BookDate = () => {
             )}
 
             {!slotsLoading && (!selectedValid || displayedSlots.length === 0) && (
-              <div className="flex h-full w-full flex-col items-center justify-center text-center text-xs text-zinc-400">
+              <div className="flex min-h-[120px] w-full flex-col items-center justify-center text-center text-xs text-zinc-400">
                 {selectedValid ? 'No hay horarios disponibles en este tramo.' : 'Selecciona un día en el calendario para ver horarios disponibles.'}
               </div>
             )}
@@ -632,14 +632,14 @@ const BookDate = () => {
           </aside>
         </div>
 
-        <div className="flex w-full justify-end">
+        <div className="mt-8 w-full lg:mt-10">
           <Button
             disabled={!canContinue}
             data-ready={canContinue}
             onClick={onNext}
             aria-disabled={!canContinue}
             className={cn(
-              'inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/15 bg-transparent px-6 text-sm font-medium text-zinc-100 shadow-[0_10px_30px_-20px_rgba(255,255,255,0.25)] ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 disabled:pointer-events-none disabled:opacity-60 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+              'inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-transparent px-6 text-sm font-medium text-zinc-100 shadow-[0_10px_30px_-20px_rgba(255,255,255,0.25)] ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 disabled:pointer-events-none disabled:opacity-60 sm:w-auto [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
               canContinue
                 ? 'border-white/60 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.3)] hover:border-white/70 hover:bg-white/10 focus-visible:ring-white/80'
                 : 'hover:border-white/20 hover:bg-white/5'
